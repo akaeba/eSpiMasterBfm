@@ -41,10 +41,45 @@ end entity eSpiMasterBfm_tb;
 
 --------------------------------------------------------------------------
 architecture sim of eSpiMasterBfm_tb is
-
-
 begin
 
+    ----------------------------------------------
+    -- stimuli process
+    p_stimuli : process
+        -- tb help variables
+            variable good   : boolean	:= true;
+		-- DUT
+			variable eSpiMasterBfm : tESpiBfm;	--! eSPI Master bfm Handle
+    begin
+
+        -------------------------
+        -- Init
+        -------------------------
+            Report "Init...";
+			init(eSpiMasterBfm);	--! init eSpi Master
+        
+		
+		
+		
+		-------------------------
+
+
+
+
+        -------------------------
+        -- Report TB
+        -------------------------
+            Report "End TB...";     -- sim finished
+            if (good) then
+                Report "Test SUCCESSFULL";
+            else
+                Report "Test FAILED" severity error;
+            end if;
+            wait;                   -- stop process continuous run
+        -------------------------
+
+    end process p_stimuli;
+    ----------------------------------------------
 
 
 

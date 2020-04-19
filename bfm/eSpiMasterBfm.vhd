@@ -75,13 +75,19 @@ package eSpiMasterBfm is
 			);
 		
 		-- Configures the BFM
-		type tSpiCfg is record
+		type tESpiBfm is record
 			TSpiClk         : time;    		--! period of spi clk
 			spiMode			: tSpiXcvMode;	--! SPI transceiver mode
-			SigSkew         : time;    		-- defines Signal Skew to prevent timing errors in back-anno
-			SigSkewEn       : boolean; 		-- enable SigSkewEn
-		end record tSpiCfg;
- 	
+			sigSkew         : time;    		--! defines Signal Skew to prevent timing errors in back-anno
+		end record tESpiBfm;
+	-----------------------------
+	
+	
+    -----------------------------
+    -- Procedures
+		-- init
+        procedure init	(variable this : inout tESpiBfm);		--! initializes bus functional model 
+	
 	
 	-----------------------------
 
@@ -93,9 +99,33 @@ end package eSpiMasterBfm;
 
 
 --------------------------------------------------------------------------
+-- eSpiMasterBfmPKG: eSPI Master Bus functional model package
 package body eSpiMasterBfm is
 
-
+    ----------------------------------------------
+    -- Functions
+    ----------------------------------------------
+	
+	----------------------------------------------
+	
+	
+    ----------------------------------------------
+    -- "init"
+    ----------------------------------------------
+        --***************************
+        -- init
+        procedure init (variable this : inout tESpiBfm) is
+        begin   
+            this.TSpiClk	:= 50 ns;	--! default clock is 20MHz
+			this.spiMode	:= QUAD;	--! for lines for data transfer used
+			this.sigSkew	:= 0 ns;	--! no skew between clock edge and data defined
+			
+			
+			
+			
+        end procedure init;
+        --***************************
+	
 
 
 
