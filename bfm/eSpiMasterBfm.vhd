@@ -3,11 +3,11 @@
 -- @copyright:	Copyright 2020
 -- @credits: 	AKAE
 --
--- @license:  	GPLv3
+-- @license:  	BSDv3
 -- @maintainer:	Andreas Kaeberlein
 -- @email:		andreas.kaeberlein@web.de
 --
--- @file:       eSpiMasterBfmPKG.vhd
+-- @file:       eSpiMasterBfm.vhd
 -- @note:       VHDL'93
 -- @date:   	2020-01-04
 --
@@ -31,7 +31,7 @@ library std;
 
 --------------------------------------------------------------------------
 -- eSpiMasterBfmPKG: eSPI Master Bus functional model package
-package eSpiMasterBfmPKG is
+package eSpiMasterBfm is
 
     -----------------------------
     -- Constant  
@@ -47,10 +47,10 @@ package eSpiMasterBfmPKG is
 			constant CMD_PUT_NP				: std_logic_vector(7 downto 0) := "00000010";	--! Put a non-posted header and optional data.
 			constant CMD_GET_PC				: std_logic_vector(7 downto 0) := "00000001";	--! Get a posted or completion header and optional data.
 			constant CMD_GET_NP				: std_logic_vector(7 downto 0) := "00000011";	--! Get a non-posted header and optional data.
-			constant CMD_PUT_IORD_SHORT		: std_logic_vector(7 downto 3) := "010000";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Read packet.
-			constant CMD_PUT_IOWR_SHORT 	: std_logic_vector(7 downto 3) := "010001";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Write packet.
-			constant CMD_PUT_MEMRD32_SHORT	: std_logic_vector(7 downto 3) := "010010";		--! Put a short (1, 2 or 4 bytes) non-posted Memory Read 32 packet.
-			constant CMD_PUT_MEMWR32_SHORT	: std_logic_vector(7 downto 3) := "010011";		--! Put a short (1, 2 or 4 bytes) posted Memory Write 32 packet.
+			constant CMD_PUT_IORD_SHORT		: std_logic_vector(7 downto 2) := "010000";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Read packet.
+			constant CMD_PUT_IOWR_SHORT 	: std_logic_vector(7 downto 2) := "010001";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Write packet.
+			constant CMD_PUT_MEMRD32_SHORT	: std_logic_vector(7 downto 2) := "010010";		--! Put a short (1, 2 or 4 bytes) non-posted Memory Read 32 packet.
+			constant CMD_PUT_MEMWR32_SHORT	: std_logic_vector(7 downto 2) := "010011";		--! Put a short (1, 2 or 4 bytes) posted Memory Write 32 packet.
 			constant CMD_PUT_VWIRE			: std_logic_vector(7 downto 0) := "00000100";	--! Put a Tunneled virtual wire packet.
 			constant CMD_GET_VWIRE			: std_logic_vector(7 downto 0) := "00000101";	--! Get a Tunneled virtual wire packet.
 			constant CMD_PUT_OOB			: std_logic_vector(7 downto 0) := "00000110";	--! Put an OOB (Tunneled SMBus) message.
@@ -61,33 +61,44 @@ package eSpiMasterBfmPKG is
 			constant CMD_SET_CONFIGURATION	: std_logic_vector(7 downto 0) := "00100010";	--! Command to set the capabilities of the slave as part of the initialization. This is typically done after the master discovers the capabilities of the slave.
 			constant CMD_GET_CONFIGURATION	: std_logic_vector(7 downto 0) := "00100001";	--! Command to discover the capabilities of the slave as part of the initialization.
 			constant CMD_RESET				: std_logic_vector(7 downto 0) := "11111111";	--! In-band RESET command.
-			
-			
-			
-			
-			
-			
     -----------------------------
 	
 	
+    -----------------------------
+    -- Data typs
+        -- SPI transceiver mode
+		type tSpiXcvMode is 
+			(
+				SINGLE,		--! standard SPI mode, MISO, MOSI
+				DUAL,		--! two bidirectional data lines
+				QUAD		--! four bidirectional data lines used
+			);
+		
+		-- Configures the BFM
+		type tSpiCfg is record
+			TSpiClk         : time;    		--! period of spi clk
+			spiMode			: tSpiXcvMode;	--! SPI transceiver mode
+			SigSkew         : time;    		-- defines Signal Skew to prevent timing errors in back-anno
+			SigSkewEn       : boolean; 		-- enable SigSkewEn
+		end record tSpiCfg;
+ 	
 	
-	
+	-----------------------------
 
 
 
-
-end package eSpiMasterBfmPKG;
+end package eSpiMasterBfm;
 --------------------------------------------------------------------------
 
 
 
 --------------------------------------------------------------------------
-package body eSpiMasterBfmPKG is
+package body eSpiMasterBfm is
 
 
 
 
 
 
-end package body eSpiMasterBfmPKG;
+end package body eSpiMasterBfm;
 --------------------------------------------------------------------------
