@@ -41,6 +41,15 @@ end entity eSpiMasterBfm_tb;
 
 --------------------------------------------------------------------------
 architecture sim of eSpiMasterBfm_tb is
+
+    -----------------------------
+    -- Constant
+        -- Test
+        constant loopIter	: integer := 20;    --! number of test loop iteration
+        constant doTest0	: boolean := true;  --! test0: 
+
+    -----------------------------
+
 begin
 
     ----------------------------------------------
@@ -49,7 +58,9 @@ begin
         -- tb help variables
             variable good   : boolean	:= true;
 		-- DUT
-			variable eSpiMasterBfm : tESpiBfm;	--! eSPI Master bfm Handle
+			variable eSpiMasterBfm	: tESpiBfm;						--! eSPI Master bfm Handle
+			variable eSpiMsg		: tESpiMsg(0 to 9);				--! eSPI Message
+			variable slv8			: std_logic_vector(7 downto 0);	--! help
     begin
 
         -------------------------
@@ -63,6 +74,36 @@ begin
 		
 		-------------------------
 
+		
+        -------------------------
+        -- Test0: Check CRC8 Function
+		-- SRC: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
+        -------------------------
+		if ( doTest0 or DO_ALL_TEST ) then
+			Report "Test0: Check CRC8 Function";
+			eSpiMsg(0) := x"31"; 
+			eSpiMsg(1) := x"32"; 
+			eSpiMsg(2) := x"33"; 
+			eSpiMsg(3) := x"34"; 
+			eSpiMsg(4) := x"35"; 
+			eSpiMsg(5) := x"36"; 
+			eSpiMsg(6) := x"37"; 
+			eSpiMsg(7) := x"38"; 
+			eSpiMsg(8) := x"39";
+			slv8 := crc8(eSpiMsg(0 to 8));	--! calc crc
+            assert ( slv8 = x"F4" ) report "  Error: CRC calculation failed, expected 0xF4" severity warning;
+            if not ( slv8 = x"F4" ) then good := false; end if;
+			wait for 10 ns;
+			eSpiMsg(0) := x"47"; 
+			eSpiMsg(1) := x"12"; 
+			eSpiMsg(2) := x"08"; 
+			eSpiMsg(3) := x"15";
+			slv8 := crc8(eSpiMsg(0 to 3));	--! calc crc
+            assert ( slv8 = x"4E" ) report "  Error: CRC calculation failed, expected 0x4E" severity warning;
+            if not ( slv8 = x"4E" ) then good := false; end if;
+			wait for 10 ns;
+		end if;
+		-------------------------
 
 
 

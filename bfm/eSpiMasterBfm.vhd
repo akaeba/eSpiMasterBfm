@@ -66,7 +66,10 @@ package eSpiMasterBfm is
 	
     -----------------------------
     -- Data typs
-        -- SPI transceiver mode
+        -- memory organization
+		type tESpiMsg is array (natural range <>) of std_logic_vector (7 downto 0);	--! Espi data packet
+		
+		-- SPI transceiver mode
 		type tSpiXcvMode is 
 			(
 				SINGLE,		--! standard SPI mode, MISO, MOSI
@@ -84,14 +87,19 @@ package eSpiMasterBfm is
 	
 	
     -----------------------------
+    -- Functions
+		-- calculate crc
+		function crc8 ( msg : in tESpiMsg ) return std_logic_vector;
+	-----------------------------
+	
+	
+    -----------------------------
     -- Procedures
 		-- init
         procedure init	(variable this : inout tESpiBfm);		--! initializes bus functional model 
 	
 	
 	-----------------------------
-
-
 
 end package eSpiMasterBfm;
 --------------------------------------------------------------------------
@@ -106,6 +114,33 @@ package body eSpiMasterBfm is
     -- Functions
     ----------------------------------------------
 	
+        --***************************
+        -- calc crc    
+        function crc8 ( msg : in tESpiMsg ) return std_logic_vector is
+			constant polynom	: std_logic_vector(7 downto 0) := x"07";
+			variable remainder 	: std_logic_vector(7 downto 0); 
+		begin
+			-- init
+			remainder := (others => '0');
+			-- calc crc
+			-- SRC: https://barrgroup.com/embedded-systems/how-to/crc-calculation-c-code
+			-- iterate over byte messages
+			for i in msg'low to msg'high loop
+				remainder := remainder xor msg(i);	--! add new messeage
+				-- iterate over bit in byte of message
+				for j in msg(i)'high downto msg(i)'low loop
+					if ( '1' = remainder(remainder'left) ) then	--! Topbit is one
+						remainder := std_logic_vector(unsigned(remainder) sll 1) xor polynom;
+					else
+						remainder := std_logic_vector(unsigned(remainder) sll 1);
+					end if;
+				end loop;
+			end loop;
+			-- release
+            return remainder;
+        end function;
+        --***************************
+	
 	----------------------------------------------
 	
 	
@@ -114,7 +149,7 @@ package body eSpiMasterBfm is
     ----------------------------------------------
         --***************************
         -- init
-        procedure init (variable this : inout tESpiBfm) is
+        procedure init ( variable this : inout tESpiBfm ) is
         begin   
             this.TSpiClk	:= 50 ns;	--! default clock is 20MHz
 			this.spiMode	:= QUAD;	--! for lines for data transfer used
@@ -125,8 +160,40 @@ package body eSpiMasterBfm is
 			
         end procedure init;
         --***************************
+	----------------------------------------------
 	
 
+    ----------------------------------------------
+    -- IO Read / Write operation
+    ----------------------------------------------
+	
+        --***************************
+        -- IOWR_SHORT
+		procedure IOWR_SHORT 
+			( 
+				variable this : inout tESpiBfm; 
+				signal CSn : inout std_logic; 
+				signal SCK : inout std_logic; 
+				signal DIO : inout std_logic_vector(3 downto 0);
+				constant adr : in std_logic_vector(15 downto 0);
+				constant data : in std_logic_vector(7 downto 0)
+			) is
+			variable eSpiPacket : tESpiMsg(0 to 4);	--! eSpi Tx Packet has 5 Bytes for 1Byte data
+		begin
+			-- build packet
+			eSpiPacket 		:= (others => (others => '0'));	--! init
+			eSpiPacket(0)	:= CMD_PUT_IOWR_SHORT & "01";	--! CMD: short write with one byte
+			eSpiPacket(1)	:= adr(15 downto 8);
+			eSpiPacket(2)	:= adr(7 downto 0);
+			eSpiPacket(3)	:= data;
+			
+			
+		
+		
+		end procedure IOWR_SHORT;
+		--***************************
+	
+	----------------------------------------------
 
 
 
