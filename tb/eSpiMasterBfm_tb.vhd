@@ -9,7 +9,7 @@
 --
 -- @file:       eSpiMasterBfm_tb.vhd
 -- @note:       VHDL'93
--- @date:   	2020-01-04
+-- @date:   	2020-04-01
 --
 -- @see:		
 -- @brief:      tests eSpiMasterBfm package functionality
@@ -47,8 +47,19 @@ architecture sim of eSpiMasterBfm_tb is
         -- Test
         constant loopIter	: integer := 20;    --! number of test loop iteration
         constant doTest0	: boolean := true;  --! test0: 
-
+		constant doTest1	: boolean := true;  --! test1: 
     -----------------------------
+	
+	
+    -----------------------------
+    -- Signals
+        -- DUT
+		signal CSn	: std_logic; 
+		signal SCK 	: std_logic; 
+		signal DIO 	: std_logic_vector(3 downto 0);
+	-----------------------------
+	
+	
 
 begin
 
@@ -67,7 +78,7 @@ begin
         -- Init
         -------------------------
             Report "Init...";
-			init(eSpiMasterBfm);	--! init eSpi Master
+			init(eSpiMasterBfm, CSn, SCK, DIO);		--! init eSpi Master
         
 		
 		
@@ -93,7 +104,7 @@ begin
 			slv8 := crc8(eSpiMsg(0 to 8));	--! calc crc
             assert ( slv8 = x"F4" ) report "  Error: CRC calculation failed, expected 0xF4" severity warning;
             if not ( slv8 = x"F4" ) then good := false; end if;
-			wait for 10 ns;
+			wait for eSpiMasterBfm.TSpiClk/2;
 			eSpiMsg(0) := x"47"; 
 			eSpiMsg(1) := x"12"; 
 			eSpiMsg(2) := x"08"; 
@@ -101,9 +112,34 @@ begin
 			slv8 := crc8(eSpiMsg(0 to 3));	--! calc crc
             assert ( slv8 = x"4E" ) report "  Error: CRC calculation failed, expected 0x4E" severity warning;
             if not ( slv8 = x"4E" ) then good := false; end if;
-			wait for 10 ns;
+			wait for eSpiMasterBfm.TSpiClk/2;
+			wait for 1 us;
 		end if;
 		-------------------------
+		
+		
+        -------------------------
+        -- Test1: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT
+		-- SRC: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
+        -------------------------
+		if ( doTest1 or DO_ALL_TEST ) then
+			Report "Test1: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT";
+				-- procedure IOWR_SHORT ( this, CSn, SCK, DIO, adr, data );
+			IOWR_SHORT( eSpiMasterBfm, CSn, SCK, DIO, x"0815", x"47" );
+			
+			
+			
+
+
+
+			
+			
+			
+		end if;
+		-------------------------
+		
+		
+		
 
 
 
