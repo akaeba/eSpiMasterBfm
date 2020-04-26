@@ -57,6 +57,11 @@ architecture sim of eSpiMasterBfm_tb is
 		signal CSn	: std_logic; 
 		signal SCK 	: std_logic; 
 		signal DIO 	: std_logic_vector(3 downto 0);
+		-- Test IOWR_SHORT
+		signal IOWR_SHORT_B0		: std_logic_vector(73 downto 0);
+		signal IOWR_SHORT_B0_SFR	: std_logic_vector(IOWR_SHORT_B0'range);
+		signal ioWrB0Load			: std_logic;
+		
 	-----------------------------
 	
 	
@@ -78,11 +83,11 @@ begin
         -- Init
         -------------------------
             Report "Init...";
-			init(eSpiMasterBfm, CSn, SCK, DIO);		--! init eSpi Master
+			init(eSpiMasterBfm, CSn, SCK, DIO);	--! init eSpi Master
+			eSpiMasterBfm.verbose := 2;			--! enable errors + warning messages
+			ioWrB0Load		<= '0';
+			IOWR_SHORT_B0	<= (others => '0');
         
-		
-		
-		
 		-------------------------
 
 		
@@ -124,11 +129,25 @@ begin
         -------------------------
 		if ( doTest1 or DO_ALL_TEST ) then
 			Report "Test1: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT";
+				-- prepare Shift reg
+			IOWR_SHORT_B0	<= (others => 'Z');
+			ioWrB0Load		<= '0';
+			wait for eSpiMasterBfm.TSpiClk/2;
+			ioWrB0Load		<= '1';
+			wait for eSpiMasterBfm.TSpiClk/2;
+			ioWrB0Load		<= '0';
 				-- procedure IOWR_SHORT ( this, CSn, SCK, DIO, adr, data );
 			IOWR_SHORT( eSpiMasterBfm, CSn, SCK, DIO, x"0815", x"47" );
-			
-			
-			
+				-- check command
+			if ( CMD_PUT_IOWR_SHORT & "01" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left downto IOWR_SHORT_B0_SFR'left-7) ) then
+				Report "  Failed Command CMD_PUT_IOWR_SHORT" severity error;
+				good := false;
+			end if;
+				-- check address
+			if ( x"0815" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left-8 downto IOWR_SHORT_B0_SFR'left-23) ) then
+				Report "  Failed IOWR_SHORT address" severity error;
+				good := false;
+			end if;
 
 
 
@@ -157,8 +176,25 @@ begin
 
     end process p_stimuli;
     ----------------------------------------------
-
-
+	
+	
+    ----------------------------------------------
+    -- IOWR_SHORT: Shift Register
+    p_IOWR_SHORT_byte_0 : process (SCK, CSn, ioWrB0Load)
+        variable clk : std_logic := '0';
+    begin
+        -- parallel load
+		if ( rising_edge(ioWrB0Load) ) then
+			IOWR_SHORT_B0_SFR	<= IOWR_SHORT_B0;
+		else
+			if ( rising_edge(SCK) and CSn = '0' ) then
+				IOWR_SHORT_B0_SFR	<= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left-1 downto IOWR_SHORT_B0_SFR'right) & DIO(0);
+				DIO(1)				<= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left);
+			end if;
+		end if;
+    end process p_IOWR_SHORT_byte_0;
+    ----------------------------------------------
+	
 
 end architecture sim;
 --------------------------------------------------------------------------

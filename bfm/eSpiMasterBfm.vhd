@@ -34,13 +34,10 @@ library std;
 package eSpiMasterBfm is
 
     -----------------------------
-    -- Constant  
-        -- parametrizes the address mapped data organization
-            constant C_DWIDTH   : integer := 8;         --! data width
-            constant C_SIZE     : integer := 2**16;     --! memory length
-        
+    -- Constant         
         -- Package internal Informations
-            constant DEBUGMODE  : boolean := FALSE;
+			-- needed by to_hstring
+            constant NUS	: STRING := " ";
 			
 		-- Command Opcode Encodings (Table 3)
 			constant CMD_PUT_PC				: std_logic_vector(7 downto 0) := "00000000";	--! Put a posted or completion header and optional data.
@@ -113,14 +110,27 @@ package eSpiMasterBfm is
 			);
 
 		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
+			-- w/ status
 			procedure IOWR_SHORT (
 				variable this	: inout tESpiBfm; 
 				signal CSn		: out std_logic; 
 				signal SCK		: out std_logic; 
 				signal DIO		: inout std_logic_vector(3 downto 0);
-				constant adr	: in std_logic_vector(15 downto 0);
-				constant data	: in std_logic_vector(7 downto 0)
+				constant adr	: in std_logic_vector(15 downto 0);		--! write address
+				constant data	: in std_logic_vector(7 downto 0);		--! write data
+				variable sts	: out std_logic_vector(15 downto 0)		--! status of write
 			);
+			-- w/o status
+			procedure IOWR_SHORT ( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);		--! write address
+				constant data	: in std_logic_vector(7 downto 0)		--! write data
+			);
+			
+			
 		
 	-----------------------------
 
@@ -163,6 +173,62 @@ package body eSpiMasterBfm is
             return remainder;
         end function;
         --***************************
+		
+        --***************************   
+        -- TO_HSTRING (STD_ULOGIC_VECTOR)
+        -- SRC: http://www.eda-stds.org/vhdl-200x/vhdl-200x-ft/packages_old/std_logic_1164_additions.vhdl
+            function to_hstring (value : STD_ULOGIC_VECTOR) return STRING is
+                constant ne     : INTEGER := (value'length+3)/4;
+                variable pad    : STD_ULOGIC_VECTOR(0 to (ne*4 - value'length) - 1);
+                variable ivalue : STD_ULOGIC_VECTOR(0 to ne*4 - 1);
+                variable result : STRING(1 to ne);
+                variable quad   : STD_ULOGIC_VECTOR(0 to 3);
+            begin
+                if value'length < 1 then
+                    return NUS;
+                else
+                    if value (value'left) = 'Z' then
+                        pad := (others => 'Z');
+                    else
+                        pad := (others => '0');
+                    end if;
+                    ivalue := pad & value;
+                    for i in 0 to ne-1 loop
+                        quad := To_X01Z(ivalue(4*i to 4*i+3));
+                        case quad is
+                            when x"0"   => result(i+1) := '0';
+                            when x"1"   => result(i+1) := '1';
+                            when x"2"   => result(i+1) := '2';
+                            when x"3"   => result(i+1) := '3';
+                            when x"4"   => result(i+1) := '4';
+                            when x"5"   => result(i+1) := '5';
+                            when x"6"   => result(i+1) := '6';
+                            when x"7"   => result(i+1) := '7';
+                            when x"8"   => result(i+1) := '8';
+                            when x"9"   => result(i+1) := '9';
+                            when x"A"   => result(i+1) := 'A';
+                            when x"B"   => result(i+1) := 'B';
+                            when x"C"   => result(i+1) := 'C';
+                            when x"D"   => result(i+1) := 'D';
+                            when x"E"   => result(i+1) := 'E';
+                            when x"F"   => result(i+1) := 'F';
+                            when "ZZZZ" => result(i+1) := 'Z';
+                            when others => result(i+1) := 'X';
+                        end case;
+                      end loop;
+                    return result;
+                end if;
+            end function to_hstring;
+        --***************************
+		
+        --***************************
+        -- TO_HSTRING (STD_LOGIC_VECTOR)
+        function to_hstring (value : STD_LOGIC_VECTOR) return STRING is
+        begin
+            return to_hstring(STD_ULOGIC_VECTOR(value));
+        end function to_hstring;
+        --***************************
+		
 	
 	----------------------------------------------
 	
@@ -345,10 +411,13 @@ package body eSpiMasterBfm is
 				signal SCK		: out std_logic; 
 				signal DIO		: inout std_logic_vector(3 downto 0);
 				constant adr	: in std_logic_vector(15 downto 0);
-				constant data	: in std_logic_vector(7 downto 0)
+				constant data	: in std_logic_vector(7 downto 0);
+				variable sts	: out std_logic_vector(15 downto 0)
 			) is
-			variable eSpiMsg : tESpiMsg(0 to 4);		--! eSpi Tx Packet has 5 Bytes for 1Byte data
+			variable eSpiMsg : tESpiMsg(0 to 4);	--! eSpi Tx Packet has 5 Bytes for 1Byte data
 		begin
+			-- status
+			sts := (others => '0');		--! no ero
 			-- build & send Command
 			eSpiMsg 	:= (others => (others => '0'));	--! clear
 			eSpiMsg(0)	:= CMD_PUT_IOWR_SHORT & "01";	--! CMD: short write with one byte
@@ -367,6 +436,12 @@ package body eSpiMasterBfm is
 			-- Byte 3:		CRC
 			eSpiMsg := (others => (others => '0'));	--! clear
 			spiRx(this, eSpiMsg(0 to 3), SCK, DIO);	--! read from slave
+			-- check CRC
+			if ( eSpiMsg(3) /= crc8(eSpiMsg(0 to 2)) ) then
+				if ( this.verbose > 0 ) then
+					Report "eSpiMasterBfm:IOWR_SHORT:CRC rcv=0x" & to_hstring(eSpiMsg(3)) & "; calc=0x" & to_hstring(crc8(eSpiMsg(0 to 2))) & ";" severity error;
+				end if;
+			end if;
 			
 			
 			
@@ -377,6 +452,28 @@ package body eSpiMasterBfm is
 			wait for this.TSpiClk;		--! limits CSn bandwidth to SCK
 		end procedure IOWR_SHORT;
 		--***************************
+		
+        --***************************
+        -- IOWR_SHORT w/o status
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
+		procedure IOWR_SHORT 
+			( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);
+				constant data	: in std_logic_vector(7 downto 0)
+			) is
+			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
+		begin
+			IOWR_SHORT( this, CSn, SCK, DIO, adr, data, sts );
+		end procedure IOWR_SHORT;
+		--***************************
+		
+		
+		
+		
 	
 	----------------------------------------------
 
