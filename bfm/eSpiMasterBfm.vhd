@@ -86,9 +86,10 @@ package eSpiMasterBfm is
 		
 		-- Configures the BFM
 		type tESpiBfm is record
-			TSpiClk         : time;    		--! period of spi clk
-			spiMode			: tSpiXcvMode;	--! SPI transceiver mode
-			sigSkew         : time;    		--! defines Signal Skew to prevent timing errors in back-anno
+			TSpiClk		: time;    		--! period of spi clk
+			spiMode		: tSpiXcvMode;	--! SPI transceiver mode
+			sigSkew		: time;    		--! defines Signal Skew to prevent timing errors in back-anno
+			verbose		: natural;		--! message level; 0: no message, 1: errors, 2: error + warnings
 		end record tESpiBfm;
 	-----------------------------
 	
@@ -183,6 +184,7 @@ package body eSpiMasterBfm is
 			this.TSpiClk	:= 50 ns;	--! default clock is 20MHz
 			this.spiMode	:= SINGLE;	--! Default mode, out of reset
 			this.sigSkew	:= 0 ns;	--! no skew between clock edge and data defined
+			this.verbose	:= 0;		--! all messages disabled
 			-- signals
 			CSn	<= '1';
 			SCK	<= '0';
@@ -196,7 +198,7 @@ package body eSpiMasterBfm is
     -- SPI 
     ----------------------------------------------
         --***************************
-        -- SPI Transceiver Procedure
+        -- SPI Transmit
 		--   Single Mode
 		--     * eSPI master drives the I/O[0] during command phase
 		--	   * response from slave is driven on the I/O[1]
@@ -214,7 +216,7 @@ package body eSpiMasterBfm is
 				-- iterate over bits in a single message byte
 				for j in msg(i)'high downto msg(i)'low loop
 					-- dispatch mode
-					if ( DUAL = this.spiMode ) then		-- add first data value
+					if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 2 ) then		
 							SCK 			<= '0';		--! falling edge
 							DIO(1 downto 0)	<= msg(i)(j downto j-1);
@@ -222,7 +224,7 @@ package body eSpiMasterBfm is
 							SCK 			<= '1';		--! rising edge
 							wait for this.TSpiClk/2;	--! half clock cycle
 						end if;
-					elsif ( QUAD = this.spiMode ) then
+					elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 4 ) then		
 							SCK 			<= '0';		--! falling edge
 							DIO(3 downto 0)	<= msg(i)(j downto j-3);
@@ -230,7 +232,7 @@ package body eSpiMasterBfm is
 							SCK 			<= '1';		--! rising edge
 							wait for this.TSpiClk/2;	--! half clock cycle
 						end if;
-					else
+					else							--! one bits per clock cycle are transfered
 						SCK 	<= '0';				--! falling edge
 						DIO(0)	<= msg(i)(j);		--! assign data
 						wait for this.TSpiClk/2;	--! half clock cycle
@@ -239,9 +241,91 @@ package body eSpiMasterBfm is
 					end if;
 				end loop;
 			end loop;
-			SCK <= '0';				--! rising edge
-			DIO <= (others => 'Z');	--! tristate
 		end procedure spiTx;
+		--***************************
+		
+        --***************************
+        -- SPI Turn-around (TAR)
+		--   @see: Figure 14: Turn-Around Time (TAR = 2 clock)
+		procedure spiTar
+			(
+				variable this	: inout tESpiBfm; 
+				signal SCK 		: out std_logic; 						--! shift clock
+				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data
+			) is
+		begin
+			-- one clock cycle drive high
+			SCK 	<= '0';						--! falling edge
+			if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
+				DIO	<= (others => '1');
+			elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
+				DIO(1 downto 0)	<= (others => '1');
+			else								--! one bits per clock cycle are transfered
+				DIO(0)	<= '1';
+			end if;
+			wait for this.TSpiClk/2;	--! half clock cycle
+			SCK 	<= '1';				--! rising edge
+			wait for this.TSpiClk/2;	--! half clock cycle
+			-- one clock cycle tristate
+			SCK 	<= '0';						--! falling edge
+			if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
+				DIO	<= (others => 'Z');
+			elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
+				DIO(1 downto 0)	<= (others => 'Z');
+			else								--! one bits per clock cycle are transfered
+				DIO(0)	<= 'Z';
+			end if;
+			wait for this.TSpiClk/2;	--! half clock cycle
+			SCK 	<= '1';				--! rising edge
+			wait for this.TSpiClk/2;	--! half clock cycle
+		end procedure spiTar;
+		--***************************
+		
+        --***************************
+        -- SPI Receive
+		--   Single Mode
+		--     * eSPI master drives the I/O[0] during command phase
+		--	   * response from slave is driven on the I/O[1]
+		--   @see: Figure 54: Single I/O Mode
+		procedure spiRx
+			(
+				variable this	: inout tESpiBfm; 
+				variable msg	: inout tESpiMsg;
+				signal SCK 		: out std_logic; 						--! shift clock
+				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data
+			) is
+		begin
+			-- iterate over message bytes
+			for i in msg'low to msg'high loop
+				-- iterate over bits in a single message byte
+				for j in msg(i)'high downto msg(i)'low loop
+					-- dispatch mode
+					if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
+						if ( 0 = (j+1) mod 2 ) then		
+							SCK 					<= '0';				--! falling edge
+							wait for this.TSpiClk/2;					--! half clock cycle
+							SCK 					<= '1';				--! rising edge
+							msg(i)(j downto j-1)	:= DIO(1 downto 0);	--! capture data from line
+							wait for this.TSpiClk/2;					--! half clock cycle
+						end if;
+					elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
+						if ( 0 = (j+1) mod 4 ) then		
+							SCK 					<= '0';				--! falling edge
+							wait for this.TSpiClk/2;					--! half clock cycle
+							SCK 					<= '1';				--! rising edge
+							msg(i)(j downto j-3)	:= DIO(3 downto 0);	--! capture data from line
+							wait for this.TSpiClk/2;					--! half clock cycle
+						end if;
+					else							--! one bits per clock cycle are transfered
+						SCK 		<= '0';			--! falling edge
+						wait for this.TSpiClk/2;	--! half clock cycle
+						SCK 		<= '1';			--! rising edge
+						msg(i)(j)	:= DIO(1);		--! capture data from line
+						wait for this.TSpiClk/2;	--! half clock cycle
+					end if;
+				end loop;
+			end loop;
+		end procedure spiRx;
 		--***************************
 		
 	----------------------------------------------
@@ -253,6 +337,7 @@ package body eSpiMasterBfm is
 	
         --***************************
         -- IOWR_SHORT
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
 		procedure IOWR_SHORT 
 			( 
 				variable this	: inout tESpiBfm; 
@@ -265,7 +350,7 @@ package body eSpiMasterBfm is
 			variable eSpiMsg : tESpiMsg(0 to 4);		--! eSpi Tx Packet has 5 Bytes for 1Byte data
 		begin
 			-- build & send Command
-			eSpiMsg 	:= (others => (others => '0'));	--! init
+			eSpiMsg 	:= (others => (others => '0'));	--! clear
 			eSpiMsg(0)	:= CMD_PUT_IOWR_SHORT & "01";	--! CMD: short write with one byte
 			eSpiMsg(1)	:= adr(15 downto 8);
 			eSpiMsg(2)	:= adr(7 downto 0);
@@ -273,17 +358,23 @@ package body eSpiMasterBfm is
 			eSpiMsg(4)	:= crc8(eSpiMsg(0 to 3));		--! add message checksum
 			-- send command
 			CSn	<= '0';
-			spiTx(this, eSpiMsg, SCK, DIO);		--! bring it to the line
+			spiTx(this, eSpiMsg, SCK, DIO);	--! write to slave
 			-- tar cycle
+			spiTar(this, SCK, DIO);	--! change direction (write-to-read)
+			-- read response
+			-- Byte 0: 		Response
+			-- Byte 1/2:	Status (STS)
+			-- Byte 3:		CRC
+			eSpiMsg := (others => (others => '0'));	--! clear
+			spiRx(this, eSpiMsg(0 to 3), SCK, DIO);	--! read from slave
 			
-			-- get response response
 			
+			
+			-- Terminate connection to slave
+			SCK	<= '0';
+			wait for this.TSpiClk/2;	--! half clock cycle
 			CSn	<= '1';
-			
-			
-			
-		
-		
+			wait for this.TSpiClk;		--! limits CSn bandwidth to SCK
 		end procedure IOWR_SHORT;
 		--***************************
 	
