@@ -38,26 +38,6 @@ package eSpiMasterBfm is
         -- Package internal Informations
 			-- needed by to_hstring
             constant NUS	: STRING := " ";
-			
-		-- Command Opcode Encodings (Table 3)
-			constant CMD_PUT_PC				: std_logic_vector(7 downto 0) := "00000000";	--! Put a posted or completion header and optional data.
-			constant CMD_PUT_NP				: std_logic_vector(7 downto 0) := "00000010";	--! Put a non-posted header and optional data.
-			constant CMD_GET_PC				: std_logic_vector(7 downto 0) := "00000001";	--! Get a posted or completion header and optional data.
-			constant CMD_GET_NP				: std_logic_vector(7 downto 0) := "00000011";	--! Get a non-posted header and optional data.
-			constant CMD_PUT_IORD_SHORT		: std_logic_vector(7 downto 2) := "010000";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Read packet.
-			constant CMD_PUT_IOWR_SHORT 	: std_logic_vector(7 downto 2) := "010001";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Write packet.
-			constant CMD_PUT_MEMRD32_SHORT	: std_logic_vector(7 downto 2) := "010010";		--! Put a short (1, 2 or 4 bytes) non-posted Memory Read 32 packet.
-			constant CMD_PUT_MEMWR32_SHORT	: std_logic_vector(7 downto 2) := "010011";		--! Put a short (1, 2 or 4 bytes) posted Memory Write 32 packet.
-			constant CMD_PUT_VWIRE			: std_logic_vector(7 downto 0) := "00000100";	--! Put a Tunneled virtual wire packet.
-			constant CMD_GET_VWIRE			: std_logic_vector(7 downto 0) := "00000101";	--! Get a Tunneled virtual wire packet.
-			constant CMD_PUT_OOB			: std_logic_vector(7 downto 0) := "00000110";	--! Put an OOB (Tunneled SMBus) message.
-			constant CMD_GET_OOB			: std_logic_vector(7 downto 0) := "00000111";	--! Get an OOB (Tunneled SMBus) message.
-			constant CMD_PUT_FLASH_C		: std_logic_vector(7 downto 0) := "00001000";	--! Put a Flash Access completion.
-			constant CMD_GET_FLASH_NP		: std_logic_vector(7 downto 0) := "00001001";	--! Get a non-posted Flash Access request.
-			constant CMD_GET_STATUS			: std_logic_vector(7 downto 0) := "00100101";	--! Command initiated by the master to read the status register of the slave.
-			constant CMD_SET_CONFIGURATION	: std_logic_vector(7 downto 0) := "00100010";	--! Command to set the capabilities of the slave as part of the initialization. This is typically done after the master discovers the capabilities of the slave.
-			constant CMD_GET_CONFIGURATION	: std_logic_vector(7 downto 0) := "00100001";	--! Command to discover the capabilities of the slave as part of the initialization.
-			constant CMD_RESET				: std_logic_vector(7 downto 0) := "11111111";	--! In-band RESET command.
     -----------------------------
 	
 	
@@ -108,7 +88,30 @@ package eSpiMasterBfm is
 				signal SCK 		: out std_logic; 						--! shift clock
 				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data	
 			);
-
+			
+		-- GET_CONFIGURATION:
+			-- w/ status
+			procedure GET_CONFIGURATION 
+				( 
+					variable this	: inout tESpiBfm; 
+					signal CSn		: out std_logic; 
+					signal SCK		: out std_logic; 
+					signal DIO		: inout std_logic_vector(3 downto 0);
+					constant adr	: in std_logic_vector(15 downto 0);		--! config address
+					variable cfg	: out std_logic_vector(31 downto 0);	--! config data
+					variable sts	: out std_logic_vector(15 downto 0)		--! status
+				);
+			-- w/o status
+			procedure GET_CONFIGURATION 
+				( 
+					variable this	: inout tESpiBfm; 
+					signal CSn		: out std_logic; 
+					signal SCK		: out std_logic; 
+					signal DIO		: inout std_logic_vector(3 downto 0);
+					constant adr	: in std_logic_vector(15 downto 0);		--! config address
+					variable cfg	: out std_logic_vector(31 downto 0)		--! config data
+				);
+			
 		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
 			-- w/ status
 			procedure IOWR_SHORT (
@@ -142,6 +145,47 @@ end package eSpiMasterBfm;
 --------------------------------------------------------------------------
 -- eSpiMasterBfmPKG: eSPI Master Bus functional model package
 package body eSpiMasterBfm is
+
+    ----------------------------------------------
+    -- Constant (Private)
+	----------------------------------------------
+		
+		--***************************
+		-- Command Opcode Encodings (Table 3)
+		constant C_PUT_PC				: std_logic_vector(7 downto 0) := "00000000";	--! Put a posted or completion header and optional data.
+		constant C_PUT_NP				: std_logic_vector(7 downto 0) := "00000010";	--! Put a non-posted header and optional data.
+		constant C_GET_PC				: std_logic_vector(7 downto 0) := "00000001";	--! Get a posted or completion header and optional data.
+		constant C_GET_NP				: std_logic_vector(7 downto 0) := "00000011";	--! Get a non-posted header and optional data.
+		constant C_PUT_IORD_SHORT		: std_logic_vector(7 downto 2) := "010000";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Read packet.
+		constant C_PUT_IOWR_SHORT 		: std_logic_vector(7 downto 2) := "010001";		--! Put a short (1, 2 or 4 bytes) non-posted I/O Write packet.
+		constant C_PUT_MEMRD32_SHORT	: std_logic_vector(7 downto 2) := "010010";		--! Put a short (1, 2 or 4 bytes) non-posted Memory Read 32 packet.
+		constant C_PUT_MEMWR32_SHORT	: std_logic_vector(7 downto 2) := "010011";		--! Put a short (1, 2 or 4 bytes) posted Memory Write 32 packet.
+		constant C_PUT_VWIRE			: std_logic_vector(7 downto 0) := "00000100";	--! Put a Tunneled virtual wire packet.
+		constant C_GET_VWIRE			: std_logic_vector(7 downto 0) := "00000101";	--! Get a Tunneled virtual wire packet.
+		constant C_PUT_OOB				: std_logic_vector(7 downto 0) := "00000110";	--! Put an OOB (Tunneled SMBus) message.
+		constant C_GET_OOB				: std_logic_vector(7 downto 0) := "00000111";	--! Get an OOB (Tunneled SMBus) message.
+		constant C_PUT_FLASH_C			: std_logic_vector(7 downto 0) := "00001000";	--! Put a Flash Access completion.
+		constant C_GET_FLASH_NP			: std_logic_vector(7 downto 0) := "00001001";	--! Get a non-posted Flash Access request.
+		constant C_GET_STATUS			: std_logic_vector(7 downto 0) := "00100101";	--! Command initiated by the master to read the status register of the slave.
+		constant C_SET_CONFIGURATION	: std_logic_vector(7 downto 0) := "00100010";	--! Command to set the capabilities of the slave as part of the initialization. This is typically done after the master discovers the capabilities of the slave.
+		constant C_GET_CONFIGURATION	: std_logic_vector(7 downto 0) := "00100001";	--! Command to discover the capabilities of the slave as part of the initialization.
+		constant C_RESET				: std_logic_vector(7 downto 0) := "11111111";	--! In-band RESET command.
+		--***************************
+		
+		--***************************
+		-- Config Register eSpi Slave, Table 20: Slave Registers
+		constant C_DEV_IDENT	: std_logic_vector(15 downto 0)	:= x"0004";		--! Device Identification
+		constant C_GEN_CAP_CFG	: std_logic_vector(15 downto 0)	:= x"0008";		--! General Capabilities and Configurations
+		constant C_CH0_CAP_CFG	: std_logic_vector(15 downto 0)	:= x"0010";		--! Channel 0 Capabilities and Configurations
+		constant C_CH1_CAP_CFG	: std_logic_vector(15 downto 0)	:= x"0020";		--! Channel 1 Capabilities and Configurations
+		constant C_CH2_CAP_CFG	: std_logic_vector(15 downto 0)	:= x"0030";		--! Channel 2 Capabilities and Configurations
+		constant C_CH3_CAP_CFG	: std_logic_vector(15 downto 0)	:= x"0040";		--! Channel 3 Capabilities and Configurations
+		--***************************
+		
+		
+		
+	----------------------------------------------
+
 
     ----------------------------------------------
     -- Functions
@@ -310,6 +354,7 @@ package body eSpiMasterBfm is
 		end procedure spiTx;
 		--***************************
 		
+		
         --***************************
         -- SPI Turn-around (TAR)
 		--   @see: Figure 14: Turn-Around Time (TAR = 2 clock)
@@ -346,6 +391,7 @@ package body eSpiMasterBfm is
 			wait for this.TSpiClk/2;	--! half clock cycle
 		end procedure spiTar;
 		--***************************
+		
 		
         --***************************
         -- SPI Receive
@@ -398,6 +444,89 @@ package body eSpiMasterBfm is
 	
 	
     ----------------------------------------------
+    -- eSPI Slave Configuration
+    ----------------------------------------------
+
+        --***************************
+        -- GET_CONFIGURATION w/ status
+		--  @see Figure 22: GET_CONFIGURATION Command
+		procedure GET_CONFIGURATION 
+			( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);
+				variable cfg	: out std_logic_vector(31 downto 0);
+				variable sts	: out std_logic_vector(15 downto 0)
+			) is
+			variable msg : tESpiMsg(0 to 7);	--! eSpi message buffer
+		begin
+			-- status
+			sts := (others => '0');						--! no ero
+			-- build command
+			msg 	:= (others => (others => '0'));	--! clear
+			msg(0)	:= C_GET_CONFIGURATION;			--! Command
+			msg(1)	:= adr(15 downto 8);			--! high byte address
+			msg(2)	:= adr(7 downto 0);				--! low byte address
+			msg(3)	:= crc8(msg(0 to 2));			--! CRC
+			-- send to slave
+			CSn	<= '0';
+			spiTx(this, msg(0 to 3), SCK, DIO);	--! write to slave
+			-- message
+			if ( this.verbose > 1 ) then
+				Report	"GET_CONFIGURATION" 							& character(LF) & 
+						"     CMD: 0x" & to_hstring(msg(0))				& character(LF) &
+						"     ADR: 0x" & to_hstring(msg(1) & msg(2))	& character(LF) &
+						"     CRC: 0x" & to_hstring(msg(3));
+			end if;
+			-- change direction (write-to-read), two cycles
+			spiTar(this, SCK, DIO);
+			-- read from slave
+			msg := (others => (others => '0'));	--! clear
+			spiRx(this, msg(0 to 7), SCK, DIO);	--! read from slave
+			-- check CRC
+			if ( msg(7) /= crc8(msg(0 to 6)) ) then
+				if ( this.verbose > 0 ) then
+					Report "eSpiMasterBfm:GET_CONFIGURATION:CRC rcv=0x" & to_hstring(msg(7)) & "; calc=0x" & to_hstring(crc8(msg(0 to 6))) & ";" severity error;
+				end if;
+			end if;
+			-- print hex data to console
+			
+			
+			
+			-- Terminate connection to slave
+			SCK	<= '0';
+			wait for this.TSpiClk/2;	--! half clock cycle
+			CSn	<= '1';
+			wait for this.TSpiClk;		--! limits CSn bandwidth to SCK
+		end procedure GET_CONFIGURATION;
+		--***************************
+		
+		
+        --***************************
+        -- GET_CONFIGURATION w/o status
+		--   @see Figure 22: GET_CONFIGURATION Command
+		procedure GET_CONFIGURATION 
+			( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);
+				variable cfg	: out std_logic_vector(31 downto 0)
+			) is
+			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
+		begin
+			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts );
+		end procedure GET_CONFIGURATION;
+		--***************************
+		
+		
+	----------------------------------------------
+	
+	
+    ----------------------------------------------
     -- IO Read / Write operation
     ----------------------------------------------
 	
@@ -420,7 +549,7 @@ package body eSpiMasterBfm is
 			sts := (others => '0');		--! no ero
 			-- build & send Command
 			eSpiMsg 	:= (others => (others => '0'));	--! clear
-			eSpiMsg(0)	:= CMD_PUT_IOWR_SHORT & "01";	--! CMD: short write with one byte
+			eSpiMsg(0)	:= C_PUT_IOWR_SHORT & "01";		--! CMD: short write with one byte
 			eSpiMsg(1)	:= adr(15 downto 8);
 			eSpiMsg(2)	:= adr(7 downto 0);
 			eSpiMsg(3)	:= data;
