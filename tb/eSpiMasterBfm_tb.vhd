@@ -58,8 +58,8 @@ architecture sim of eSpiMasterBfm_tb is
 		signal SCK 	: std_logic; 
 		signal DIO 	: std_logic_vector(3 downto 0);
 		-- Test IOWR_SHORT
-		signal IOWR_SHORT_B0		: std_logic_vector(73 downto 0);
-		signal IOWR_SHORT_B0_SFR	: std_logic_vector(IOWR_SHORT_B0'range);
+		signal IOWR_SHORT_B0		: std_logic_vector(73 downto 0) 		:= (others => 'Z');
+		signal IOWR_SHORT_B0_SFR	: std_logic_vector(IOWR_SHORT_B0'range)	:= (others => 'Z');
 		signal ioWrB0Load			: std_logic;
 		
 	-----------------------------
@@ -205,6 +205,11 @@ begin
     end process p_IOWR_SHORT_byte_0;
     ----------------------------------------------
 	
-
+	
+    ----------------------------------------------
+    -- Pull Resistors
+	DIO	<= (others => 'H');
+	----------------------------------------------
+	
 end architecture sim;
 --------------------------------------------------------------------------
