@@ -199,11 +199,11 @@ package body eSpiMasterBfm is
 		begin
 			-- init
 			remainder := (others => '0');
-			-- calc crc
+			-- calculate crc
 			-- SRC: https://barrgroup.com/embedded-systems/how-to/crc-calculation-c-code
 			-- iterate over byte messages
 			for i in msg'low to msg'high loop
-				remainder := remainder xor msg(i);	--! add new messeage
+				remainder := remainder xor msg(i);	--! add new message
 				-- iterate over bit in byte of message
 				for j in msg(i)'high downto msg(i)'low loop
 					if ( '1' = remainder(remainder'left) ) then	--! Topbit is one

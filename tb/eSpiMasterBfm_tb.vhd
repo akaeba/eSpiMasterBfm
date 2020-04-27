@@ -125,8 +125,8 @@ begin
 			eSpiMsg(1) := x"00"; 
 			eSpiMsg(2) := x"04"; 
 			slv8 := crc8(eSpiMsg(0 to 2));	--! calc crc
-            assert ( slv8 = x"46" ) report "  Error: CRC calculation failed, expected 0x46" severity warning;
-            if not ( slv8 = x"46" ) then good := false; end if;
+            assert ( slv8 = x"34" ) report "  Error: CRC calculation failed, expected 0x46" severity warning;
+            if not ( slv8 = x"34" ) then good := false; end if;
 			wait for eSpiMasterBfm.TSpiClk/2;
 			wait for 1 us;
 		end if;
