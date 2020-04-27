@@ -97,6 +97,7 @@ begin
         -------------------------
 		if ( doTest0 or DO_ALL_TEST ) then
 			Report "Test0: Check CRC8 Function";
+			-- set 0
 			eSpiMsg(0) := x"31"; 
 			eSpiMsg(1) := x"32"; 
 			eSpiMsg(2) := x"33"; 
@@ -110,6 +111,7 @@ begin
             assert ( slv8 = x"F4" ) report "  Error: CRC calculation failed, expected 0xF4" severity warning;
             if not ( slv8 = x"F4" ) then good := false; end if;
 			wait for eSpiMasterBfm.TSpiClk/2;
+			-- set 1
 			eSpiMsg(0) := x"47"; 
 			eSpiMsg(1) := x"12"; 
 			eSpiMsg(2) := x"08"; 
@@ -117,6 +119,14 @@ begin
 			slv8 := crc8(eSpiMsg(0 to 3));	--! calc crc
             assert ( slv8 = x"4E" ) report "  Error: CRC calculation failed, expected 0x4E" severity warning;
             if not ( slv8 = x"4E" ) then good := false; end if;
+			wait for eSpiMasterBfm.TSpiClk/2;
+			-- set 2
+			eSpiMsg(0) := x"21"; 
+			eSpiMsg(1) := x"00"; 
+			eSpiMsg(2) := x"04"; 
+			slv8 := crc8(eSpiMsg(0 to 2));	--! calc crc
+            assert ( slv8 = x"46" ) report "  Error: CRC calculation failed, expected 0x46" severity warning;
+            if not ( slv8 = x"46" ) then good := false; end if;
 			wait for eSpiMasterBfm.TSpiClk/2;
 			wait for 1 us;
 		end if;
@@ -139,8 +149,8 @@ begin
 				-- procedure IOWR_SHORT ( this, CSn, SCK, DIO, adr, data );
 			IOWR_SHORT( eSpiMasterBfm, CSn, SCK, DIO, x"0815", x"47" );
 				-- check command
-			if ( CMD_PUT_IOWR_SHORT & "01" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left downto IOWR_SHORT_B0_SFR'left-7) ) then
-				Report "  Failed Command CMD_PUT_IOWR_SHORT" severity error;
+			if ( "010001" & "01" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left downto IOWR_SHORT_B0_SFR'left-7) ) then
+				Report "  Failed Command PUT_IOWR_SHORT" severity error;
 				good := false;
 			end if;
 				-- check address
