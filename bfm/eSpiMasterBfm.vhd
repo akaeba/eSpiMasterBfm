@@ -428,6 +428,14 @@ package body eSpiMasterBfm is
 			-- send command
 			CSn	<= '0';
 			spiTx(this, eSpiMsg, SCK, DIO);	--! write to slave
+			-- message
+			if ( this.verbose > 1 ) then
+				Report	"IOWR_SHORT" 											& character(LF) & 
+						"     CMD: 0x" & to_hstring(eSpiMsg(0))					& character(LF) &
+						"     ADR: 0x" & to_hstring(eSpiMsg(1) & eSpiMsg(2))	& character(LF) &
+						"     DAT: 0x" & to_hstring(eSpiMsg(3))					& character(LF) &
+						"     CRC: 0x" & to_hstring(eSpiMsg(4));
+			end if;
 			-- tar cycle
 			spiTar(this, SCK, DIO);	--! change direction (write-to-read)
 			-- read response
