@@ -183,6 +183,15 @@ package body eSpiMasterBfm is
 		constant C_CH3_CAP_CFG	: std_logic_vector(15 downto 0)	:= x"0040";		--! Channel 3 Capabilities and Configurations
 		--***************************
 		
+		--***************************
+		-- Response Fields, Table 4: Response Field Encodings
+		constant C_ACCEPT			: std_logic_vector(5 downto 0)	:= "001000";	--! Command was successfully received
+		constant C_DEFER			: std_logic_vector(7 downto 0)	:= "00000001";	--! Only valid in response to a PUT_NP
+		constant C_NON_FATAL_ERROR	: std_logic_vector(7 downto 0)	:= "00000010";	--! The received command had an error with nonfatal severity
+		constant C_FATAL_ERROR		: std_logic_vector(7 downto 0)	:= "00000011";	--! The received command had a fatal error that prevented the transaction layer packet from being successfully processed
+		constant C_WAIT_STATE		: std_logic_vector(7 downto 0)	:= "00001111";	--! Adds one byte-time of delay when responding to a transaction on the bus.
+		constant C_NO_RESPONSE		: std_logic_vector(7 downto 0)	:= "11111111";	--! The response encoding of all 1’s is defined as no response
+		--***************************
 		
 		
 	----------------------------------------------
@@ -277,7 +286,7 @@ package body eSpiMasterBfm is
 		
 		
         --***************************   
-        -- to_hstring
+        -- hexStr
 		--   converts byte array into hexadecimal string
 		function hexStr ( msg : in tESpiMsg ) return string is
 			variable str	: string(1 to (msg'length+1)*5+1); 	--! 8bit per 
@@ -289,12 +298,31 @@ package body eSpiMasterBfm is
 				str(i*5+1 to i*5+5) := "0x" & to_hstring(msg(i)) & " ";
 			end loop;
 			-- drop last blank
-			str((msg'length-1)*5+1) := character(NUL);
+			str((msg'length)*5+5) := character(NUL);
 			-- return
 			return str;
 		end function hexStr;
 		--***************************
-	
+		
+		
+		--***************************   
+        -- checkCRC
+		--   calculates CRC from msglen-1 and compares with last byte of msg len
+		function checkCRC ( this : in tESpiBfm; msg : in tESpiMsg ) return boolean is
+			variable ret : boolean := true;
+		begin
+			if ( this.crcSlvEna ) then
+				if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
+					ret := false;
+					if ( this.verbose > 0 ) then
+						Report "eSpiMasterBfm:checkCRC rcv=0x" & to_hstring(msg(msg'length-1)) & "; calc=0x" & to_hstring(crc8(msg(0 to msg'length-2))) & ";" severity error;
+					end if;
+				end if;
+			end if;
+			return ret;
+		end function checkCRC;
+		--*************************** 
+		
 	----------------------------------------------
 	
 	
@@ -341,25 +369,17 @@ package body eSpiMasterBfm is
 				variable msg	: inout tESpiMsg;
 				signal SCK 		: out std_logic; 						--! shift clock
 				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data
-			) is
-			variable crcMsg : tESpiMsg(0 to msg'length);	--! message with appended CRC	
+			) is	
 		begin
-			-- copy message and calc CRC
-			crcMsg(0 to crcMsg'length-2)	:= msg;									--! capture original message
-			crcMsg(crcMsg'length-1)			:= crc8(crcMsg(0 to crcMsg'length-2));	--! append CRC
-			-- print send message to console
-			if ( this.verbose > 1 ) then
-				Report "eSpiMasterBfm:spiTx: " & hexStr(crcMsg);
-			end if;
 			-- iterate over message bytes
-			for i in crcMsg'low to crcMsg'high loop
+			for i in msg'low to msg'high loop
 				-- iterate over bits in a single message byte
-				for j in crcMsg(i)'high downto crcMsg(i)'low loop
+				for j in msg(i)'high downto msg(i)'low loop
 					-- dispatch mode
 					if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 2 ) then		
 							SCK 			<= '0';		--! falling edge
-							DIO(1 downto 0)	<= crcMsg(i)(j downto j-1);
+							DIO(1 downto 0)	<= msg(i)(j downto j-1);
 							wait for this.TSpiClk/2;	--! half clock cycle
 							SCK 			<= '1';		--! rising edge
 							wait for this.TSpiClk/2;	--! half clock cycle
@@ -367,14 +387,14 @@ package body eSpiMasterBfm is
 					elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 4 ) then		
 							SCK 			<= '0';		--! falling edge
-							DIO(3 downto 0)	<= crcMsg(i)(j downto j-3);
+							DIO(3 downto 0)	<= msg(i)(j downto j-3);
 							wait for this.TSpiClk/2;	--! half clock cycle
 							SCK 			<= '1';		--! rising edge
 							wait for this.TSpiClk/2;	--! half clock cycle
 						end if;
 					else							--! one bits per clock cycle are transfered
 						SCK 	<= '0';				--! falling edge
-						DIO(0)	<= crcMsg(i)(j);	--! assign data
+						DIO(0)	<= msg(i)(j);	--! assign data
 						wait for this.TSpiClk/2;	--! half clock cycle
 						SCK 	<= '1';				--! rising edge
 						wait for this.TSpiClk/2;	--! half clock cycle
@@ -436,21 +456,18 @@ package body eSpiMasterBfm is
 				signal SCK 		: out std_logic; 						--! shift clock
 				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data
 			) is
-			variable crcMsg : tESpiMsg(0 to msg'length);	--! message with appended CRC
 		begin
-			-- clear all bytes in message
-			crcMsg := (others => (others => '0'));
 			-- iterate over message bytes
-			for i in crcMsg'low to crcMsg'high loop
+			for i in msg'low to msg'high loop
 				-- iterate over bits in a single message byte
-				for j in crcMsg(i)'high downto crcMsg(i)'low loop
+				for j in msg(i)'high downto msg(i)'low loop
 					-- dispatch mode
 					if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 2 ) then		
 							SCK 					<= '0';				--! falling edge
 							wait for this.TSpiClk/2;					--! half clock cycle
 							SCK 					<= '1';				--! rising edge
-							crcMsg(i)(j downto j-1)	:= DIO(1 downto 0);	--! capture data from line
+							msg(i)(j downto j-1)	:= DIO(1 downto 0);	--! capture data from line
 							wait for this.TSpiClk/2;					--! half clock cycle
 						end if;
 					elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
@@ -458,32 +475,18 @@ package body eSpiMasterBfm is
 							SCK 					<= '0';				--! falling edge
 							wait for this.TSpiClk/2;					--! half clock cycle
 							SCK 					<= '1';				--! rising edge
-							crcMsg(i)(j downto j-3)	:= DIO(3 downto 0);	--! capture data from line
+							msg(i)(j downto j-3)	:= DIO(3 downto 0);	--! capture data from line
 							wait for this.TSpiClk/2;					--! half clock cycle
 						end if;
 					else							--! one bits per clock cycle are transfered
 						SCK 			<= '0';		--! falling edge
 						wait for this.TSpiClk/2;	--! half clock cycle
 						SCK 			<= '1';		--! rising edge
-						crcMsg(i)(j)	:= DIO(1);	--! capture data from line
+						msg(i)(j)	:= DIO(1);		--! capture data from line
 						wait for this.TSpiClk/2;	--! half clock cycle
 					end if;
 				end loop;
 			end loop;
-			-- copy message and drop CRC
-			msg := crcMsg(0 to crcMsg'length-2);
-			-- check CRC
-			if ( this.crcSlvEna ) then
-				if ( crcMsg(crcMsg'length-1) /= crc8(crcMsg(0 to crcMsg'length-2)) ) then
-					if ( this.verbose > 0 ) then
-						Report "eSpiMasterBfm:spiRx:CRC rcv=0x" & to_hstring(crcMsg(crcMsg'length-1)) & "; calc=0x" & to_hstring(crc8(crcMsg(0 to crcMsg'length-2))) & ";" severity error;
-					end if;
-				end if;
-			end if;
-			-- print received message to console
-			if ( this.verbose > 1 ) then
-				Report "eSpiMasterBfm:spiRx: " & hexStr(crcMsg);
-			end if;
 		end procedure spiRx;
 		--***************************
 		
@@ -507,29 +510,46 @@ package body eSpiMasterBfm is
 				variable cfg	: out std_logic_vector(31 downto 0);
 				variable sts	: out std_logic_vector(15 downto 0)
 			) is
-			variable msg : tESpiMsg(0 to 6);	--! eSpi message buffer
+			variable msg : tESpiMsg(0 to 7);	--! eSpi message buffer
 		begin
 			-- entry message
 			if ( this.verbose > 1 ) then
 				Report "eSpiMasterBfm:GET_CONFIGURATION";
 			end if;
-			-- status
-			sts := (others => '0');						--! no ero
 			-- build command
 			msg 	:= (others => (others => '0'));	--! clear
 			msg(0)	:= C_GET_CONFIGURATION;			--! Command
 			msg(1)	:= adr(15 downto 8);			--! high byte address
 			msg(2)	:= adr(7 downto 0);				--! low byte address
-			-- send to slave
+			msg(3)	:= crc8(msg(0 to 2));			--! add CRC
+			-- print send message to console
+			if ( this.verbose > 1 ) then
+				Report "eSpiMasterBfm:GET_CONFIGURATION:Tx " & hexStr(msg(0 to 3));
+			end if;
+			-- interact with slave
 			CSn	<= '0';
-			spiTx(this, msg(0 to 2), SCK, DIO);		--! write to slave, CRC is auto appended
-			-- change direction (write-to-read), two cycles
-			spiTar(this, SCK, DIO);
-			-- read from slave
-			msg := (others => (others => '0'));	--! clear
-			spiRx(this, msg, SCK, DIO);			--! read from slave, CRC is auto removed
-
-			
+			spiTx(this, msg(0 to 3), SCK, DIO);		--! write to slave
+			spiTar(this, SCK, DIO);					--! change direction (write-to-read), two cycles
+			spiRx(this, msg(0 to 0), SCK, DIO);		--! read only response field
+			while ( msg(0) = C_WAIT_STATE ) loop	--! response ready
+				spiRx(this, msg(0 to 0), SCK, DIO);	--! read from slave
+				if ( this.verbose > 1 ) then
+					Report "eSpiMasterBfm:GET_CONFIGURATION:   WAIT_STATE";
+				end if;
+			end loop;
+			spiRx(this, msg(1 to 7), SCK, DIO);	--! read from slave
+			-- print send message to console
+			if ( this.verbose > 1 ) then
+				Report "eSpiMasterBfm:GET_CONFIGURATION:Rx " & hexStr(msg(0 to 7));
+			end if;
+			-- check CRC and assign only in case of valid/disabled CRC
+			if ( checkCRC(this, msg(0 to 7)) ) then
+				cfg := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assembled cfg
+				sts := msg(6) & msg(5);						--! status
+			else
+				cfg := (others => '0');
+				sts := (others => '0');
+			end if;
 			-- Terminate connection to slave
 			SCK	<= '0';
 			wait for this.TSpiClk/2;	--! half clock cycle
