@@ -55,12 +55,17 @@ package eSpiMasterBfm is
 			);
 			
 		-- SPI Direction
-		type tESpiDir is 
+		type tESpiRsp is 
 			(
-				MOSI,	--! Master-out, Slave-in
-				MISO	--! Master-in, Slave-out
+				ACCEPT,				--! Command was successfully received
+				DEFER,				--! Only valid in response to a PUT_NP
+				NON_FATAL_ERROR,	--! The received command had an error with nonfatal severity
+				FATAL_ERROR,		--! The received command had a fatal error that prevented the transaction layer packet from being successfully processed
+				WAIT_STATE,			--! Adds one byte-time of delay when responding to a transaction on the bus.
+				NO_RESPONSE,		--! The response encoding of all 1’s is defined as no response
+				NO_DECODE			--! not in eSPI Spec, no decoding possible
 			);
-		
+			
 		-- Configures the BFM
 		type tESpiBfm is record
 			TSpiClk		: time;    		--! period of spi clk
@@ -100,7 +105,8 @@ package eSpiMasterBfm is
 					signal DIO		: inout std_logic_vector(3 downto 0);
 					constant adr	: in std_logic_vector(15 downto 0);		--! config address
 					variable cfg	: out std_logic_vector(31 downto 0);	--! config data
-					variable sts	: out std_logic_vector(15 downto 0)		--! status
+					variable sts	: out std_logic_vector(15 downto 0);	--! status
+					variable rsp	: out tESpiRsp							--! slave response
 				);
 			-- w/o status
 			procedure GET_CONFIGURATION 
@@ -323,6 +329,34 @@ package body eSpiMasterBfm is
 		end function checkCRC;
 		--*************************** 
 		
+		
+		--***************************   
+        -- decodeRsp
+		--   decodes the responses from the slave
+		function decodeRsp ( this : in tESpiBfm; response : in std_logic_vector(7 downto 0) ) return tESpiRsp is
+			variable ret : tESpiRsp;
+		begin
+			-- decode
+			if ( C_ACCEPT = response(C_ACCEPT'range) ) then
+				ret	:= ACCEPT;
+			elsif ( C_DEFER = response(C_DEFER'range) ) then
+				ret	:= DEFER;
+			elsif ( C_NON_FATAL_ERROR = response(C_NON_FATAL_ERROR'range) ) then
+				ret	:= NON_FATAL_ERROR;
+			elsif ( C_FATAL_ERROR = response(C_FATAL_ERROR'range) ) then
+				ret	:= FATAL_ERROR;
+			elsif ( C_WAIT_STATE = response(C_WAIT_STATE'range) ) then
+				ret	:= WAIT_STATE;
+			elsif ( C_NO_RESPONSE = response(C_NO_RESPONSE'range) ) then
+				ret	:= NO_RESPONSE;
+			else
+				ret := NO_DECODE;
+			end if;
+			-- return
+			return ret;
+		end function decodeRsp;
+		--***************************
+		
 	----------------------------------------------
 	
 	
@@ -508,9 +542,10 @@ package body eSpiMasterBfm is
 				signal DIO		: inout std_logic_vector(3 downto 0);
 				constant adr	: in std_logic_vector(15 downto 0);
 				variable cfg	: out std_logic_vector(31 downto 0);
-				variable sts	: out std_logic_vector(15 downto 0)
+				variable sts	: out std_logic_vector(15 downto 0);
+				variable rsp	: out tESpiRsp
 			) is
-			variable msg : tESpiMsg(0 to 7);	--! eSpi message buffer
+			variable msg 	: tESpiMsg(0 to 7);	--! eSpi message buffer
 		begin
 			-- entry message
 			if ( this.verbose > 1 ) then
@@ -531,11 +566,8 @@ package body eSpiMasterBfm is
 			spiTx(this, msg(0 to 3), SCK, DIO);		--! write to slave
 			spiTar(this, SCK, DIO);					--! change direction (write-to-read), two cycles
 			spiRx(this, msg(0 to 0), SCK, DIO);		--! read only response field
-			while ( msg(0) = C_WAIT_STATE ) loop	--! response ready
-				spiRx(this, msg(0 to 0), SCK, DIO);	--! read from slave
-				if ( this.verbose > 1 ) then
-					Report "eSpiMasterBfm:GET_CONFIGURATION:   WAIT_STATE";
-				end if;
+			while ( WAIT_STATE = decodeRsp(this, msg(0)) ) loop	--! response ready
+				spiRx(this, msg(0 to 0), SCK, DIO);				--! read from slave
 			end loop;
 			spiRx(this, msg(1 to 7), SCK, DIO);	--! read from slave
 			-- print send message to console
@@ -543,13 +575,18 @@ package body eSpiMasterBfm is
 				Report "eSpiMasterBfm:GET_CONFIGURATION:Rx " & hexStr(msg(0 to 7));
 			end if;
 			-- check CRC and assign only in case of valid/disabled CRC
-			if ( checkCRC(this, msg(0 to 7)) ) then
+			if ( checkCRC(this, msg(0 to 7)) and (ACCEPT = decodeRsp(this, msg(0))) ) then
 				cfg := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assembled cfg
 				sts := msg(6) & msg(5);						--! status
 			else
 				cfg := (others => '0');
 				sts := (others => '0');
+				if ( this.verbose > 0 ) then
+					Report "eSpiMasterBfm:GET_CONFIGURATION: Failed to get Response " & hexStr(msg(0 to 7)) severity error;
+				end if;
 			end if;
+			-- assign reponse
+			rsp := decodeRsp(this, msg(0));
 			-- Terminate connection to slave
 			SCK	<= '0';
 			wait for this.TSpiClk/2;	--! half clock cycle
@@ -572,8 +609,9 @@ package body eSpiMasterBfm is
 				variable cfg	: out std_logic_vector(31 downto 0)
 			) is
 			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
+			variable rsp : tESpiRsp;
 		begin
-			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts );
+			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp );
 		end procedure GET_CONFIGURATION;
 		--***************************
 		
