@@ -106,7 +106,8 @@ package eSpiMasterBfm is
 					constant adr	: in std_logic_vector(15 downto 0);		--! config address
 					variable cfg	: out std_logic_vector(31 downto 0);	--! config data
 					variable sts	: out std_logic_vector(15 downto 0);	--! status
-					variable rsp	: out tESpiRsp							--! slave response
+					variable rsp	: out tESpiRsp;							--! slave response
+					variable good	: inout boolean							--! procedure state
 				);
 			-- w/o status
 			procedure GET_CONFIGURATION 
@@ -116,7 +117,8 @@ package eSpiMasterBfm is
 					signal SCK		: out std_logic; 
 					signal DIO		: inout std_logic_vector(3 downto 0);
 					constant adr	: in std_logic_vector(15 downto 0);		--! config address
-					variable cfg	: out std_logic_vector(31 downto 0)		--! config data
+					variable cfg	: out std_logic_vector(31 downto 0);	--! config data
+					variable good	: inout boolean							--! procedure state
 				);
 			
 		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
@@ -333,7 +335,7 @@ package body eSpiMasterBfm is
 		--***************************   
         -- decodeRsp
 		--   decodes the responses from the slave
-		function decodeRsp ( this : in tESpiBfm; response : in std_logic_vector(7 downto 0) ) return tESpiRsp is
+		function decodeRsp ( response : in std_logic_vector(7 downto 0) ) return tESpiRsp is
 			variable ret : tESpiRsp;
 		begin
 			-- decode
@@ -490,6 +492,7 @@ package body eSpiMasterBfm is
 				signal SCK 		: out std_logic; 						--! shift clock
 				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data
 			) is
+			variable slv1	: std_logic_vector(0 downto 0);
 		begin
 			-- iterate over message bytes
 			for i in msg'low to msg'high loop
@@ -498,26 +501,27 @@ package body eSpiMasterBfm is
 					-- dispatch mode
 					if ( DUAL = this.spiMode ) then		--! two bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 2 ) then		
-							SCK 					<= '0';				--! falling edge
-							wait for this.TSpiClk/2;					--! half clock cycle
-							SCK 					<= '1';				--! rising edge
-							msg(i)(j downto j-1)	:= DIO(1 downto 0);	--! capture data from line
-							wait for this.TSpiClk/2;					--! half clock cycle
+							SCK 					<= '0';													--! falling edge
+							wait for this.TSpiClk/2;														--! half clock cycle
+							SCK 					<= '1';													--! rising edge
+							msg(i)(j downto j-1)	:= std_logic_vector(TO_01(unsigned(DIO(1 downto 0))));	--! capture data from line
+							wait for this.TSpiClk/2;														--! half clock cycle
 						end if;
 					elsif ( QUAD = this.spiMode ) then	--! four bits per clock cycle are transfered
 						if ( 0 = (j+1) mod 4 ) then		
-							SCK 					<= '0';				--! falling edge
-							wait for this.TSpiClk/2;					--! half clock cycle
-							SCK 					<= '1';				--! rising edge
-							msg(i)(j downto j-3)	:= DIO(3 downto 0);	--! capture data from line
-							wait for this.TSpiClk/2;					--! half clock cycle
+							SCK 					<= '0';													--! falling edge
+							wait for this.TSpiClk/2;														--! half clock cycle
+							SCK 					<= '1';													--! rising edge
+							msg(i)(j downto j-3)	:= std_logic_vector(TO_01(unsigned(DIO(3 downto 0))));	--! capture data from line
+							wait for this.TSpiClk/2;														--! half clock cycle
 						end if;
-					else							--! one bits per clock cycle are transfered
-						SCK 			<= '0';		--! falling edge
-						wait for this.TSpiClk/2;	--! half clock cycle
-						SCK 			<= '1';		--! rising edge
-						msg(i)(j)	:= DIO(1);		--! capture data from line
-						wait for this.TSpiClk/2;	--! half clock cycle
+					else								--! one bits per clock cycle are transfered
+						SCK 		<= '0';															--! falling edge
+						wait for this.TSpiClk/2;													--! half clock cycle
+						SCK 				<= '1';													--! rising edge
+						slv1(0 downto 0)	:= std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));	--! help
+						msg(i)(j)			:= slv1(0);												--! capture data from line
+						wait for this.TSpiClk/2;													--! half clock cycle
 					end if;
 				end loop;
 			end loop;
@@ -543,14 +547,14 @@ package body eSpiMasterBfm is
 				constant adr	: in std_logic_vector(15 downto 0);
 				variable cfg	: out std_logic_vector(31 downto 0);
 				variable sts	: out std_logic_vector(15 downto 0);
-				variable rsp	: out tESpiRsp
+				variable rsp	: out tESpiRsp;
+				variable good	: inout boolean
 			) is
 			variable msg 	: tESpiMsg(0 to 7);	--! eSpi message buffer
 		begin
-			-- entry message
-			if ( this.verbose > 1 ) then
-				Report "eSpiMasterBfm:GET_CONFIGURATION";
-			end if;
+			-- init
+			cfg	:= (others => '0');
+			sts	:= (others => '0');
 			-- build command
 			msg 	:= (others => (others => '0'));	--! clear
 			msg(0)	:= C_GET_CONFIGURATION;			--! Command
@@ -558,35 +562,48 @@ package body eSpiMasterBfm is
 			msg(2)	:= adr(7 downto 0);				--! low byte address
 			msg(3)	:= crc8(msg(0 to 2));			--! add CRC
 			-- print send message to console
-			if ( this.verbose > 1 ) then
+			if ( this.verbose > 2) then
 				Report "eSpiMasterBfm:GET_CONFIGURATION:Tx " & hexStr(msg(0 to 3));
 			end if;
 			-- interact with slave
 			CSn	<= '0';
 			spiTx(this, msg(0 to 3), SCK, DIO);		--! write to slave
 			spiTar(this, SCK, DIO);					--! change direction (write-to-read), two cycles
-			spiRx(this, msg(0 to 0), SCK, DIO);		--! read only response field
-			while ( WAIT_STATE = decodeRsp(this, msg(0)) ) loop	--! response ready
-				spiRx(this, msg(0 to 0), SCK, DIO);				--! read from slave
+			spiRx(this, msg(0 to 0), SCK, DIO);				--! read only response field
+			while ( WAIT_STATE = decodeRsp(msg(0)) ) loop	--! response ready
+				spiRx(this, msg(0 to 0), SCK, DIO);			--! read from slave
 			end loop;
-			spiRx(this, msg(1 to 7), SCK, DIO);	--! read from slave
-			-- print send message to console
-			if ( this.verbose > 1 ) then
-				Report "eSpiMasterBfm:GET_CONFIGURATION:Rx " & hexStr(msg(0 to 7));
-			end if;
-			-- check CRC and assign only in case of valid/disabled CRC
-			if ( checkCRC(this, msg(0 to 7)) and (ACCEPT = decodeRsp(this, msg(0))) ) then
-				cfg := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assembled cfg
-				sts := msg(6) & msg(5);						--! status
-			else
-				cfg := (others => '0');
-				sts := (others => '0');
-				if ( this.verbose > 0 ) then
-					Report "eSpiMasterBfm:GET_CONFIGURATION: Failed to get Response " & hexStr(msg(0 to 7)) severity error;
+			-- check response
+			if ( ACCEPT = decodeRsp(msg(0)) ) then	--! command accepted?
+				spiRx(this, msg(1 to 7), SCK, DIO);	--! read from slave
+				-- print receive message to console
+				if ( this.verbose > 1 ) then
+					Report "eSpiMasterBfm:GET_CONFIGURATION:Rx " & hexStr(msg(0 to 7));
+				end if;
+				-- check CRC
+				if ( checkCRC(this, msg(0 to 7)) ) then
+					cfg := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assembled cfg
+					sts := msg(6) & msg(5);						--! status
+				else											--! CRC check failed
+					good := false;
+					if ( this.verbose > 1) then
+						Report "eSpiMasterBfm:GET_CONFIGURATION: CRC check failed" severity warning;
+					end if;
+				end if;
+				
+			elsif ( NO_RESPONSE = decodeRsp(msg(0)) ) then	--! devices is not responding
+				good := false;
+				if ( this.verbose > 1) then
+					Report "eSpiMasterBfm:GET_CONFIGURATION: Slave not found" severity warning;
+				end if;
+			else	--! something other happend
+				good := false;
+				if ( this.verbose > 0) then
+					Report "eSpiMasterBfm:GET_CONFIGURATION: Unknown Error" severity error;
 				end if;
 			end if;
 			-- assign reponse
-			rsp := decodeRsp(this, msg(0));
+			rsp := decodeRsp(msg(0));
 			-- Terminate connection to slave
 			SCK	<= '0';
 			wait for this.TSpiClk/2;	--! half clock cycle
@@ -606,12 +623,13 @@ package body eSpiMasterBfm is
 				signal SCK		: out std_logic; 
 				signal DIO		: inout std_logic_vector(3 downto 0);
 				constant adr	: in std_logic_vector(15 downto 0);
-				variable cfg	: out std_logic_vector(31 downto 0)
+				variable cfg	: out std_logic_vector(31 downto 0);
+				variable good	: inout boolean
 			) is
 			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
 			variable rsp : tESpiRsp;
 		begin
-			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp );
+			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp, good );
 		end procedure GET_CONFIGURATION;
 		--***************************
 		
@@ -636,7 +654,7 @@ package body eSpiMasterBfm is
 				constant data	: in std_logic_vector(7 downto 0);
 				variable sts	: out std_logic_vector(15 downto 0)
 			) is
-			variable msg : tESpiMsg(0 to 3);	--! eSpi Tx Packet has 5 Bytes for 1Byte data
+			variable msg : tESpiMsg(0 to 4);	--! eSpi Tx Packet has 5 Bytes for 1Byte data
 		begin
 			-- entry message
 			if ( this.verbose > 1 ) then
@@ -650,15 +668,41 @@ package body eSpiMasterBfm is
 			msg(1)	:= adr(15 downto 8);
 			msg(2)	:= adr(7 downto 0);
 			msg(3)	:= data;
+			msg(4)	:= crc8(msg(0 to 3));
+			-- print send message to console
+			if ( this.verbose > 1 ) then
+				Report "eSpiMasterBfm:IOWR_SHORT:Tx " & hexStr(msg);
+			end if;
 			-- send command
 			CSn	<= '0';
 			spiTx(this, msg, SCK, DIO);	--! write to slave, CRC is auto appended
-			-- tar cycle
 			spiTar(this, SCK, DIO);		--! change direction (write-to-read)
 			-- read response
-			-- Byte 0: 		Response
-			-- Byte 1/2:	Status (STS)
-			spiRx(this, msg(0 to 2), SCK, DIO);	--! read from slave, CRC is auto removed
+			--   Byte 0: 	Response
+			--   Byte 1/2:	Status (STS)
+			spiRx(this, msg(0 to 0), SCK, DIO);				--! read only response field
+			while ( WAIT_STATE = decodeRsp(msg(0)) ) loop	--! response ready
+				spiRx(this, msg(0 to 0), SCK, DIO);			--! read from slave
+			end loop;
+			-- command accepted
+			if ( ACCEPT = decodeRsp(msg(0)) ) then
+				spiRx(this, msg(1 to 3), SCK, DIO);	--! read from slave
+				-- print receive message to console
+				if ( this.verbose > 1 ) then
+					Report "eSpiMasterBfm:IOWR_SHORT:Rx " & hexStr(msg(0 to 3));
+				end if;
+				-- check CRC and assign only in case of valid/disabled CRC
+				if ( checkCRC(this, msg(0 to 2)) and (ACCEPT = decodeRsp(msg(0))) ) then
+					sts := msg(2) & msg(1);		--! status
+				end if;
+			else
+				if ( this.verbose > 0 ) then
+					Report "eSpiMasterBfm:IOWR_SHORT: Command not accepted" severity error;
+				end if;
+			end if;
+			-- decode response
+			
+			
 			-- Terminate connection to slave
 			SCK	<= '0';
 			wait for this.TSpiClk/2;	--! half clock cycle
