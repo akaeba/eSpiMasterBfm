@@ -76,7 +76,8 @@ architecture sim of eSpiMasterBfm_tb is
         -- TO_HSTRING (STD_ULOGIC_VECTOR)
         -- SRC: http://www.eda-stds.org/vhdl-200x/vhdl-200x-ft/packages_old/std_logic_1164_additions.vhdl
             function to_hstring (value : STD_ULOGIC_VECTOR) return STRING is
-                constant ne     : INTEGER := (value'length+3)/4;
+                constant nus	: STRING := " ";
+				constant ne     : INTEGER := (value'length+3)/4;
                 variable pad    : STD_ULOGIC_VECTOR(0 to (ne*4 - value'length) - 1);
                 variable ivalue : STD_ULOGIC_VECTOR(0 to ne*4 - 1);
                 variable result : STRING(1 to ne);
@@ -176,8 +177,11 @@ begin
 		-- DUT
 			variable eSpiMasterBfm	: tESpiBfm;							--! eSPI Master bfm Handle
 			variable eSpiMsg		: tESpiMsg(0 to 9);					--! eSPI Message
+			variable config			: std_logic_vector(31 downto 0);	--! help for configuration
+			variable status			: std_logic_vector(15 downto 0);	--! help for status
 			variable slv8			: std_logic_vector(7 downto 0);		--! help
 			variable slv32			: std_logic_vector(31 downto 0);	--! help
+			
     begin
 
         -------------------------
@@ -185,7 +189,7 @@ begin
         -------------------------
             Report "Init...";
 			init(eSpiMasterBfm, CSn, SCK, DIO);	--! init eSpi Master
-			eSpiMasterBfm.verbose := 2;			--! enable errors + warning messages
+			eSpiMasterBfm.verbose := 3;			--! enable errors + warning messages
 			ioWrB0Load		<= '0';
 			IOWR_SHORT_B0	<= (others => '0');
 			
@@ -244,7 +248,7 @@ begin
 			-- prepare message recorder
 			espiRecCmd(1 to 9)	<= "21000434" 				& character(NUL);
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);
-			GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", slv32 );	--! read from Slave
+			GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, good );	--! read from Slave
 		
 		
 
