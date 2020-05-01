@@ -34,14 +34,6 @@ library std;
 package eSpiMasterBfm is
 
     -----------------------------
-    -- Constant         
-        -- Package internal Informations
-			-- needed by to_hstring
-            constant NUS	: STRING := " ";
-    -----------------------------
-	
-	
-    -----------------------------
     -- Data typs
         -- memory organization
 		type tESpiMsg is array (natural range <>) of std_logic_vector (7 downto 0);	--! Espi data packet
@@ -78,9 +70,12 @@ package eSpiMasterBfm is
 	
 	
     -----------------------------
-    -- Functions
+    -- Functions (public)
 		-- calculate crc
 		function crc8 ( msg : in tESpiMsg ) return std_logic_vector;
+        
+		-- printStatus
+		function printStatus ( sts : in std_logic_vector(15 downto 0) ) return string;
 	-----------------------------
 	
 	
@@ -99,17 +94,17 @@ package eSpiMasterBfm is
 			-- w/ status
 			procedure GET_CONFIGURATION 
 				( 
-					variable this	: inout tESpiBfm; 
-					signal CSn		: out std_logic; 
-					signal SCK		: out std_logic; 
-					signal DIO		: inout std_logic_vector(3 downto 0);
-					constant adr	: in std_logic_vector(15 downto 0);		--! config address
-					variable cfg	: out std_logic_vector(31 downto 0);	--! config data
-					variable sts	: out std_logic_vector(15 downto 0);	--! status
-					variable rsp	: out tESpiRsp;							--! slave response
-					variable good	: inout boolean							--! procedure state
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr		: in std_logic_vector(15 downto 0);		--! config address
+					variable config		: out std_logic_vector(31 downto 0);	--! config data
+					variable status		: out std_logic_vector(15 downto 0);	--! status
+					variable response	: out tESpiRsp;							--! slave response
+					variable good		: inout boolean							--! procedure state
 				);
-			-- w/o status
+			-- w/o status, response
 			procedure GET_CONFIGURATION 
 				( 
 					variable this	: inout tESpiBfm; 
@@ -117,7 +112,7 @@ package eSpiMasterBfm is
 					signal SCK		: out std_logic; 
 					signal DIO		: inout std_logic_vector(3 downto 0);
 					constant adr	: in std_logic_vector(15 downto 0);		--! config address
-					variable cfg	: out std_logic_vector(31 downto 0);	--! config data
+					variable config	: out std_logic_vector(31 downto 0);	--! config data
 					variable good	: inout boolean							--! procedure state
 				);
 			
@@ -158,7 +153,7 @@ package body eSpiMasterBfm is
     ----------------------------------------------
     -- Constant (Private)
 	----------------------------------------------
-		
+	
 		--***************************
 		-- Command Opcode Encodings (Table 3)
 		constant C_PUT_PC				: std_logic_vector(7 downto 0) := "00000000";	--! Put a posted or completion header and optional data.
@@ -240,14 +235,15 @@ package body eSpiMasterBfm is
         -- TO_HSTRING (STD_ULOGIC_VECTOR)
         -- SRC: http://www.eda-stds.org/vhdl-200x/vhdl-200x-ft/packages_old/std_logic_1164_additions.vhdl
             function to_hstring (value : STD_ULOGIC_VECTOR) return STRING is
-                constant ne     : INTEGER := (value'length+3)/4;
+                constant nus	: STRING := " ";
+				constant ne     : INTEGER := (value'length+3)/4;
                 variable pad    : STD_ULOGIC_VECTOR(0 to (ne*4 - value'length) - 1);
                 variable ivalue : STD_ULOGIC_VECTOR(0 to ne*4 - 1);
                 variable result : STRING(1 to ne);
                 variable quad   : STD_ULOGIC_VECTOR(0 to 3);
             begin
                 if value'length < 1 then
-                    return NUS;
+                    return nus;
                 else
                     if value (value'left) = 'Z' then
                         pad := (others => 'Z');
@@ -358,6 +354,33 @@ package body eSpiMasterBfm is
 			return ret;
 		end function decodeRsp;
 		--***************************
+		
+		
+		--***************************   
+        -- printStatus
+		--   print status register to string in a human-readable way
+		function printStatus ( sts : in std_logic_vector(15 downto 0) ) return string is
+			variable ret : string(1 to 808);
+		begin
+			-- convert
+			ret :=	character(LF) & 
+					"     Status           : 0x"	& to_hstring(sts)																								& character(LF) & 
+					"       PC_FREE        : " 		& integer'image(to_integer(unsigned(sts(00 downto 00)))) & "       Peripheral Posted/Completion Rx Queue Free" 	& character(LF) &  
+					"       NP_FREE        : " 		& integer'image(to_integer(unsigned(sts(01 downto 01)))) & "       Peripheral Non-Posted Rx Queue Free" 		& character(LF) &  
+					"       VWIRE_FREE     : " 		& integer'image(to_integer(unsigned(sts(02 downto 02)))) & "       Virtual Wire Rx Queue Free" 					& character(LF) &  
+					"       OOB_FREE       : " 		& integer'image(to_integer(unsigned(sts(03 downto 03)))) & "       OOB Posted Rx Queue Free" 					& character(LF) &  
+					"       PC_AVAIL       : " 		& integer'image(to_integer(unsigned(sts(04 downto 04)))) & "       Peripheral Posted/Completion Tx Queue Avail"	& character(LF) &  
+					"       NP_AVAIL       : " 		& integer'image(to_integer(unsigned(sts(05 downto 05)))) & "       Peripheral Non-Posted Tx Queue Avail" 		& character(LF) &  
+					"       VWIRE_AVAIL    : " 		& integer'image(to_integer(unsigned(sts(06 downto 06)))) & "       Virtual Wire Tx Queue Avail" 				& character(LF) &  
+					"       OOB_AVAIL      : " 		& integer'image(to_integer(unsigned(sts(07 downto 07)))) & "       OOB Posted Tx Queue Avail" 					& character(LF) &  
+					"       FLASH_C_FREE   : " 		& integer'image(to_integer(unsigned(sts(08 downto 08)))) & "       Flash Completion Rx Queue Free" 				& character(LF) &  
+					"       FLASH_NP_FREE  : " 		& integer'image(to_integer(unsigned(sts(09 downto 09)))) & "       Flash Non-Posted Rx Queue Free" 				& character(LF) &  
+					"       FLASH_C_AVAIL  : " 		& integer'image(to_integer(unsigned(sts(12 downto 12)))) & "       Flash Completion Tx Queue Avail" 			& character(LF) &  
+					"       FLASH_NP_AVAIL : " 		& integer'image(to_integer(unsigned(sts(13 downto 13)))) & "       Flash Non-Posted Tx Queue Avail" 			& character(LF);  
+			-- release
+			return ret;
+		end function printStatus;
+		--*************************** 
 		
 	----------------------------------------------
 	
@@ -540,17 +563,19 @@ package body eSpiMasterBfm is
 		--  @see Figure 22: GET_CONFIGURATION Command
 		procedure GET_CONFIGURATION 
 			( 
-				variable this	: inout tESpiBfm; 
-				signal CSn		: out std_logic; 
-				signal SCK		: out std_logic; 
-				signal DIO		: inout std_logic_vector(3 downto 0);
-				constant adr	: in std_logic_vector(15 downto 0);
-				variable cfg	: out std_logic_vector(31 downto 0);
-				variable sts	: out std_logic_vector(15 downto 0);
-				variable rsp	: out tESpiRsp;
-				variable good	: inout boolean
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr		: in std_logic_vector(15 downto 0);
+				variable config		: out std_logic_vector(31 downto 0);
+				variable status		: out std_logic_vector(15 downto 0);
+				variable response	: out tESpiRsp;
+				variable good		: inout boolean
 			) is
-			variable msg 	: tESpiMsg(0 to 7);	--! eSpi message buffer
+			variable msg 	: tESpiMsg(0 to 7);					--! eSpi message buffer
+			variable cfg	: std_logic_vector(config'range);	--! internal buffer
+			variable sts	: std_logic_vector(status'range);	--! internal buffer
 		begin
 			-- init
 			cfg	:= (others => '0');
@@ -562,9 +587,7 @@ package body eSpiMasterBfm is
 			msg(2)	:= adr(7 downto 0);				--! low byte address
 			msg(3)	:= crc8(msg(0 to 2));			--! add CRC
 			-- print send message to console
-			if ( this.verbose > 2) then
-				Report "eSpiMasterBfm:GET_CONFIGURATION:Tx " & hexStr(msg(0 to 3));
-			end if;
+			if ( this.verbose > 2) then Report "eSpiMasterBfm:GET_CONFIGURATION:Tx " & hexStr(msg(0 to 3)); end if;
 			-- interact with slave
 			CSn	<= '0';
 			spiTx(this, msg(0 to 3), SCK, DIO);		--! write to slave
@@ -577,33 +600,26 @@ package body eSpiMasterBfm is
 			if ( ACCEPT = decodeRsp(msg(0)) ) then	--! command accepted?
 				spiRx(this, msg(1 to 7), SCK, DIO);	--! read from slave
 				-- print receive message to console
-				if ( this.verbose > 1 ) then
-					Report "eSpiMasterBfm:GET_CONFIGURATION:Rx " & hexStr(msg(0 to 7));
-				end if;
+				if ( this.verbose > 2 ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Rx " & hexStr(msg(0 to 7)); end if;
 				-- check CRC
-				if ( checkCRC(this, msg(0 to 7)) ) then
-					cfg := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assembled cfg
-					sts := msg(6) & msg(5);						--! status
-				else											--! CRC check failed
+				if ( checkCRC(this, msg(0 to 7)) ) then		--! passed/disabled
+					cfg := msg(4) & msg(3) & msg(2) & msg(1);				--! extract and assembled cfg
+					sts := msg(6) & msg(5);									--! status
+					if ( this.verbose > 2 ) then Report printStatus(sts); end if;	--! print status
+				else										--! failed
 					good := false;
-					if ( this.verbose > 1) then
-						Report "eSpiMasterBfm:GET_CONFIGURATION: CRC check failed" severity warning;
-					end if;
 				end if;
-				
 			elsif ( NO_RESPONSE = decodeRsp(msg(0)) ) then	--! devices is not responding
 				good := false;
-				if ( this.verbose > 1) then
-					Report "eSpiMasterBfm:GET_CONFIGURATION: Slave not found" severity warning;
-				end if;
+				if ( this.verbose > 1) then Report "eSpiMasterBfm:GET_CONFIGURATION: Slave not found" severity warning; end if;
 			else	--! something other happend
 				good := false;
-				if ( this.verbose > 0) then
-					Report "eSpiMasterBfm:GET_CONFIGURATION: Unknown Error" severity error;
-				end if;
+				if ( this.verbose > 0) then Report "eSpiMasterBfm:GET_CONFIGURATION: Unknown Error" severity error; end if;
 			end if;
-			-- assign reponse
-			rsp := decodeRsp(msg(0));
+			-- assign to out
+			config 		:= cfg;
+			status 		:= sts;
+			response	:= decodeRsp(msg(0));
 			-- Terminate connection to slave
 			SCK	<= '0';
 			wait for this.TSpiClk/2;	--! half clock cycle
@@ -614,7 +630,7 @@ package body eSpiMasterBfm is
 		
 		
         --***************************
-        -- GET_CONFIGURATION w/o status
+        -- GET_CONFIGURATION w/o status, response
 		--   @see Figure 22: GET_CONFIGURATION Command
 		procedure GET_CONFIGURATION 
 			( 
@@ -623,16 +639,15 @@ package body eSpiMasterBfm is
 				signal SCK		: out std_logic; 
 				signal DIO		: inout std_logic_vector(3 downto 0);
 				constant adr	: in std_logic_vector(15 downto 0);
-				variable cfg	: out std_logic_vector(31 downto 0);
+				variable config	: out std_logic_vector(31 downto 0);
 				variable good	: inout boolean
 			) is
 			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
 			variable rsp : tESpiRsp;
 		begin
-			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp, good );
+			GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, sts, rsp, good );
 		end procedure GET_CONFIGURATION;
 		--***************************
-		
 		
 	----------------------------------------------
 	
