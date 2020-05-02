@@ -88,6 +88,7 @@ package eSpiMasterBfm is
 			);
 			
 		-- GET_CONFIGURATION:
+		-- @see Figure 22: GET_CONFIGURATION Command
 			-- w/ status
 			procedure GET_CONFIGURATION 
 				( 
@@ -101,7 +102,7 @@ package eSpiMasterBfm is
 					variable response	: out tESpiRsp;							--! slave response
 					variable good		: inout boolean							--! procedure state
 				);
-			-- w/o status, response
+			-- w/o status, response, regs, instead print to console
 			procedure GET_CONFIGURATION 
 				( 
 					variable this	: inout tESpiBfm; 
@@ -112,7 +113,30 @@ package eSpiMasterBfm is
 					variable config	: out std_logic_vector(31 downto 0);	--! config data
 					variable good	: inout boolean							--! procedure state
 				);
-			
+				
+        -- GET_STATUS
+		-- @see Figure 20: GET_STATUS Command
+			-- w/o any print to console
+			procedure GET_STATUS 
+				(
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					variable status 	: out std_logic_vector(15 downto 0);
+					variable response	: out tESpiRsp;		
+					variable good		: inout boolean
+				);
+			-- print to console only
+			procedure GET_STATUS 
+				(
+					variable this	: inout tESpiBfm; 
+					signal CSn		: out std_logic; 
+					signal SCK		: out std_logic; 
+					signal DIO		: inout std_logic_vector(3 downto 0);
+					variable good	: inout boolean
+				);
+				
 		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
 			-- w/ status
 			procedure IOWR_SHORT (
@@ -664,10 +688,10 @@ package body eSpiMasterBfm is
 				variable response	: out tESpiRsp;
 				variable good		: inout boolean
 			) is
-			variable msg 		: tMemX08(0 to 6);										--! eSpi message buffer
-			variable cfg		: std_logic_vector(config'range) := (others => '0');	--! internal buffer
-			variable sts		: std_logic_vector(status'range) := (others => '0');	--! internal buffer
-			variable spiGood	: boolean;												--! signals fail in SPI phy
+			variable msg	: tMemX08(0 to 6);										--! eSpi message buffer
+			variable cfg	: std_logic_vector(config'range) := (others => '0');	--! internal buffer
+			variable sts	: std_logic_vector(status'range) := (others => '0');	--! internal buffer
+			variable fg		: boolean;												--! signals fail in SPI phy
 		begin
 			-- build command
 			msg 	:= (others => (others => '0'));	--! clear
@@ -676,10 +700,10 @@ package body eSpiMasterBfm is
 			msg(2)	:= adr(7 downto 0);				--! low byte address
 			-- send and get response
 				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
-			spiXcv(this, msg, CSn, SCK, DIO, 3, 7, spiGood);	--! CRC added and checked by transceiver procedure 
+			spiXcv(this, msg, CSn, SCK, DIO, 3, 7, fg);	--! CRC added and checked by transceiver procedure 
 			-- process slaves response
 			response := decodeRsp(msg(0));						--! signal response
-			if ( spiGood ) then
+			if ( fg ) then
 				config := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assemble config
 				status := msg(6) & msg(5);						--! status
 			else
@@ -732,27 +756,55 @@ package body eSpiMasterBfm is
 				variable response	: out tESpiRsp;		
 				variable good		: inout boolean
 			) is
-			--variable 
-			variable msg 		: tMemX08(0 to 2);					--! eSpi message buffer
-			variable sts		: std_logic_vector(15 downto 0);	--! status register
-			variable spiGood	: boolean;							--! signals fail in SPI phy
+			variable msg	: tMemX08(0 to 2);	--! eSpi message buffer
+			variable fg		: boolean;			--! signals fail in SPI phy
 		begin
-			-- init
-			sts := (others => '0');
 			-- assemble command
-			msg(0) := C_GET_STATUS;
+			msg 	:= (others => (others => '0'));	--! clear
+			msg(0)	:= C_GET_STATUS;
 			-- send and get response
 				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
-			spiXcv(this, msg, CSn, SCK, DIO, 1, 7, spiGood);	--! CRC added and checked by transceiver procedure 
+			spiXcv(this, msg, CSn, SCK, DIO, 1, 3, fg);	--! CRC added and checked by transceiver procedure 
 			-- process slaves response
 			response := decodeRsp(msg(0));	--! signal response
-			if ( spiGood ) then
+			if ( fg ) then
 				status := msg(2) & msg(1);	--! status
 			else
 				good := false;
 			end if;
 		end procedure GET_STATUS;
 		--***************************
+		
+		
+        --***************************
+        -- GET_STATUS w/o register, prints only to console
+		--  @see Figure 20: GET_STATUS Command
+		procedure GET_STATUS 
+			(
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				variable good	: inout boolean
+			) is
+			variable fg	 	: boolean := true;					--! state of function good
+			variable sts	: std_logic_vector(15 downto 0);	--! needed for stucking
+			variable rsp	: tESpiRsp;							--!
+		begin
+			-- acquire status
+				-- GET_STATUS(this, CSn, SCK, DIO, status, response, good)
+			GET_STATUS(this, CSn, SCK, DIO, sts, rsp, fg);
+			-- in case of no output print to console
+			if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+			-- Function is good?
+			if ( not fg ) then
+				good := false;
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_STATUS:Slave " & rsp2str(rsp) severity error; end if;
+			end if;
+		end procedure GET_STATUS;
+		--***************************
+		
+		
 		
 		
 	----------------------------------------------
