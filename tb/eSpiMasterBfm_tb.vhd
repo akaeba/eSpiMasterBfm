@@ -176,7 +176,7 @@ begin
             variable good   : boolean	:= true;
 		-- DUT
 			variable eSpiMasterBfm	: tESpiBfm;							--! eSPI Master bfm Handle
-			variable eSpiMsg		: tESpiMsg(0 to 9);					--! eSPI Message
+			variable eSpiMsg		: tMemX08(0 to 9);					--! eSPI Message
 			variable config			: std_logic_vector(31 downto 0);	--! help for configuration
 			variable status			: std_logic_vector(15 downto 0);	--! help for status
 			variable slv8			: std_logic_vector(7 downto 0);		--! help
