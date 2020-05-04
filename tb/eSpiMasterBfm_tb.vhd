@@ -48,7 +48,9 @@ architecture sim of eSpiMasterBfm_tb is
         constant loopIter	: integer := 20;    --! number of test loop iteration
         constant doTest0	: boolean := true;  --! test0: 
 		constant doTest1	: boolean := true;  --! test1: GET_CONFIGURATION
-		constant doTest2	: boolean := false; --! test2:
+		constant doTest2	: boolean := true; 	--! test2: GET_STATUS
+		constant doTest3	: boolean := true; 	--! test3:
+		constant doTest4	: boolean := false; 	--! test4:
     -----------------------------
 	
 	
@@ -58,10 +60,6 @@ architecture sim of eSpiMasterBfm_tb is
 		signal CSn	: std_logic; 
 		signal SCK 	: std_logic; 
 		signal DIO 	: std_logic_vector(3 downto 0);
-		-- Test IOWR_SHORT
-		signal IOWR_SHORT_B0		: std_logic_vector(73 downto 0) 		:= (others => 'Z');
-		signal IOWR_SHORT_B0_SFR	: std_logic_vector(IOWR_SHORT_B0'range)	:= (others => 'Z');
-		signal ioWrB0Load			: std_logic;
 		-- Test Message Recorder
 		signal espiRecCmd	: string(1 to 50);	--! expected command string, NULL terminated
 		signal espiRecRsp	: string(1 to 50);	--! response, null terminated
@@ -190,9 +188,6 @@ begin
             Report "Init...";
 			init(eSpiMasterBfm, CSn, SCK, DIO);	--! init eSpi Master
 			eSpiMasterBfm.verbose := 3;			--! enable errors + warning messages
-			ioWrB0Load		<= '0';
-			IOWR_SHORT_B0	<= (others => '0');
-			
 			wait for 1 us;
 		-------------------------
 
@@ -202,7 +197,7 @@ begin
 		-- SRC: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
         -------------------------
 		if ( doTest0 or DO_ALL_TEST ) then
-			Report "Test0: Check CRC8 Function";
+			Report "Test0: Check CRC8";
 			-- set 0
 			eSpiMsg(0) := x"31"; 
 			eSpiMsg(1) := x"32"; 
@@ -240,51 +235,77 @@ begin
 		
 		
 		-------------------------
-        -- Test1: GET_CONFIGURATION Command
-		-- SRC: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
+        -- Test1: GET_CONFIGURATION
         -------------------------
 		if ( doTest1 or DO_ALL_TEST ) then
-			Report "Test1: GET_CONFIGURATION Command";
+			Report "Test1: GET_CONFIGURATION";
 			-- prepare message recorder
-			espiRecCmd(1 to 9)	<= "21000434" 				& character(NUL);
-			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);
+			espiRecCmd(1 to 9)	<= "21000434" 				& character(NUL);			--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);			--! received response 	(Slave to BFM)
 			GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, good );	--! read from Slave
-		
-		
-
-		
-		
-		
-		
+			wait for 1 us;
 		end if;
 		-------------------------
 		
 		
 		-------------------------
-        -- Test2: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT
-		-- SRC: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
+        -- Test2: GET_STATUS
         -------------------------
 		if ( doTest2 or DO_ALL_TEST ) then
-			Report "Test2: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT";
-				-- prepare Shift reg
-			IOWR_SHORT_B0	<= (others => 'Z');
-			ioWrB0Load		<= '0';
-			wait for eSpiMasterBfm.TSpiClk/2;
-			ioWrB0Load		<= '1';
-			wait for eSpiMasterBfm.TSpiClk/2;
-			ioWrB0Load		<= '0';
-				-- procedure IOWR_SHORT ( this, CSn, SCK, DIO, adr, data );
-			IOWR_SHORT( eSpiMasterBfm, CSn, SCK, DIO, x"0815", x"47" );
-				-- check command
-			if ( "010001" & "01" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left downto IOWR_SHORT_B0_SFR'left-7) ) then
-				Report "  Failed Command PUT_IOWR_SHORT" severity error;
-				good := false;
-			end if;
-				-- check address
-			if ( x"0815" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left-8 downto IOWR_SHORT_B0_SFR'left-23) ) then
-				Report "  Failed IOWR_SHORT address" severity error;
-				good := false;
-			end if;
+			Report "Test2: GET_STATUS";
+			-- prepare message recorder
+			espiRecCmd(1 to 5)	<= "25FB" 					& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
+			GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );					--! get status from slave
+			wait for 1 us;
+		end if;
+		-------------------------
+		
+		
+		-------------------------
+        -- Test3: MEMWR32
+        -------------------------
+		if ( doTest3 or DO_ALL_TEST ) then
+			Report "Test3: MEMWR32";
+			-- prepare message recorder
+			espiRecCmd(1 to 11)	<= "4C00804717" 			& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
+			MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good );	--! write single byte to address 0x80
+			wait for 1 us;
+		end if;
+		-------------------------
+		
+		
+		
+		
+		
+		
+		
+		
+		-------------------------
+        -- Test4: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT
+        -------------------------
+		if ( doTest4 or DO_ALL_TEST ) then
+			Report "Test3: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT";
+				-- -- prepare Shift reg
+			-- IOWR_SHORT_B0	<= (others => 'Z');
+			-- ioWrB0Load		<= '0';
+			-- wait for eSpiMasterBfm.TSpiClk/2;
+			-- ioWrB0Load		<= '1';
+			-- wait for eSpiMasterBfm.TSpiClk/2;
+			-- ioWrB0Load		<= '0';
+				-- -- procedure IOWR_SHORT ( this, CSn, SCK, DIO, adr, data );
+			-- IOWR_SHORT( eSpiMasterBfm, CSn, SCK, DIO, x"0815", x"47" );
+				-- -- check command
+			-- if ( "010001" & "01" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left downto IOWR_SHORT_B0_SFR'left-7) ) then
+				-- Report "  Failed Command PUT_IOWR_SHORT" severity error;
+				-- good := false;
+			-- end if;
+				-- -- check address
+			-- if ( x"0815" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left-8 downto IOWR_SHORT_B0_SFR'left-23) ) then
+				-- Report "  Failed IOWR_SHORT address" severity error;
+				-- good := false;
+			-- end if;
 
 
 
