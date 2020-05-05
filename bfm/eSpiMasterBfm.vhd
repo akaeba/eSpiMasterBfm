@@ -865,7 +865,7 @@ package body eSpiMasterBfm is
 			-- determine instruction type
 			if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! CMD: PUT_MEMWR32_SHORT
 				-- user message
-				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT (Memory Write) instruction"; end if;
+				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT instruction"; end if;
 				-- build instruction
 				dataLenSlv	:= std_logic_vector(to_unsigned(data'length - 1, dataLenSlv'length));	--! number of bytes
 				msg(0)		:= C_PUT_MEMWR32_SHORT & dataLenSlv(1 downto 0);						--! assemble command
