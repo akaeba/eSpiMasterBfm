@@ -864,26 +864,17 @@ package body eSpiMasterBfm is
 			msg := (others => (others => '0'));
 			-- determine instruction type
 			if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! CMD: PUT_MEMWR32_SHORT
+				-- user message
+				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT (Memory Write) instruction"; end if;
 				-- build instruction
 				dataLenSlv	:= std_logic_vector(to_unsigned(data'length - 1, dataLenSlv'length));	--! number of bytes
 				msg(0)		:= C_PUT_MEMWR32_SHORT & dataLenSlv(1 downto 0);						--! assemble command
 				msgLen		:= msgLen + 1;
-				-- Short I/O Write Requests / Short Memory Write 32 Requests?
-				if ( x"0000" = adr(31 downto 16) ) then	--!  Short I/O Write
-					msg(1)	:= adr(15 downto 8);
-					msg(2)	:= adr(7 downto 0);
-					msgLen	:= msgLen + 2;
-					-- user message
-					if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT (IO Write) instruction"; end if;
-				else									--! Short Memory Write 32
-					msg(1)	:= adr(31 downto 24);
-					msg(2)	:= adr(23 downto 16);
-					msg(3)	:= adr(15 downto 8);
-					msg(4)	:= adr(7 downto 0);
-					msgLen	:= msgLen + 4;
-					-- user message
-					if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT (Memory Write) instruction"; end if;
-				end if;
+				msg(1)		:= adr(31 downto 24);
+				msg(2)		:= adr(23 downto 16);
+				msg(3)		:= adr(15 downto 8);
+				msg(4)		:= adr(7 downto 0);
+				msgLen		:= msgLen + 4;
 			else																		--! CMD: PUT_NP
 			
 			
@@ -929,13 +920,14 @@ package body eSpiMasterBfm is
 			-- fill in data
 			dBuf(0) := data;
 				-- MEMWR32(this, CSn, SCK, DIO, adr, data, status, response, good)
-			MEMWR32(this, CSn, SCK, DIO, adr, dBuf, sts, rsp, good);
-			-- in case of no output print to console
-			if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+			MEMWR32(this, CSn, SCK, DIO, adr, dBuf, sts, rsp, fg);
 			-- Slave request good?
 			if ( not fg ) then
 				good := false;
 				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
+			else
+				-- in case of no output print to console
+				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
 			end if;
 		end procedure MEMWR32;
 		--***************************
