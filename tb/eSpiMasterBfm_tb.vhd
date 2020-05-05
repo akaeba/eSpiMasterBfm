@@ -49,8 +49,9 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest0	: boolean := true;  --! test0: 
 		constant doTest1	: boolean := true;  --! test1: GET_CONFIGURATION
 		constant doTest2	: boolean := true; 	--! test2: GET_STATUS
-		constant doTest3	: boolean := true; 	--! test3:
-		constant doTest4	: boolean := false; 	--! test4:
+		constant doTest3	: boolean := true; 	--! test3: MEMWR32
+		constant doTest4	: boolean := true; 	--! test4: MEMRD32
+		constant doTest5	: boolean := false; 	--! test4: 
     -----------------------------
 	
 	
@@ -254,9 +255,9 @@ begin
 		if ( doTest2 or DO_ALL_TEST ) then
 			Report "Test2: GET_STATUS";
 			-- prepare message recorder
-			espiRecCmd(1 to 5)	<= "25FB" 					& character(NUL);	--! sent Request 		(BFM to Slave)
-			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
-			GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );					--! get status from slave
+			espiRecCmd(1 to 5)	<= "25FB" 			& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 15)	<= "0F0F0F080F039B" & character(NUL);	--! received response 	(Slave to BFM)
+			GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );			--! get status from slave
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -276,6 +277,20 @@ begin
 		-------------------------
 		
 		
+		-------------------------
+        -- Test4: MEMRD32
+        -------------------------
+		if ( doTest4 or DO_ALL_TEST ) then
+			Report "Test4: MEMRD32";
+			-- prepare message recorder
+			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
+			MEMRD32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", slv8, good );	--! read single byte from address 0x80
+			wait for 1 us;
+		end if;
+		-------------------------
+		
+		
 		
 		
 		
@@ -285,7 +300,7 @@ begin
 		-------------------------
         -- Test4: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT
         -------------------------
-		if ( doTest4 or DO_ALL_TEST ) then
+		if ( doTest5 or DO_ALL_TEST ) then
 			Report "Test3: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT";
 				-- -- prepare Shift reg
 			-- IOWR_SHORT_B0	<= (others => 'Z');

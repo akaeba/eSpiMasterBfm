@@ -138,7 +138,7 @@ package eSpiMasterBfm is
 				);
 				
 		-- MEMWR32
-		--@see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
+		--  @see Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
 			-- arbitrary number of data bytes, response and status register
 			procedure MEMWR32 
 				(
@@ -164,6 +164,33 @@ package eSpiMasterBfm is
 					variable good		: inout boolean							--! successful?
 				);
 				
+        -- MEMRD32
+		--  @see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
+			-- arbitrary number of data bytes, response and status register
+			procedure MEMRD32 
+				(
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr 		: in std_logic_vector(31 downto 0);		--! memory address
+					variable data		: out tMemX08;							--! arbitrary number of data bytes
+					variable status 	: out std_logic_vector(15 downto 0);	--! slave status
+					variable response	: out tESpiRsp;							--! slave command response
+					variable good		: inout boolean							--! successful? 
+				);
+			-- single data byte, w/o response and status register
+			procedure MEMRD32 
+				(
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr 		: in std_logic_vector(31 downto 0);		--! memory address
+					variable data		: out std_logic_vector(7 downto 0);		--! single data word
+					variable good		: inout boolean							--! successful 
+				);
+				
 		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
 			-- w/ status
 			procedure IOWR_SHORT (
@@ -185,8 +212,6 @@ package eSpiMasterBfm is
 				constant data	: in std_logic_vector(7 downto 0)		--! write data
 			);
 			
-			
-		
 	-----------------------------
 
 end package eSpiMasterBfm;
@@ -842,7 +867,7 @@ package body eSpiMasterBfm is
         --***************************
         -- Memory write (32bit)
 		-- PUT_MEMWR32_SHORT / PUT_NP 
-		--  @see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
+		--  @see Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
 		procedure MEMWR32 
 			(
 				variable this		: inout tESpiBfm; 
@@ -876,7 +901,7 @@ package body eSpiMasterBfm is
 				msg(4)		:= adr(7 downto 0);
 				msgLen		:= msgLen + 4;
 			else																		--! CMD: PUT_NP
-			
+				--! TODO
 			
 			
 			end if;
@@ -901,7 +926,7 @@ package body eSpiMasterBfm is
         --***************************
         -- Memory write (32bit), w/o status/response register, prints it values to console, except only one data word
 		-- PUT_MEMWR32_SHORT / PUT_NP 
-		--  @see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
+		--  @see Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
 		procedure MEMWR32 
 			(
 				variable this		: inout tESpiBfm; 
@@ -931,7 +956,99 @@ package body eSpiMasterBfm is
 			end if;
 		end procedure MEMWR32;
 		--***************************
-	
+		
+		
+        --***************************
+        -- Memory read (32bit)
+		-- PUT_MEMRD32_SHORT / PUT_PC 
+		--  @see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
+		procedure MEMRD32 
+			(
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr 		: in std_logic_vector(31 downto 0);
+				variable data		: out tMemX08;		
+				variable status 	: out std_logic_vector(15 downto 0);
+				variable response	: out tESpiRsp;	
+				variable good		: inout boolean
+			) is
+			variable fg	 		: boolean := true;					--! state of function good
+			variable msg		: tMemX08(0 to data'length + 9);	--! 4Byte Address, Length 1Byte, Length/Tag 1Byte, Cycle Type 1Byte, CMD 1Byte, CRC 1Byte
+			variable dataLenSlv	: std_logic_vector(11 downto 0);	--! needed for 'PUT_MEMWR32_SHORT'
+			variable msgLen		: integer := 0;
+		begin
+			-- init
+			msg := (others => (others => '0'));
+			-- determine instruction type
+			if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! CMD: PUT_MEMWR32_SHORT
+				-- user message
+				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMRD32: PUT_MEMRD32_SHORT instruction"; end if;
+				-- build instruction
+				dataLenSlv	:= std_logic_vector(to_unsigned(data'length - 1, dataLenSlv'length));	--! number of bytes
+				msg(0)		:= C_PUT_MEMRD32_SHORT & dataLenSlv(1 downto 0);						--! assemble command
+				msgLen		:= msgLen + 1;
+				msg(1)		:= adr(31 downto 24);
+				msg(2)		:= adr(23 downto 16);
+				msg(3)		:= adr(15 downto 8);
+				msg(4)		:= adr(7 downto 0);
+				msgLen		:= msgLen + 4;
+			else																		--! CMD: PUT_NP
+				--! TODO
+			
+			
+			end if;
+			-- send and get response
+				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
+			spiXcv(this, msg, CSn, SCK, DIO, msgLen, data'length+3, fg);	--! xByte Data, +1Byte Response, +2Byte Status, CRC added and checked by transceiver procedure 
+			-- process slaves response
+			response := decodeRsp(msg(0));	--! slave response
+			if ( fg ) then
+				data 	:= msg(1 to data'length);					--! extract data from message
+				status 	:= msg(data'length+2) & msg(data'length+1);	--! status
+			else
+				status	:= (others => '0');
+				good 	:= false;
+			end if;
+		end procedure MEMRD32;
+		--***************************
+		
+		
+        --***************************
+        -- Memory read (32bit)
+		-- PUT_MEMRD32_SHORT / PUT_PC 
+		--  @see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
+		procedure MEMRD32 
+			(
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr 		: in std_logic_vector(31 downto 0);		--! memory address
+				variable data		: out std_logic_vector(7 downto 0);		--! single data word
+				variable good		: inout boolean							--! successful 
+			) is
+			variable dBuf	: tMemX08(0 to 0);
+			variable fg	 	: boolean := true;					--! state of function good
+			variable sts	: std_logic_vector(15 downto 0);	--! needed for stucking
+			variable rsp	: tESpiRsp;							--! decoded slave response
+		begin
+				-- MEMWR32(this, CSn, SCK, DIO, adr, data, status, response, good)
+			MEMRD32(this, CSn, SCK, DIO, adr, dBuf, sts, rsp, fg);
+			-- Slave request good?
+			if ( not fg ) then
+				good := false;
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMRD32:Slave " & rsp2str(rsp) severity error; end if;
+			else
+				-- in case of no output print to console
+				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+			end if;
+			-- fill in data
+			data := dBuf(0);
+		end procedure MEMRD32;
+		--***************************
+		
 	----------------------------------------------
 	
 	
@@ -1028,12 +1145,7 @@ package body eSpiMasterBfm is
 		end procedure IOWR_SHORT;
 		--***************************
 		
-		
-		
-		
-	
 	----------------------------------------------
-
 
 
 end package body eSpiMasterBfm;
