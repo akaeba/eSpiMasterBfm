@@ -163,6 +163,17 @@ package eSpiMasterBfm is
 					constant data		: in std_logic_vector(7 downto 0);		--! single data word
 					variable good		: inout boolean							--! successful?
 				);
+			-- multiple data bytes, w/o response and status register
+			procedure MEMWR32 
+				(
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr 		: in std_logic_vector(31 downto 0);		--! memory address
+					constant data		: in tMemX08;							--! multiple data
+					variable good		: inout boolean							--! successful 
+				);
 				
         -- MEMRD32
 		--  @see Figure 37: Short Peripheral Memory or Short I/O Read Packet Format (Master Initiated only)
@@ -267,6 +278,14 @@ package body eSpiMasterBfm is
 		constant C_FATAL_ERROR		: std_logic_vector(7 downto 0)	:= "00000011";	--! The received command had a fatal error that prevented the transaction layer packet from being successfully processed
 		constant C_WAIT_STATE		: std_logic_vector(7 downto 0)	:= "00001111";	--! Adds one byte-time of delay when responding to a transaction on the bus.
 		constant C_NO_RESPONSE		: std_logic_vector(7 downto 0)	:= "11111111";	--! The response encoding of all 1’s is defined as no response
+		--***************************
+		
+		--***************************
+		-- Cycle Type Encodings, Table 6: Cycle Types
+		constant C_CT_MEMRD32		: std_logic_vector(7 downto 0)	:= "00000000";	--! 32 bit addressing Memory Read Request. LPC Memory Read and LPC Bus Master Memory Read requests are mapped to this cycle type.
+		constant C_CT_MEMRD64		: std_logic_vector(7 downto 0)	:= "00000010";	--! 64 bit addressing Memory Read Request. Support of upstream Memory Read 64 is mandatory for eSPI slaves that are bus mastering capable.
+		constant C_CT_MEMWR32		: std_logic_vector(7 downto 0)	:= "00000001";	--! 32 bit addressing Memory Write Request. LPC Memory Write and LPC Bus Master Memory Write requests are mapped to this cycle type.
+		constant C_CT_MEMWR64		: std_logic_vector(7 downto 0)	:= "00000011";	--! 64 bit addressing Memory Write Request. Support of upstream Memory Write 64 is mandatory for eSPI slaves that are bus mastering capable.
 		--***************************
 		
 	----------------------------------------------
@@ -661,7 +680,7 @@ package body eSpiMasterBfm is
 		
 		
         --***************************
-        -- SPI Transceive
+        -- SPI Transceiver procedure
 		--   sends command to eSPI slave and captures response
 		--   the request is overwritten by the response
 		procedure spiXcv
@@ -882,29 +901,36 @@ package body eSpiMasterBfm is
 			) is
 			variable fg	 		: boolean := true;					--! state of function good
 			variable msg		: tMemX08(0 to data'length + 9);	--! 4Byte Address, Length 1Byte, Length/Tag 1Byte, Cycle Type 1Byte, CMD 1Byte, CRC 1Byte
-			variable dataLenSlv	: std_logic_vector(11 downto 0);	--! needed for 'PUT_MEMWR32_SHORT'
-			variable msgLen		: integer := 0;
+			variable dLenSlv	: std_logic_vector(11 downto 0);	--! needed for 'PUT_MEMWR32_SHORT'
+			variable msgLen		: natural := 0;
 		begin
-			-- init
-			msg := (others => (others => '0'));
+			-- prepare
+			msg := (others => (others => '0'));											--! init message array
 			-- determine instruction type
-			if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! CMD: PUT_MEMWR32_SHORT
+			if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! PUT_MEMWR32_SHORT; Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
 				-- user message
-				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT instruction"; end if;
+				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT"; end if;
 				-- build instruction
-				dataLenSlv	:= std_logic_vector(to_unsigned(data'length - 1, dataLenSlv'length));	--! number of bytes
-				msg(0)		:= C_PUT_MEMWR32_SHORT & dataLenSlv(1 downto 0);						--! assemble command
-				msgLen		:= msgLen + 1;
-				msg(1)		:= adr(31 downto 24);
-				msg(2)		:= adr(23 downto 16);
-				msg(3)		:= adr(15 downto 8);
-				msg(4)		:= adr(7 downto 0);
-				msgLen		:= msgLen + 4;
-			else																		--! CMD: PUT_NP
-				--! TODO
-			
-			
+				dLenSlv	:= std_logic_vector(to_unsigned(data'length - 1, dLenSlv'length));	--! number of bytes
+				msg(0)	:= C_PUT_MEMWR32_SHORT & dLenSlv(1 downto 0);
+				msgLen	:= msgLen + 1;
+			else																		--! PUT_NP; Figure 34: Peripheral Memory Write Packet Format
+				-- user message
+				if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_PC"; end if;
+				-- build instruction
+				dLenSlv	:= std_logic_vector(to_unsigned(data'length, dLenSlv'length));	--! number of bytes
+				msg(0)	:= C_PUT_PC;													--! Posted Completion Command
+				msg(1)	:= C_CT_MEMWR32;												--! Memory write with 32Bit
+				msg(2)	:= "0000" & dLenSlv(11 downto 8);								--! TAG and Len field
+				msg(3)	:= dLenSlv(7 downto 0);											--! Len Field
+				msgLen	:= msgLen + 4;
 			end if;
+			-- add address to message
+			msg(msgLen + 0)	:= adr(31 downto 24);
+			msg(msgLen + 1)	:= adr(23 downto 16);
+			msg(msgLen + 2)	:= adr(15 downto 8);
+			msg(msgLen + 3)	:= adr(7 downto 0);
+			msgLen			:= msgLen + 4;
 			-- fill in data
 			msg(msgLen to data'length + msgLen - 1)	:= data;	--! copy data
 			msgLen := msgLen + data'length;
@@ -946,6 +972,38 @@ package body eSpiMasterBfm is
 			dBuf(0) := data;
 				-- MEMWR32(this, CSn, SCK, DIO, adr, data, status, response, good)
 			MEMWR32(this, CSn, SCK, DIO, adr, dBuf, sts, rsp, fg);
+			-- Slave request good?
+			if ( not fg ) then
+				good := false;
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
+			else
+				-- in case of no output print to console
+				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+			end if;
+		end procedure MEMWR32;
+		--***************************
+		
+		
+        --***************************
+        -- Memory write (32bit), w/o status/response register, prints it values to console, except only one data word
+		-- PUT_MEMWR32_SHORT / PUT_NP 
+		--  @see Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
+		procedure MEMWR32 
+			(
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr 		: in std_logic_vector(31 downto 0);		--! memory address
+				constant data		: in tMemX08;							--! multiple data
+				variable good		: inout boolean							--! successful 
+			) is
+			variable fg	 	: boolean := true;					--! state of function good
+			variable sts	: std_logic_vector(15 downto 0);	--! needed for stucking
+			variable rsp	: tESpiRsp;							--! decoded slave response
+		begin
+				-- MEMWR32(this, CSn, SCK, DIO, adr, data, status, response, good)
+			MEMWR32(this, CSn, SCK, DIO, adr, data, sts, rsp, fg);
 			-- Slave request good?
 			if ( not fg ) then
 				good := false;

@@ -180,7 +180,7 @@ begin
 			variable status			: std_logic_vector(15 downto 0);	--! help for status
 			variable slv8			: std_logic_vector(7 downto 0);		--! help
 			variable slv32			: std_logic_vector(31 downto 0);	--! help
-			
+			variable memX08			: tMemX08(0 to 2);					--! help
     begin
 
         -------------------------
@@ -268,10 +268,20 @@ begin
         -------------------------
 		if ( doTest3 or DO_ALL_TEST ) then
 			Report "Test3: MEMWR32";
-			-- prepare message recorder
-			espiRecCmd(1 to 11)	<= "4C00804717" 			& character(NUL);	--! sent Request 		(BFM to Slave)
-			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
-			MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good );	--! write single byte to address 0x80
+			Report "         single Byte write";
+			-- Memory write with short command
+			espiRecCmd(1 to 15)	<= "4C0000008047F9" 		& character(NUL);		--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);		--! received response 	(Slave to BFM)
+			MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good );		--! write single byte to address 0x80
+			wait for 4*eSpiMasterBfm.TSpiClk;
+			-- Memory write non-short command
+			Report "         multiple Byte write";
+			espiRecCmd(1 to 25)	<= "00010003000000800123454A" 	& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" 	& character(NUL);	--! received response 	(Slave to BFM)
+			memX08(0) 	:= x"01";
+			memX08(1)	:= x"23";
+			memX08(2)	:= x"45";
+			MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", memX08, good );	--! write to memory
 			wait for 1 us;
 		end if;
 		-------------------------
