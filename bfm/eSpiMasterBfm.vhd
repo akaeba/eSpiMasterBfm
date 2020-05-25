@@ -12,6 +12,7 @@
 -- @date:   	2020-01-04
 --
 -- @see:		https://www.intel.com/content/dam/support/us/en/documents/software/chipset-software/327432-004_espi_base_specification_rev1.0_cb.pdf
+-- @see:		https://github.com/akaeba/eSpiMM
 -- @brief:      bus functional model for enhanced SPI (eSPI)
 --				provides function to interact with an eSPI 
 --				slave
@@ -85,6 +86,16 @@ package eSpiMasterBfm is
 				signal CSn		: out std_logic; 						--! slave select
 				signal SCK 		: out std_logic; 						--! shift clock
 				signal DIO 		: inout std_logic_vector(3 downto 0)	--! bidirectional data	
+			);
+		
+        -- RESET: apply reset sequence
+		-- @see Figure 63: In-band RESET Command
+		procedure RESET
+			(
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK 			: out std_logic; 						--! shift clock
+				signal DIO 			: inout std_logic_vector(3 downto 0)	--! bidirectional data
 			);
 			
 		-- GET_CONFIGURATION:
@@ -703,7 +714,7 @@ package body eSpiMasterBfm is
 			crcMsg(lenReq)			:= crc8(crcMsg(0 to lenReq-1));	-- append CRC
 			crcMsgLen				:= lenReq + 1;					-- set new message length
 			-- print send message to console
-			if ( this.verbose > 2) then Report "eSpiMasterBfm:spiXcv:Tx: " & hexStr(crcMsg(0 to crcMsgLen-1)); end if;
+			if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Tx: " & hexStr(crcMsg(0 to crcMsgLen-1)); end if;
 			-- start
 			CSn	<= '0';											--! enable Slave
 			spiTx(this, crcMsg(0 to crcMsgLen-1), SCK, DIO);	--! write to slave
@@ -744,6 +755,36 @@ package body eSpiMasterBfm is
     -- eSPI Slave Management
     ----------------------------------------------
 
+        --***************************
+        -- RESET: sends reset sequence to slave
+		procedure RESET
+			(
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK 			: out std_logic; 						--! shift clock
+				signal DIO 			: inout std_logic_vector(3 downto 0)	--! bidirectional data
+			) is
+		begin
+			-- user message
+			if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:RESET"; end if;
+			-- select slave
+			CSn	<= '0';
+			DIO	<= (others => '1');
+			wait for this.TSpiClk/2;
+			-- do reset sequence
+			for i in 0 to 15 loop
+				SCK	<= '1';
+				wait for this.TSpiClk/2;
+				SCK	<= '0';
+				wait for this.TSpiClk/2;
+			end loop;
+			CSn	<= '1';
+			DIO	<= (others => 'Z');
+			wait for this.TSpiClk;	--! limits CSn bandwidth to SCK
+		end procedure RESET;
+		--***************************
+	
+	
         --***************************
         -- GET_CONFIGURATION w/ status
 		--  @see Figure 22: GET_CONFIGURATION Command
