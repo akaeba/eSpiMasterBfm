@@ -125,6 +125,33 @@ package eSpiMasterBfm is
 					variable good	: inout boolean							--! procedure state
 				);
 				
+		-- SET_CONFIGURATION:
+		-- @see Figure 23: SET_CONFIGURATION Command
+			-- w/ status
+			procedure SET_CONFIGURATION 
+				( 
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr		: in std_logic_vector(15 downto 0);
+					constant config		: in std_logic_vector(31 downto 0);
+					variable status		: out std_logic_vector(15 downto 0);
+					variable response	: out tESpiRsp;
+					variable good		: inout boolean
+				);
+			-- w/o status, response, regs, instead print to console
+			procedure SET_CONFIGURATION 
+				( 
+					variable this	: inout tESpiBfm; 
+					signal CSn		: out std_logic; 
+					signal SCK		: out std_logic; 
+					signal DIO		: inout std_logic_vector(3 downto 0);
+					constant adr	: in std_logic_vector(15 downto 0);
+					constant config	: in std_logic_vector(31 downto 0);
+					variable good	: inout boolean
+				);
+				
         -- GET_STATUS
 		-- @see Figure 20: GET_STATUS Command
 			-- w/o any print to console
@@ -859,6 +886,8 @@ package body eSpiMasterBfm is
 			variable sts	: std_logic_vector(status'range) := (others => '0');	--! internal buffer
 			variable fg		: boolean;												--! signals fail in SPI phy
 		begin
+			-- user message
+			if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:GET_CONFIGURATION"; end if;
 			-- build command
 			msg 	:= (others => (others => '0'));	--! clear
 			msg(0)	:= C_GET_CONFIGURATION;			--! Command
@@ -873,7 +902,8 @@ package body eSpiMasterBfm is
 				config := msg(4) & msg(3) & msg(2) & msg(1);	--! extract and assemble config
 				status := msg(6) & msg(5);						--! status
 			else
-				good := false;
+				status	:= (others => '0');
+				good 	:= false;
 			end if;
 		end procedure GET_CONFIGURATION;
 		--***************************
@@ -906,6 +936,82 @@ package body eSpiMasterBfm is
 				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
 			end if;
 		end procedure GET_CONFIGURATION;
+		--***************************
+		
+		
+        --***************************
+        -- SET_CONFIGURATION w/ status
+		--  @see Figure 23: SET_CONFIGURATION Command
+		procedure SET_CONFIGURATION 
+			( 
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr		: in std_logic_vector(15 downto 0);
+				constant config		: in std_logic_vector(31 downto 0);
+				variable status		: out std_logic_vector(15 downto 0);
+				variable response	: out tESpiRsp;
+				variable good		: inout boolean
+			) is
+			variable msg	: tMemX08(0 to 6);										--! eSpi message buffer
+			variable cfg	: std_logic_vector(config'range) := (others => '0');	--! internal buffer
+			variable sts	: std_logic_vector(status'range) := (others => '0');	--! internal buffer
+			variable fg		: boolean;												--! signals fail in SPI phy
+		begin
+			-- user message
+			if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:SET_CONFIGURATION"; end if;
+			-- build command
+			msg 	:= (others => (others => '0'));	--! clear
+			msg(0)	:= C_SET_CONFIGURATION;			--! Command
+			msg(1)	:= adr(15 downto 8);			--! high byte address
+			msg(2)	:= adr(07 downto 0);			--! low byte address
+			msg(3)	:= config(31 downto 24);		--! new config value
+			msg(4)	:= config(23 downto 16);
+			msg(5)	:= config(15 downto 08);
+			msg(6)	:= config(07 downto 00);
+			-- send and get response
+				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
+			spiXcv(this, msg, CSn, SCK, DIO, 7, 3, fg);	--! CRC added and checked by transceiver procedure 
+			-- process slaves response
+			response := decodeRsp(msg(0));	--! signal response
+			if ( fg ) then
+				status := msg(2) & msg(1);	--! status
+			else
+				status 	:= (others => '0');
+				good 	:= false;
+			end if;
+		end procedure SET_CONFIGURATION;
+		--***************************
+		
+		
+        --***************************
+        -- SET_CONFIGURATION w/o status, response
+		--   @see Figure 23: SET_CONFIGURATION Command
+		procedure SET_CONFIGURATION 
+			( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);
+				constant config	: in std_logic_vector(31 downto 0);
+				variable good	: inout boolean
+			) is
+			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
+			variable rsp : tESpiRsp;
+			variable fg	 : boolean := true;					--! state of function good
+		begin
+			-- get configuration
+			SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, sts, rsp, fg );
+			-- in case of no output print to console
+			if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+			-- Function is good?
+			if ( not fg ) then
+				good := false;
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
+			end if;
+		end procedure SET_CONFIGURATION;
 		--***************************
 		
 		
@@ -975,7 +1081,7 @@ package body eSpiMasterBfm is
 	
 	
     ----------------------------------------------
-    -- Memory Read /Write Operation
+    -- Memory Read / Write Operation
     ----------------------------------------------
 	
         --***************************
