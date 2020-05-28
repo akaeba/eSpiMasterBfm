@@ -253,6 +253,20 @@ package eSpiMasterBfm is
 					variable good		: inout boolean							--! successful
 				);
 				
+		-- System Event Virtual Wires
+		-- Coomunication via "VWIREWR"
+		--   @see Table 11: System Event Virtual Wires for Index=3
+			-- PLTRST
+			procedure VW_PLTRST
+				(
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 						--! slave select
+					signal SCK			: out std_logic; 						--! shift clock
+					signal DIO			: inout std_logic_vector(3 downto 0);	--! data lines
+					constant XPLTRST	: bit;									--! active low reset, assert/de-assert 
+					variable good		: inout boolean							--! successful
+				);
+				
 		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
 			-- w/ status
 			procedure IOWR_SHORT (
@@ -1193,7 +1207,7 @@ package body eSpiMasterBfm is
 	
 	
     ----------------------------------------------
-    -- Virtual Channel Operations
+    -- Virtual Channel Interactions
     ----------------------------------------------
 	
         --***************************
@@ -1313,6 +1327,46 @@ package body eSpiMasterBfm is
 				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
 			end if;
 		end procedure VWIREWR;
+		--***************************
+		
+	----------------------------------------------
+	
+	
+
+    ----------------------------------------------
+    -- System Event Virtual Wires
+    ----------------------------------------------
+
+        --***************************
+        -- Vitual Wire: Manipulate PLTRST level
+		-- Platform Reset: Command to indicate Platform Reset assertion and de-assertion.
+		--   @see Table 11: System Event Virtual Wires for Index=3
+		procedure VW_PLTRST
+			(
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 						--! slave select
+				signal SCK			: out std_logic; 						--! shift clock
+				signal DIO			: inout std_logic_vector(3 downto 0);	--! data lines
+				constant XPLTRST	: bit;									--! active low reset, assert/de-assert 
+				variable good		: inout boolean							--! successful
+			) is
+				constant vwIdx 	: std_logic_vector(7 downto 0) := x"03";	--! System Event Index
+				variable vwData	: std_logic_vector(7 downto 0);				--! Modifier of PLTRST
+				variable slv1	: std_logic_vector(0 downto 0);				--! help vector
+		begin
+			-- user message
+			if ( this.verbose > C_MSG_INFO ) then 
+				slv1(0)	:= to_stdulogic(XPLTRST);
+				Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = " & integer'image(to_integer(unsigned(slv1))); 
+			end if;
+			-- prepare command
+			vwData 		:= (others => '0');			--! init
+			vwData(5)	:= '1';						--! PLTRST modifier is valid
+			vwData(1)	:= to_stdulogic(XPLTRST);	--! assign new PLTRST value
+			-- perform command
+				-- VWIREWR ( this, CSn, SCK, DIO, vwireIdx, vwireData, good	);
+			VWIREWR ( this, CSn, SCK, DIO, vwIdx, vwData, good );
+		end procedure VW_PLTRST;
 		--***************************
 		
 	----------------------------------------------
