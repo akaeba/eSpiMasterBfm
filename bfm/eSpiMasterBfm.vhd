@@ -1456,22 +1456,27 @@ package body eSpiMasterBfm is
 				constant XPLTRST	: bit;									--! active low reset, assert/de-assert 
 				variable good		: inout boolean							--! successful
 			) is
-				constant vwIdx 	: std_logic_vector(7 downto 0) := x"03";	--! System Event Index
 				variable vwData	: std_logic_vector(7 downto 0);				--! Modifier of PLTRST
-				variable slv1	: std_logic_vector(0 downto 0);				--! help vector
 		begin
-			-- user message
-			if ( this.verbose > C_MSG_INFO ) then 
-				slv1(0)	:= to_stdulogic(XPLTRST);
-				Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = " & integer'image(to_integer(unsigned(slv1))); 
+			-- assert/deassert reset?
+			if ( XPLTRST = '0' ) then	-- assert
+				-- user message
+				if ( this.verbose > C_MSG_INFO ) then 
+					Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = 0"; 
+				end if;
+				-- prepare data
+				vwData := x"11";	--! activate PLTRST#, activate SUS_STAT#
+			else						-- deassert
+				-- user message
+				if ( this.verbose > C_MSG_INFO ) then 
+					Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = 1"; 
+				end if;
+				-- prepare data
+				vwData := x"22";	--! deactivate PLTRST#, deactivate SUS_STAT#
 			end if;
-			-- prepare command
-			vwData 		:= (others => '0');			--! init
-			vwData(5)	:= '1';						--! PLTRST modifier is valid
-			vwData(1)	:= to_stdulogic(XPLTRST);	--! assign new PLTRST value
 			-- perform command
 				-- VWIREWR ( this, CSn, SCK, DIO, vwireIdx, vwireData, good	);
-			VWIREWR ( this, CSn, SCK, DIO, vwIdx, vwData, good );
+			VWIREWR ( this, CSn, SCK, DIO, x"03", vwData, good );
 		end procedure VW_PLTRST;
 		--***************************
 		
