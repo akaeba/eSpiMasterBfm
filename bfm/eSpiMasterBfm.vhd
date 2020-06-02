@@ -964,12 +964,14 @@ package body eSpiMasterBfm is
 			-- build command
 			msg 	:= (others => (others => '0'));	--! clear
 			msg(0)	:= C_SET_CONFIGURATION;			--! Command
+			-- Address: From MSB to LSB, @see: 327432-004, p. 93
 			msg(1)	:= adr(15 downto 8);			--! high byte address
 			msg(2)	:= adr(07 downto 0);			--! low byte address
-			msg(3)	:= config(31 downto 24);		--! new config value
-			msg(4)	:= config(23 downto 16);
-			msg(5)	:= config(15 downto 08);
-			msg(6)	:= config(07 downto 00);
+			-- Data: From LSB to MSB, @see: 327432-004, p. 93
+			msg(3)	:= config(07 downto 00);		--! new config value
+			msg(4)	:= config(15 downto 08);
+			msg(5)	:= config(23 downto 16);
+			msg(6)	:= config(31 downto 24);
 			-- send and get response
 				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
 			spiXcv(this, msg, CSn, SCK, DIO, 7, 3, fg);	--! CRC added and checked by transceiver procedure 
