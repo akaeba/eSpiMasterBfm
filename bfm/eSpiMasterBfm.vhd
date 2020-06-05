@@ -266,7 +266,34 @@ package eSpiMasterBfm is
 					constant data	: in std_logic_vector(7 downto 0);		--! single data word
 					variable good	: inout boolean							--! successful?
 				);
-		
+				
+		-- IORD
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
+			-- arbitrary number (1/2/4 bytes) of data, response and status register
+			procedure IORD
+				( 
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr		: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+					variable data		: out tMemX08;							--! read data, 1/2/4 Bytes supported
+					variable status 	: out std_logic_vector(15 downto 0);	--! slave status
+					variable response	: out tESpiRsp;							--! command response
+					variable good		: inout boolean							--! successful?
+				);
+			-- single data byte, w/o response and status register
+			procedure IORD 
+				( 
+					variable this	: inout tESpiBfm; 
+					signal CSn		: out std_logic; 
+					signal SCK		: out std_logic; 
+					signal DIO		: inout std_logic_vector(3 downto 0);
+					constant adr	: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+					variable data	: out std_logic_vector(7 downto 0);		--! single data word
+					variable good	: inout boolean							--! successful?
+				);
+
 		-- VWIREWR	
 		--	@see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
 			-- arbitrary number (<64) of vwire data, response and status register
@@ -1406,6 +1433,86 @@ package body eSpiMasterBfm is
 				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
 			end if;
 		end procedure IOWR;
+		--***************************
+		
+        --***************************
+        -- IORD
+		-- PUT_IORD_SHORT
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
+		procedure IORD
+			( 
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr		: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+				variable data		: out tMemX08;							--! read data, 1/2/4 Bytes supported
+				variable status 	: out std_logic_vector(15 downto 0);	--! slave status
+				variable response	: out tESpiRsp;							--! command response
+				variable good		: inout boolean							--! successful?
+			) is
+			variable fg	 		: boolean := true;					--! state of function good
+			variable msg		: tMemX08(0 to data'length + 3);	--! CMD 1Byte, 2Byte Address
+		begin
+			-- user message
+			if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD: PUT_IORD_SHORT"; end if;
+			-- check length
+			if not ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! PUT_IOWR_SHORT; Figure 26: Master Initiated Short Non-Posted Transaction
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
+				good := False;	--! fail
+				return;			--! leave procedure
+			end if;
+			-- prepare data packet
+			msg 	:= (others => (others => '0'));												--! init message array
+			msg(0)	:= C_PUT_IORD_SHORT & std_logic_vector(to_unsigned(data'length - 1, 2));	--! CPUT_IORD_SHORT w/ 1/2/4 data bytes
+			msg(1)	:= adr(15 downto 8);
+			msg(2)	:= adr(7 downto 0);
+			-- send and get response
+				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
+			spiXcv(this, msg, CSn, SCK, DIO, 3, data'length+3, fg);	--! CRC added and checked by transceiver procedure 
+			-- process slaves response
+			response := decodeRsp(msg(0));	--! slave response
+			if ( fg ) then
+				status 	:= msg(2) & msg(1);					--! status
+				data	:= msg(3 to data'length + 3 - 1);	--! data bytes
+			else
+				status	:= (others => '0');
+				good 	:= false;	
+			end if;
+		end procedure IORD;
+		--***************************
+		
+        --***************************
+        -- IORD_SHORT, w/o status and response register -> console print, except only one data word
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
+		procedure IORD 
+			( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+				variable data	: out std_logic_vector(7 downto 0);		--! single data word
+				variable good	: inout boolean							--! successful?
+			) is
+			variable dBuf	: tMemX08(0 to 0);
+			variable fg	 	: boolean := true;					--! state of function good
+			variable sts	: std_logic_vector(15 downto 0);	--! needed for stucking
+			variable rsp	: tESpiRsp;							--! decoded slave response
+		begin
+				-- IORD( this, CSn, SCK, DIO, adr, data, status, response, good )
+			IORD( this, CSn, SCK, DIO, adr, dBuf, sts, rsp, fg );
+			-- Slave request good?
+			if ( not fg ) then
+				good := false;
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+			else
+				-- in case of no output print to console
+				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+				-- release data
+				data := dBuf(0);
+			end if;
+		end procedure IORD;
 		--***************************
 		
 	----------------------------------------------
