@@ -239,7 +239,34 @@ package eSpiMasterBfm is
 					variable data		: out std_logic_vector(7 downto 0);		--! single data word
 					variable good		: inout boolean							--! successful 
 				);
-				
+		
+        -- IOWR
+		--  @see Figure 26: Master Initiated Short Non-Posted Transaction
+			-- arbitrary number (1/2/4 bytes) of data, response and status register
+			procedure IOWR
+				( 
+					variable this		: inout tESpiBfm; 
+					signal CSn			: out std_logic; 
+					signal SCK			: out std_logic; 
+					signal DIO			: inout std_logic_vector(3 downto 0);
+					constant adr		: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+					constant data		: in tMemX08;							--! write data, 1/2/4 Bytes supported
+					variable status 	: out std_logic_vector(15 downto 0);	--! slave status
+					variable response	: out tESpiRsp;							--! command response
+					variable good		: inout boolean							--! successful?
+				);
+			-- single data byte, w/o response and status register
+			procedure IOWR 
+				( 
+					variable this	: inout tESpiBfm; 
+					signal CSn		: out std_logic; 
+					signal SCK		: out std_logic; 
+					signal DIO		: inout std_logic_vector(3 downto 0);
+					constant adr	: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+					constant data	: in std_logic_vector(7 downto 0);		--! single data word
+					variable good	: inout boolean							--! successful?
+				);
+		
 		-- VWIREWR	
 		--	@see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
 			-- arbitrary number (<64) of vwire data, response and status register
@@ -281,7 +308,7 @@ package eSpiMasterBfm is
 				);
 				
 		-- System Event Virtual Wires
-		-- Coomunication via "VWIREWR"
+		-- Communication via "VWIREWR"
 		--   @see Table 11: System Event Virtual Wires for Index=3
 			-- PLTRST
 			procedure VW_PLTRST
@@ -293,28 +320,7 @@ package eSpiMasterBfm is
 					constant XPLTRST	: bit;									--! active low reset, assert/de-assert 
 					variable good		: inout boolean							--! successful
 				);
-				
-		-- IOWR_SHORT: Master Initiated Short Non-Posted Transaction
-			-- w/ status
-			procedure IOWR_SHORT (
-				variable this	: inout tESpiBfm; 
-				signal CSn		: out std_logic; 
-				signal SCK		: out std_logic; 
-				signal DIO		: inout std_logic_vector(3 downto 0);
-				constant adr	: in std_logic_vector(15 downto 0);		--! write address
-				constant data	: in std_logic_vector(7 downto 0);		--! write data
-				variable sts	: out std_logic_vector(15 downto 0)		--! status of write
-			);
-			-- w/o status
-			procedure IOWR_SHORT ( 
-				variable this	: inout tESpiBfm; 
-				signal CSn		: out std_logic; 
-				signal SCK		: out std_logic; 
-				signal DIO		: inout std_logic_vector(3 downto 0);
-				constant adr	: in std_logic_vector(15 downto 0);		--! write address
-				constant data	: in std_logic_vector(7 downto 0)		--! write data
-			);
-			
+
 	-----------------------------
 
 end package eSpiMasterBfm;
@@ -1153,7 +1159,7 @@ package body eSpiMasterBfm is
 		
 		
         --***************************
-        -- Memory write (32bit), w/o status/response register, prints it values to console, except only one data word
+        -- Memory write (32bit), w/o status and response register -> console print, except only one data word
 		-- PUT_MEMWR32_SHORT / PUT_NP 
 		--  @see Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
 		procedure MEMWR32 
@@ -1288,7 +1294,7 @@ package body eSpiMasterBfm is
 				signal DIO			: inout std_logic_vector(3 downto 0);
 				constant adr 		: in std_logic_vector(31 downto 0);		--! memory address
 				variable data		: out std_logic_vector(7 downto 0);		--! single data word
-				variable good		: inout boolean							--! successful 
+				variable good		: inout boolean							--! successful?
 			) is
 			variable dBuf	: tMemX08(0 to 0);
 			variable fg	 	: boolean := true;					--! state of function good
@@ -1308,6 +1314,98 @@ package body eSpiMasterBfm is
 			-- fill in data
 			data := dBuf(0);
 		end procedure MEMRD32;
+		--***************************
+		
+	----------------------------------------------
+	
+	
+	
+    ----------------------------------------------
+    -- IO Read / Write operation
+    ----------------------------------------------
+	
+        --***************************
+        -- IOWR
+		-- PUT_IOWR_SHORT
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
+		procedure IOWR
+			( 
+				variable this		: inout tESpiBfm; 
+				signal CSn			: out std_logic; 
+				signal SCK			: out std_logic; 
+				signal DIO			: inout std_logic_vector(3 downto 0);
+				constant adr		: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+				constant data		: in tMemX08;							--! write data, 1/2/4 Bytes supported
+				variable status 	: out std_logic_vector(15 downto 0);	--! slave status
+				variable response	: out tESpiRsp;							--! command response
+				variable good		: inout boolean							--! successful?
+			) is
+			variable fg	 		: boolean := true;					--! state of function good
+			variable msg		: tMemX08(0 to data'length + 3);	--! CMD 1Byte, 2Byte Address
+			variable msgLen		: natural := 0;
+		begin
+			-- user message
+			if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR: PUT_IOWR_SHORT"; end if;
+			-- check length
+			if not ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then	--! PUT_IOWR_SHORT; Figure 26: Master Initiated Short Non-Posted Transaction
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
+				good := False;	--! fail
+				return;			--! leave procedure
+			end if;
+			-- prepare data packet
+			msg 	:= (others => (others => '0'));												--! init message array
+			msg(0)	:= C_PUT_IOWR_SHORT & std_logic_vector(to_unsigned(data'length - 1, 2));	--! CPUT_IOWR_SHORT w/ 1/2/4 data bytes
+			msg(1)	:= adr(15 downto 8);
+			msg(2)	:= adr(7 downto 0);
+			msgLen	:= msgLen + 3;
+			-- fill in data
+			msg(msgLen to data'length + msgLen - 1)	:= data;	--! copy data
+			msgLen := msgLen + data'length;
+			-- send and get response
+				-- spiXcv(this, msg, CSn, SCK, DIO, lenReq, lenRsp, good)
+			spiXcv(this, msg, CSn, SCK, DIO, msgLen, 3, fg);	--! CRC added and checked by transceiver procedure 
+			-- process slaves response
+			response := decodeRsp(msg(0));	--! slave response
+			if ( fg ) then
+				status 	:= msg(2) & msg(1);	--! status
+			else
+				status	:= (others => '0');
+				good 	:= false;
+			end if;
+		end procedure IOWR;
+		--***************************
+		
+        --***************************
+        -- IOWR_SHORT, w/o status and response register -> console print, except only one data word
+		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
+		procedure IOWR 
+			( 
+				variable this	: inout tESpiBfm; 
+				signal CSn		: out std_logic; 
+				signal SCK		: out std_logic; 
+				signal DIO		: inout std_logic_vector(3 downto 0);
+				constant adr	: in std_logic_vector(15 downto 0);		--! IO space address, 16Bits
+				constant data	: in std_logic_vector(7 downto 0);		--! single data word
+				variable good	: inout boolean							--! successful?
+			) is
+			variable dBuf	: tMemX08(0 to 0);
+			variable fg	 	: boolean := true;					--! state of function good
+			variable sts	: std_logic_vector(15 downto 0);	--! needed for stucking
+			variable rsp	: tESpiRsp;							--! decoded slave response
+		begin
+			-- fill in data
+			dBuf(0) := data;
+				-- IOWR( this, CSn, SCK, DIO, adr, data, status, response, good )
+			IOWR( this, CSn, SCK, DIO, adr, dBuf, sts, rsp, fg );
+			-- Slave request good?
+			if ( not fg ) then
+				good := false;
+				if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+			else
+				-- in case of no output print to console
+				if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;	--! INFO: print status
+			end if;
+		end procedure IOWR;
 		--***************************
 		
 	----------------------------------------------
@@ -1484,102 +1582,5 @@ package body eSpiMasterBfm is
 		
 	----------------------------------------------
 	
-	
-	
-    ----------------------------------------------
-    -- IO Read / Write operation
-    ----------------------------------------------
-	
-        --***************************
-        -- IOWR_SHORT
-		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
-		procedure IOWR_SHORT 
-			( 
-				variable this	: inout tESpiBfm; 
-				signal CSn		: out std_logic; 
-				signal SCK		: out std_logic; 
-				signal DIO		: inout std_logic_vector(3 downto 0);
-				constant adr	: in std_logic_vector(15 downto 0);
-				constant data	: in std_logic_vector(7 downto 0);
-				variable sts	: out std_logic_vector(15 downto 0)
-			) is
-			variable msg : tMemX08(0 to 4);	--! eSpi Tx Packet has 5 Bytes for 1Byte data
-		begin
-			-- entry message
-			if ( this.verbose > 1 ) then
-				Report "eSpiMasterBfm:IOWR_SHORT";
-			end if;
-			-- status
-			sts := (others => '0');		--! no ero
-			-- build & send Command
-			msg 	:= (others => (others => '0'));	--! clear
-			msg(0)	:= C_PUT_IOWR_SHORT & "01";		--! CMD: short write with one byte
-			msg(1)	:= adr(15 downto 8);
-			msg(2)	:= adr(7 downto 0);
-			msg(3)	:= data;
-			msg(4)	:= crc8(msg(0 to 3));
-			-- print send message to console
-			if ( this.verbose > 1 ) then
-				Report "eSpiMasterBfm:IOWR_SHORT:Tx " & hexStr(msg);
-			end if;
-			-- send command
-			CSn	<= '0';
-			spiTx(this, msg, SCK, DIO);	--! write to slave, CRC is auto appended
-			spiTar(this, SCK, DIO);		--! change direction (write-to-read)
-			-- read response
-			--   Byte 0: 	Response
-			--   Byte 1/2:	Status (STS)
-			spiRx(this, msg(0 to 0), SCK, DIO);				--! read only response field
-			while ( WAIT_STATE = decodeRsp(msg(0)) ) loop	--! response ready
-				spiRx(this, msg(0 to 0), SCK, DIO);			--! read from slave
-			end loop;
-			-- command accepted
-			if ( ACCEPT = decodeRsp(msg(0)) ) then
-				spiRx(this, msg(1 to 3), SCK, DIO);	--! read from slave
-				-- print receive message to console
-				if ( this.verbose > 1 ) then
-					Report "eSpiMasterBfm:IOWR_SHORT:Rx " & hexStr(msg(0 to 3));
-				end if;
-				-- check CRC and assign only in case of valid/disabled CRC
-				if ( checkCRC(this, msg(0 to 2)) and (ACCEPT = decodeRsp(msg(0))) ) then
-					sts := msg(2) & msg(1);		--! status
-				end if;
-			else
-				if ( this.verbose > 0 ) then
-					Report "eSpiMasterBfm:IOWR_SHORT: Command not accepted" severity error;
-				end if;
-			end if;
-			-- decode response
-			
-			
-			-- Terminate connection to slave
-			SCK	<= '0';
-			wait for this.TSpiClk/2;	--! half clock cycle
-			CSn	<= '1';
-			wait for this.TSpiClk;		--! limits CSn bandwidth to SCK
-		end procedure IOWR_SHORT;
-		--***************************
-		
-        --***************************
-        -- IOWR_SHORT w/o status
-		--   @see Figure 26: Master Initiated Short Non-Posted Transaction
-		procedure IOWR_SHORT 
-			( 
-				variable this	: inout tESpiBfm; 
-				signal CSn		: out std_logic; 
-				signal SCK		: out std_logic; 
-				signal DIO		: inout std_logic_vector(3 downto 0);
-				constant adr	: in std_logic_vector(15 downto 0);
-				constant data	: in std_logic_vector(7 downto 0)
-			) is
-			variable sts : std_logic_vector(15 downto 0);	--! wrapper variable for status
-		begin
-			IOWR_SHORT( this, CSn, SCK, DIO, adr, data, sts );
-		end procedure IOWR_SHORT;
-		--***************************
-		
-	----------------------------------------------
-
-
 end package body eSpiMasterBfm;
 --------------------------------------------------------------------------
