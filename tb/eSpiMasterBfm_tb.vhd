@@ -52,6 +52,7 @@ architecture sim of eSpiMasterBfm_tb is
 		constant doTest3	: boolean := true; 	--! test3: MEMWR32
 		constant doTest4	: boolean := true; 	--! test4: MEMRD32
 		constant doTest5	: boolean := true; 	--! test5: RESET
+		constant doTest6	: boolean := true; 	--! test6: IOWR
     -----------------------------
 	
 	
@@ -315,44 +316,22 @@ begin
 		-------------------------
 		
 		
-		
-		
-		
-		
-		
-		
 		-------------------------
-        -- Test4: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT
+        -- Test6: IOWR
         -------------------------
-		--if ( doTest5 or DO_ALL_TEST ) then
-			--Report "Test3: Master Initiated Short Non-Posted Transaction, PUT_IOWR_SHORT";
-				-- -- prepare Shift reg
-			-- IOWR_SHORT_B0	<= (others => 'Z');
-			-- ioWrB0Load		<= '0';
-			-- wait for eSpiMasterBfm.TSpiClk/2;
-			-- ioWrB0Load		<= '1';
-			-- wait for eSpiMasterBfm.TSpiClk/2;
-			-- ioWrB0Load		<= '0';
-				-- -- procedure IOWR_SHORT ( this, CSn, SCK, DIO, adr, data );
-			-- IOWR_SHORT( eSpiMasterBfm, CSn, SCK, DIO, x"0815", x"47" );
-				-- -- check command
-			-- if ( "010001" & "01" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left downto IOWR_SHORT_B0_SFR'left-7) ) then
-				-- Report "  Failed Command PUT_IOWR_SHORT" severity error;
-				-- good := false;
-			-- end if;
-				-- -- check address
-			-- if ( x"0815" /= IOWR_SHORT_B0_SFR(IOWR_SHORT_B0_SFR'left-8 downto IOWR_SHORT_B0_SFR'left-23) ) then
-				-- Report "  Failed IOWR_SHORT address" severity error;
-				-- good := false;
-			-- end if;
-
-
-
-			
-			
-			
-		--end if;
+		if ( doTest6 or DO_ALL_TEST ) then
+			Report "Test4: MEMRD32";
+			-- prepare message recorder
+			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
+			-- test command
+			IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"55", good );		--! write data byte 0x55 to IO space adr 0x80
+			wait for 1 us;
+		end if;
 		-------------------------
+		
+		
+		
 		
 		
 		
