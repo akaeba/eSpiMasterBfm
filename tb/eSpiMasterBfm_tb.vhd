@@ -53,6 +53,7 @@ architecture sim of eSpiMasterBfm_tb is
 		constant doTest4	: boolean := true; 	--! test4: MEMRD32
 		constant doTest5	: boolean := true; 	--! test5: RESET
 		constant doTest6	: boolean := true; 	--! test6: IOWR
+		constant doTest7	: boolean := true; 	--! test7: IORD
     -----------------------------
 	
 	
@@ -320,12 +321,27 @@ begin
         -- Test6: IOWR
         -------------------------
 		if ( doTest6 or DO_ALL_TEST ) then
-			Report "Test4: MEMRD32";
+			Report "Test6: IOWR";
 			-- prepare message recorder
 			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
 			-- test command
 			IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"55", good );		--! write data byte 0x55 to IO space adr 0x80
+			wait for 1 us;
+		end if;
+		-------------------------
+		
+		
+		-------------------------
+        -- Test7: IORD
+        -------------------------
+		if ( doTest7 or DO_ALL_TEST ) then
+			Report "Test7: IORD";
+			-- prepare message recorder
+			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
+			-- test command
+			IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good );	--! read data byte from io space adr 0x80
 			wait for 1 us;
 		end if;
 		-------------------------
