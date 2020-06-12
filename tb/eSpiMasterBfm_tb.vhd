@@ -67,7 +67,7 @@ architecture sim of eSpiMasterBfm_tb is
 		-- Test Message Recorder
 		signal espiRecCmd	: string(1 to 50);	--! expected command string, NULL terminated
 		signal espiRecRsp	: string(1 to 50);	--! response, null terminated
-		signal espiCmdCmp	: std_logic;		--! command compare successful
+		signal espiCmdFail	: std_logic;		--! command compare successful
 	-----------------------------
 	
     -----------------------------
@@ -247,6 +247,7 @@ begin
 			espiRecCmd(1 to 9)	<= "21000434" 				& character(NUL);			--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);			--! received response 	(Slave to BFM)
 			GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, good );	--! read from Slave
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -261,6 +262,7 @@ begin
 			espiRecCmd(1 to 17)	<= "2200080000008088" 	& character(NUL);					--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 15)	<= "0F0F0F080F039B" 	& character(NUL);					--! received response 	(Slave to BFM)
 			SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", good );	--! General Capabilities and Configuration 0x08, enable CRC
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -275,6 +277,7 @@ begin
 			espiRecCmd(1 to 5)	<= "25FB" 			& character(NUL);	--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 15)	<= "0F0F0F080F039B" & character(NUL);	--! received response 	(Slave to BFM)
 			GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );			--! get status from slave
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -290,6 +293,7 @@ begin
 			espiRecCmd(1 to 15)	<= "4C0000008047F9" 		& character(NUL);		--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);		--! received response 	(Slave to BFM)
 			MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good );		--! write single byte to address 0x80
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 4*eSpiMasterBfm.TSpiClk;
 			-- Memory write non-short command
 			Report "         multiple Byte write";
@@ -299,6 +303,7 @@ begin
 			memX08(1)	:= x"23";
 			memX08(2)	:= x"45";
 			MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", memX08, good );	--! write to memory
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -314,8 +319,9 @@ begin
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
 			-- test command
 			MEMRD32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", slv8, good );	--! read single byte from address 0x80
-            assert ( slv8 = x"01" ) report "  Read value wrong" severity warning;
-            if not ( slv8 = x"01" ) then good := false; end if;
+            assert ( x"01" = slv8 ) report "  Read value unequal 0x01" severity warning;
+            if not ( x"01" = slv8 ) then good := false; end if;
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -344,6 +350,7 @@ begin
 			espiRecRsp(1 to 15)	<= "0F0F0F084F03C0" & character(NUL);		--! received response 	(Slave to BFM)
 			-- test command
 			IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"47", good );	--! write data byte 0x47 to IO space adr 0x80 (Port 80)
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -359,6 +366,7 @@ begin
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
 			-- test command
 			IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good );	--! read data byte from io space adr 0x80
+			if ( '1' = espiCmdFail ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
@@ -401,7 +409,7 @@ begin
 	begin
 		if ( falling_edge(CSn) ) then
 			stage 		:= 0;		--! start with command receive
-			espiCmdCmp	<= '0';
+			espiCmdFail	<= '0';
 			cmdBitsCap	:= 0;
 			rcvCmd		:= (others => character(NUL));
 			tarPend		:= 2;
@@ -432,7 +440,7 @@ begin
 						for i in 1 to cmdBitsCap/4 loop
 							if ( rcvCmd(i) /= espiRecCmd(i) ) then
 								Report "Received command and expected command unequal" & character(lf) & "RCV = " & rcvCmd & character(lf) & "EXP = " & espiRecCmd;
-								espiCmdCmp <= '1';
+								espiCmdFail <= '1';
 								exit;
 							end if;
 						end loop;
