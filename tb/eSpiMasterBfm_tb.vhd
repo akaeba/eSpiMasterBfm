@@ -46,14 +46,15 @@ architecture sim of eSpiMasterBfm_tb is
     -- Constant
         -- Test
         constant loopIter	: integer := 20;    --! number of test loop iteration
-        constant doTest0	: boolean := true;  --! test0: 
+        constant doTest0	: boolean := true;  --! test0: CRC8
 		constant doTest1	: boolean := true;  --! test1: GET_CONFIGURATION
-		constant doTest2	: boolean := true; 	--! test2: GET_STATUS
-		constant doTest3	: boolean := true; 	--! test3: MEMWR32
-		constant doTest4	: boolean := true; 	--! test4: MEMRD32
-		constant doTest5	: boolean := true; 	--! test5: RESET
-		constant doTest6	: boolean := true; 	--! test6: IOWR
-		constant doTest7	: boolean := true; 	--! test7: IORD
+		constant doTest2	: boolean := true; 	--! test2: SET_CONFIGURATION
+		constant doTest3	: boolean := true; 	--! test2: GET_STATUS
+		constant doTest4	: boolean := true; 	--! test3: MEMWR32
+		constant doTest5	: boolean := true; 	--! test4: MEMRD32
+		constant doTest6	: boolean := true; 	--! test5: RESET
+		constant doTest7	: boolean := true; 	--! test6: IOWR
+		constant doTest8	: boolean := true; 	--! test7: IORD
     -----------------------------
 	
 	
@@ -252,10 +253,24 @@ begin
 		
 		
 		-------------------------
-        -- Test2: GET_STATUS
+        -- Test2: SET_CONFIGURATION
         -------------------------
 		if ( doTest2 or DO_ALL_TEST ) then
-			Report "Test2: GET_STATUS";
+			Report "Test2: SET_CONFIGURATION";
+			-- prepare message recorder
+			espiRecCmd(1 to 17)	<= "2200080000008088" 	& character(NUL);					--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 15)	<= "0F0F0F080F039B" 	& character(NUL);					--! received response 	(Slave to BFM)
+			SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", good );	--! General Capabilities and Configuration 0x08, enable CRC
+			wait for 1 us;
+		end if;
+		-------------------------
+		
+
+		-------------------------
+        -- Test3: GET_STATUS
+        -------------------------
+		if ( doTest3 or DO_ALL_TEST ) then
+			Report "Test3: GET_STATUS";
 			-- prepare message recorder
 			espiRecCmd(1 to 5)	<= "25FB" 			& character(NUL);	--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 15)	<= "0F0F0F080F039B" & character(NUL);	--! received response 	(Slave to BFM)
@@ -266,10 +281,10 @@ begin
 		
 		
 		-------------------------
-        -- Test3: MEMWR32
+        -- Test4: MEMWR32
         -------------------------
-		if ( doTest3 or DO_ALL_TEST ) then
-			Report "Test3: MEMWR32";
+		if ( doTest4 or DO_ALL_TEST ) then
+			Report "Test4: MEMWR32";
 			Report "         single Byte write";
 			-- Memory write with short command
 			espiRecCmd(1 to 15)	<= "4C0000008047F9" 		& character(NUL);		--! sent Request 		(BFM to Slave)
@@ -290,25 +305,27 @@ begin
 		
 		
 		-------------------------
-        -- Test4: MEMRD32
+        -- Test5: MEMRD32
         -------------------------
-		if ( doTest4 or DO_ALL_TEST ) then
-			Report "Test4: MEMRD32";
+		if ( doTest5 or DO_ALL_TEST ) then
+			Report "Test5: MEMRD32";
 			-- prepare message recorder
 			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
 			-- test command
 			MEMRD32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", slv8, good );	--! read single byte from address 0x80
+            assert ( slv8 = x"01" ) report "  Read value wrong" severity warning;
+            if not ( slv8 = x"01" ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
 		
 		
 		-------------------------
-        -- Test5: Reset
+        -- Test6: Reset
         -------------------------
-		if ( doTest5 or DO_ALL_TEST ) then
-			Report "Test5: In-band Reset";
+		if ( doTest6 or DO_ALL_TEST ) then
+			Report "Test6: In-band Reset";
 			-- test command
 				-- RESET ( this, CSn, SCK, DIO );
 			RESET ( eSpiMasterBfm, CSn, SCK, DIO );
@@ -318,27 +335,27 @@ begin
 		
 		
 		-------------------------
-        -- Test6: IOWR
+        -- Test7: IOWR
         -------------------------
-		if ( doTest6 or DO_ALL_TEST ) then
-			Report "Test6: IOWR";
+		if ( doTest7 or DO_ALL_TEST ) then
+			Report "Test7: IOWR";
 			-- prepare message recorder
-			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
-			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
+			espiRecCmd(1 to 11)	<= "44008047A7" 	& character(NUL);		--! sent Request 		(BFM to Slave)
+			espiRecRsp(1 to 15)	<= "0F0F0F084F03C0" & character(NUL);		--! received response 	(Slave to BFM)
 			-- test command
-			IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"55", good );		--! write data byte 0x55 to IO space adr 0x80
+			IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"47", good );	--! write data byte 0x47 to IO space adr 0x80 (Port 80)
 			wait for 1 us;
 		end if;
 		-------------------------
 		
 		
 		-------------------------
-        -- Test7: IORD
+        -- Test8: IORD
         -------------------------
-		if ( doTest7 or DO_ALL_TEST ) then
-			Report "Test7: IORD";
+		if ( doTest8 or DO_ALL_TEST ) then
+			Report "Test8: IORD";
 			-- prepare message recorder
-			espiRecCmd(1 to 13)	<= "480000008058" 			& character(NUL);	--! sent Request 		(BFM to Slave)
+			espiRecCmd(1 to 9)	<= "4000800F" 				& character(NUL);	--! sent Request 		(BFM to Slave)
 			espiRecRsp(1 to 23)	<= "0F0F0F08010000000F0309" & character(NUL);	--! received response 	(Slave to BFM)
 			-- test command
 			IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good );	--! read data byte from io space adr 0x80
