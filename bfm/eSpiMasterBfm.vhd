@@ -66,6 +66,7 @@ package eSpiMasterBfm is
             spiMode     : tSpiXcvMode;  --! SPI transceiver mode
             sigSkew     : time;         --! defines Signal Skew to prevent timing errors in back-anno
             verbose     : natural;      --! message level; 0: no message, 1: errors, 2: error + warnings
+            tiout       : time;         --! time out when master give up an interaction
         end record tESpiBfm;
     -----------------------------
 
@@ -270,6 +271,7 @@ package eSpiMasterBfm is
                     signal CSn          : out std_logic;
                     signal SCK          : out std_logic;
                     signal DIO          : inout std_logic_vector(3 downto 0);
+                    signal ALERTn       : in std_logic;                         --! SLAVE requestes service
                     constant adr        : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                     variable data       : out tMemX08;                          --! read data, 1/2/4 Bytes supported
                     variable status     : out std_logic_vector(15 downto 0);    --! slave status
@@ -282,6 +284,7 @@ package eSpiMasterBfm is
                     signal CSn      : out std_logic;
                     signal SCK      : out std_logic;
                     signal DIO      : inout std_logic_vector(3 downto 0);
+                    signal ALERTn   : in std_logic;                         --! SLAVE requestes service
                     constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                     variable data   : out std_logic_vector(7 downto 0);     --! single data word
                     variable good   : inout boolean                         --! successful?
@@ -647,6 +650,7 @@ package body eSpiMasterBfm is
             this.spiMode    := SINGLE;  --! Default mode, out of reset
             this.sigSkew    := 0 ns;    --! no skew between clock edge and data defined
             this.verbose    := 0;       --! all messages disabled
+            this.tiout      := 100 us;  --! 100us master time out for wait
             -- signals
             CSn <= '1';
             SCK <= '0';
@@ -1433,13 +1437,17 @@ package body eSpiMasterBfm is
                 signal CSn          : out std_logic;
                 signal SCK          : out std_logic;
                 signal DIO          : inout std_logic_vector(3 downto 0);
+                signal ALERTn       : in std_logic;                         --! SLAVE requestes service
                 constant adr        : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data       : out tMemX08;                          --! read data, 1/2/4 Bytes supported
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
                 variable response   : out tESpiRsp                          --! command response
             ) is
-            variable msg    : tMemX08(0 to data'length + 3);    --! CMD 1Byte, 2Byte Address
-            variable rsp    : tESpiRsp;                         --! Slaves response to performed request
+            variable msg        : tMemX08(0 to data'length + 6);    --! +1Byte Response, +3Byte Header, +2Byte Status
+            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable rspGetSts  : tESpiRsp;                         --! Slaves response to performed request
+            variable tiout      : natural := 0;                     --! tiout counter
+            variable sts        : std_logic_vector(15 downto 0);    --! help variable for status
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD: PUT_IORD_SHORT"; end if;
@@ -1457,15 +1465,63 @@ package body eSpiMasterBfm is
             -- send and get response
                 -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
             spiXcv(this, msg, CSn, SCK, DIO, 3, data'length+3, rsp);    --! CRC added and checked by transceiver procedure
-            -- process slaves response
-            if ( ACCEPT = rsp ) then
-                status  := msg(2) & msg(1);                 --! status
-                data    := msg(3 to data'length + 3 - 1);   --! data bytes
+            -- slave has the data?
+            if ( ACCEPT = rsp ) then                                --! data is in response
+                data    := msg(1 to data'length - 1 + 1);           --! data bytes
+                sts     := msg(data'length+2) & msg(data'length+1); --! status register
+            elsif ( DEFER = rsp ) then     --! Wait, Figure 25: Deferred Master Initiated Non-Posted Transaction
+                -- assemble status
+                sts := msg(2) & msg(1); --! status
+                -- check for PC_AVAIL, otherwise wait for alert
+                while ( sts(4) = '0' ) loop
+                    -- user message
+                    if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD:DEFER: no PC_AVAIL wait for #ALERT"; end if;
+                    -- wait for alert
+                    while ( ALERTn /= '0' ) loop
+                        wait for this.TSpiClk/8;    --! wait for core
+                        tiout := tiout + 1;         --! increment counter
+                        if ( tiout > 8 * (this.tiout/this.TSpiClk) ) then
+                            rsp := NO_RESPONSE;
+                            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD: After DEFER no reponse within " & time'image(this.tiout); end if;
+                            exit;
+                        end if;
+                    end loop;
+                    -- check status
+                    if ( DEFER = rsp ) then
+                        -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
+                        GET_STATUS ( this, CSn, SCK, DIO, sts, rspGetSts );     --! check for PC_AVAIL
+                        if ( ACCEPT /= rspGetSts ) then
+                            rsp := FATAL_ERROR;
+                            exit;
+                        end if;
+                    else
+                        exit;
+                    end if;
+                end loop;
+                -- DEFER and PC_AVAIL, fetch data
+                -- @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
+                if ( DEFER = rsp and sts(4) = '1' ) then
+                    -- user message
+                    if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD:DEFER: PC_AVAIL "; end if;
+                    -- assemble Posted completion message
+                    msg     := (others => (others => '0')); --! init message array
+                    msg(0)  := C_GET_PC;                    --! request posted completion
+                        -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
+                    -- numRxByte: +1Byte Response, +3Byte Header, +2Byte Status
+                    spiXcv(this, msg, CSn, SCK, DIO, 1, data'length+6, rsp);    --! CRC added and checked by transceiver procedure
+                else
+                    rsp := FATAL_ERROR;
+                end if;
+                -- slave has now the data
+                if ( ACCEPT = rsp ) then
+                    data := msg(4 to data'length + 4 - 1);
+                end if;
             else
-                status  := (others => '0');
+                sts := (others => '0'); --! invalid
             end if;
             -- propagate response
-            response := rsp;
+            response    := rsp;
+            status      := sts;
         end procedure IORD;
         --***************************
 
@@ -1479,6 +1535,7 @@ package body eSpiMasterBfm is
                 signal CSn      : out std_logic;
                 signal SCK      : out std_logic;
                 signal DIO      : inout std_logic_vector(3 downto 0);
+                signal ALERTn   : in std_logic;                         --! SLAVE requestes service
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data   : out std_logic_vector(7 downto 0);     --! single data word
                 variable good   : inout boolean                         --! successful?
@@ -1487,8 +1544,8 @@ package body eSpiMasterBfm is
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
-                -- IORD( this, CSn, SCK, DIO, adr, data, status, response )
-            IORD( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+                -- IORD( this, CSn, SCK, DIO, ALERTn, adr, data, status, response )
+            IORD( this, CSn, SCK, DIO, ALERTn, adr, dBuf, sts, rsp );
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
