@@ -1499,7 +1499,6 @@ package body eSpiMasterBfm is
                     end if;
                 end loop;
                 -- DEFER and PC_AVAIL, fetch data
-                -- @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
                 if ( DEFER = rsp and sts(4) = '1' ) then
                     -- user message
                     if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD:DEFER: PC_AVAIL "; end if;
@@ -1514,7 +1513,8 @@ package body eSpiMasterBfm is
                 end if;
                 -- slave has now the data
                 if ( ACCEPT = rsp ) then
-                    data := msg(4 to data'length + 4 - 1);
+                    sts     := msg(4 + data'length + 2) & msg(4 + data'length + 1); --! status register
+                    data    := msg(4 to data'length + 4 - 1);                       --! @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
                 end if;
             else
                 sts := (others => '0'); --! invalid
