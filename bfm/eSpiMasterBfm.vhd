@@ -1493,7 +1493,7 @@ package body eSpiMasterBfm is
             if ( ACCEPT /= rsp ) then
                 good := false;
                 data := (others => '0');    --! make invalid
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
                 if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
