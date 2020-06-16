@@ -17,7 +17,8 @@
 
 
 # start simulation, disable optimization
-vsim -novopt -gDO_ALL_TEST=true -t 1ps work.eSpiMasterBfm_tb
+vsim -novopt -t 1ps work.eSpiMasterBfm_tb
+#vsim -novopt -gDO_ALL_TEST=true -t 1ps work.eSpiMasterBfm_tb
 
 # load Waveform
 do "../tcl/sim/eSpiMasterBfm/eSpiMasterBfm_waveform.do"
