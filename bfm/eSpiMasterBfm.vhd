@@ -12,7 +12,7 @@
 -- @date:       2020-01-04
 --
 -- @see:        https://www.intel.com/content/dam/support/us/en/documents/software/chipset-software/327432-004_espi_base_specification_rev1.0_cb.pdf
--- @see:        https://github.com/akaeba/eSpiMM
+-- @see:        https://github.com/akaeba/eSpiMasterBfm
 -- @brief:      bus functional model for enhanced SPI (eSPI)
 --              provides function to interact with an eSPI
 --              slave
@@ -31,7 +31,7 @@ library std;
 
 
 --------------------------------------------------------------------------
--- eSpiMasterBfmPKG: eSPI Master Bus functional model package
+-- eSpiMasterBfm: eSPI Master Bus functional model package
 package eSpiMasterBfm is
 
     -----------------------------

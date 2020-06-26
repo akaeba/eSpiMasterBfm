@@ -11,7 +11,7 @@
 -- @note:       VHDL'93
 -- @date:   	2020-04-01
 --
--- @see:		https://github.com/akaeba/eSpiMM
+-- @see:		https://github.com/akaeba/eSpiMasterBfm
 -- @brief:      tests eSpiMasterBfm package functionality
 --************************************************************************
 
