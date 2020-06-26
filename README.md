@@ -9,6 +9,10 @@ Currently are procedures available for:
  * IO Read/Write
  * Memory Read/Write
  * Endpoint Configuration
+ 
+
+## Enhanced Serial Peripheral Interface (ESPI)
+ 
 
 
 ## File Listing
@@ -17,6 +21,25 @@ Currently are procedures available for:
 | --------------------------------------------------------------------------------------------------- | ----------------- |
 | [eSpiMasterBfm.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd)      | BFM package       |
 | [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd) | Testbench for BFM |
+
+
+## Procedures
+
+### init
+
+Initializes the BFM.
+
+```vhdl
+init( this, CSn, SCK, DIO);
+```
+
+
+### RESET
+
+Initializes endpoints reset sequence.
+
+
+
 
 
 ## References
