@@ -1,0 +1,31 @@
+#************************************************************************
+# @author:  	 Andreas Kaeberlein
+# @copyright:	 Copyright 2020
+# @credits: 	 AKAE
+#
+# @license:  	 BSDv3
+# @maintainer:	 Andreas Kaeberlein
+# @email:		 andreas.kaeberlein@web.de
+#
+# @file:         .gitignore.
+# @date:   		 2020-07-21
+#
+# @see:			 https://git-scm.com/docs/gitignore
+# @brief:        preserve files for repo check-in
+#************************************************************************
+
+
+
+# Modelsim directory
+# Exclude all subdirectories, f.e. compiled hdl code
+#
+sim/**/work
+#
+
+
+# Exceptions
+#
+!.gitignore.
+!.gitconfig.
+**/!.gitkeep.
+#
