@@ -353,9 +353,7 @@ begin
                     end if;
                 end if;
             else
-                -- prepare for next activation
-
-                MISO        <= 'Z';                         --! line disable
+                MISO <= 'Z';    --! line disable
             end if;
         end if;
     end process p_espiSlave;
