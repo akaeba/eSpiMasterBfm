@@ -65,7 +65,7 @@ architecture sim of eSpiStaticSlave_tb is
 		signal REQMSG	: string(1 to MAXMSGLEN);
 		signal CMPMSG	: string(1 to MAXMSGLEN);
 		signal LDMSG	: std_logic;
-		signal MAGOOD	: std_logic;
+		signal SLGOOD	: boolean;
 	-----------------------------
 
 begin
@@ -86,7 +86,7 @@ begin
 						REQMSG => REQMSG,
 						CMPMSG => CMPMSG,
 						LDMSG  => LDMSG,
-						GOOD   => MAGOOD
+						GOOD   => SLGOOD
 					);
 	----------------------------------------------
 
@@ -96,6 +96,7 @@ begin
     p_stimuli : process
         -- tb help variables
             variable good   : boolean	:= true;
+			variable slv08	: std_logic_vector(7 downto 0);
 		-- DUT
     begin
 
@@ -118,19 +119,19 @@ begin
 		
 		
         -------------------------
-        -- Test0: Check CRC8 Function
+        -- Test0: Test0: Send/Receive Byte
         -------------------------
 		if ( doTest0 or DO_ALL_TEST ) then
-			Report "Test0: Send/Receive Single Byte";
+			Report "Test0: Send/Receive Byte";
 			-- load message
-			REQMSG(1 to 2) 	<= "54";
+			REQMSG(1 to 2) 	<= "55";
 			CMPMSG(1 to 2)	<= "AA";
 			LDMSG			<= '1';
 			wait for TP;
 			LDMSG			<= '0';
 			-- check transfer
 			XCS	<= '0';
-			-- send 0x55 to slave
+			-- Request: send 0x55 to slave
 			for i in 0 to 7 loop
 				if ( 0 = (i mod 2) ) then
 					MOSI <= '0';
@@ -143,11 +144,27 @@ begin
 				SCK	<= '0';
 			end loop;
 			MOSI <= 'Z';
-			
-			
-			
-		
-		
+			-- TAR
+			for i in 0 to 1 loop
+				wait for TP/2;
+				SCK	<= '1';
+				wait for TP/2;
+				SCK	<= '0';
+			end loop;
+			-- Response
+			slv08 := (others => '0');
+			for i in 0 to 7 loop
+				wait for TP/2;
+				SCK	<= '1';
+				slv08 := slv08(slv08'left-1 downto slv08'right) & MISO;	--! capture data
+				wait for TP/2;
+				SCK	<= '0';
+			end loop;
+            wait for TP/2;
+			XCS	<= '1';
+			-- check
+			assert ( x"aa" = slv08 ) report "  Error: Expected 0xAA" severity warning;
+            if not ( x"aa" = slv08 ) then good := false; end if;
 			wait for 10*TP;
 		end if;
 		-------------------------
@@ -157,7 +174,7 @@ begin
         -- Report TB
         -------------------------
             Report "End TB...";     -- sim finished
-            if (good) then
+            if ( good and SLGOOD ) then
                 Report "Test SUCCESSFULL";
             else
                 Report "Test FAILED" severity error;
