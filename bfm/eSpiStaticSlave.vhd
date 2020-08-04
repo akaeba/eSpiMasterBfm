@@ -48,18 +48,18 @@ generic (
         );
 port    (
             -- ESPI
-            SCK		: in 	std_logic;            			--! shift clock
-			MOSI	: in	std_logic;						--! Single mode, data in from Master;	DIO(0)
-			MISO	: out	std_logic;						--! Single mode, data out to master;	DIO(1)		
-			XCS		: in	std_logic;						--! slave select
-			XALERT	: inout	std_logic;						--! Alert
-			XRESET	: in    std_logic;						--! reset
+            SCK		: in 	std_logic;            	--! shift clock
+			MOSI	: in	std_logic;				--! Single mode, data in from Master;	DIO(0)
+			MISO	: out	std_logic;				--! Single mode, data out to master;	DIO(1)		
+			XCS		: in	std_logic;				--! slave select
+			XALERT	: inout	std_logic;				--! Alert
+			XRESET	: in    std_logic;				--! reset
 			-- Message control
-			REQMSG	: in	string(1 to MAXMSGLEN);			--! request message 
-            CMPMSG	: in	string(1 to MAXMSGLEN);			--! complete message, if request was ok
-            LDMSG	: in	std_logic;						--! load message on rising edge
+			REQMSG	: in	string(1 to MAXMSGLEN);	--! request message 
+            CMPMSG	: in	string(1 to MAXMSGLEN);	--! complete message, if request was ok
+            LDMSG	: in	std_logic;				--! load message on rising edge
 			-- Status
-			GOOD	: out	std_logic						--! all request messages were good, set with XRESET
+			GOOD	: out	boolean					--! all request messages were good, set with XRESET
         );
 end entity eSpiStaticSlave;
 --------------------------------------------------------------------------
@@ -166,7 +166,8 @@ architecture sim of eSpiStaticSlave is
 	
 	
     -----------------------------
-    -- Typs
+    -- Type
+	-----------------------------
         type t_tEspiSlv is  (
                                 CMD_S,	--! Command phase
                                 TAR_S,	--! Turn-around
@@ -175,54 +176,57 @@ architecture sim of eSpiStaticSlave is
                             );
     -----------------------------
 	
+	
+    -----------------------------
+    -- Constant
+	-----------------------------	
+		constant C_TAR_CYCLES : integer := 2;	--! set number of cycles in turn-around phase
+	-----------------------------
+	
 begin
 	
   	----------------------------------------------
     -- eSPI Message Recorder 
 	p_espiSlave : process (SCK, XCS, XRESET, LDMSG)
-		variable requestMsg			: string(REQMSG'range);	--! request message; created by BFM
-		variable completeMsg		: string(CMPMSG'range);	--! complete message; evaluated be BFM
-		variable numReqSegs			: natural;				--! by 'LF' divided segments of request message
-		variable numCpltSegs		: natural;				--! by 'LF' divided segments of complete message
-		variable reqMsgStartIdx		: integer;				--! in current segment start pointer of message to receive
-		variable reqMsgStopIdx		: integer;				--! in current segment stop pointer of message to receive
+		variable requestMsg			: string(REQMSG'range);			--! request message; created by BFM
+		variable completeMsg		: string(CMPMSG'range);			--! complete message; evaluated be BFM
+		variable numReqSegs			: natural;						--! by 'LF' divided segments of request message
+		variable numCpltSegs		: natural;						--! by 'LF' divided segments of complete message
+		variable reqMsgStartIdx		: integer;						--! in current segment start pointer of message to receive
+		variable reqMsgStopIdx		: integer;						--! in current segment stop pointer of message to receive
 		variable cpltSegStartIdx	: integer;
 		variable cpltSegStopIdx		: integer;
-		variable reqBitsPend		: integer;				--! number of pending command nibbles
+		variable reqBitsPend		: integer;						--! number of pending command nibbles
 		variable reqBitsCap			: integer;
-		variable reqMsgCap			: string(REQMSG'range);	--! recorded request
-		variable totalSeg			: natural;				--! total number of segment
-		variable currentSeg			: natural;				--! current number of segment
-		variable stage 				: t_tEspiSlv;			--! transmission stage
-		
-		
-		
-		--variable rcvCmd		: string(espiRecCmd'range);
-		variable SFR			: std_logic_vector(3 downto 0);
-		variable str1		: string(1 to 1);
-		variable tarPend		: integer := 2;
-		variable rspBitsSend	: integer;
+		variable reqMsgCap			: string(REQMSG'range);			--! recorded request
+		variable totalSeg			: natural;						--! total number of segment
+		variable currentSeg			: natural;						--! current number of segment
+		variable stage 				: t_tEspiSlv;					--! transmission stage
+		variable tarPend			: integer := C_TAR_CYCLES;		--! turn-around
+		variable SFR				: std_logic_vector(3 downto 0);	--! shift-forward-register
+		variable str1				: string(1 to 1);				--! help variable for slv to char conversion
+		variable rspBitsSend		: integer;						--! counts sent bits
 	begin
 		if ( '0' = XRESET ) then	--! init ESPI
 			MISO 		<= 'Z';
 			XALERT 		<= 'Z';
-			GOOD		<= '1';
-			completeMsg	:= (others => character(NUL));
-			reqMsgCap	:= (others => character(NUL));
-			totalSeg	:= 0;
-			currentSeg	:= 0;
+			GOOD		<= true;
 			stage		:= NOMSG_S;
+			tarPend		:= C_TAR_CYCLES;
 			
 		elsif ( rising_edge(LDMSG) ) then	--! prepare message sequence
-			-- copy to internal
-			requestMsg	:= REQMSG;
-			completeMsg := CMPMSG;
-			-- temporary segment counter
-			numCpltSegs	:= 0;
-			numReqSegs	:= 0;
-			-- control counter
-			totalSeg	:= 0;
-			currentSeg	:= 0;
+			-- prepare
+			requestMsg		:= REQMSG;	--! copy to internal
+			completeMsg 	:= CMPMSG;
+			numCpltSegs		:= 0;		--! temporary segment counter
+			numReqSegs		:= 0;
+			totalSeg		:= 0;		--! control counter
+			currentSeg		:= 0;
+			reqMsgStartIdx	:= 0;		--! init message pointer
+			reqMsgStopIdx	:= 0;
+			cpltSegStartIdx	:= 0;
+			cpltSegStopIdx	:= 0;
+			reqMsgCap		:= (others => character(NUL));
 			-- count Segments
 			--	some ESPI requests consists out of multiple requests and responses, this mimic counts this
 				-- request Message
@@ -245,7 +249,7 @@ begin
 			end loop;
 			-- perform check
 			if ( numReqSegs /= numCpltSegs ) then
-				GOOD 		<= '0';		--! something went wrong
+				GOOD 		<= false;	--! something went wrong
 				totalSeg	:= 0;		--! make invalid
 				stage		:= NOMSG_S;	--! no transmit
 				Report "Request and Response Message have different number of segments, CSn activations; TX=" & integer'image(numReqSegs) & " RX=" & integer'image(numCpltSegs) & ";" severity warning;
@@ -253,17 +257,12 @@ begin
 				stage 		:= CMD_S;		--! ready to transmit
 				totalSeg	:= numReqSegs;	--! copy
 			end if;
-			-- init messages pointer
-			reqMsgStartIdx	:= 0;
-			reqMsgStopIdx	:= 0;
-			cpltSegStartIdx	:= 0;
-			cpltSegStopIdx	:= 0;
-			
+
 		else	--! bring it on the line
 			if ( falling_edge(XCS) ) then
 				-- check segment
 				if ( currentSeg >= totalSeg ) then
-					GOOD	<= '0';		--! something went wrong
+					GOOD <= false;	--! something went wrong
 					Report "More XCS divided telegrams requested then expected" severity warning;
 				end if;
 				-- update from last transmission
@@ -283,8 +282,11 @@ begin
 					end if;
 				end loop;
 				-- prepare bit counter
-				reqBitsPend := 4 * (reqMsgStopIdx - reqMsgStartIdx);
-				reqBitsCap := 0;
+				reqBitsPend	:= 4 * (reqMsgStopIdx - reqMsgStartIdx);	--! Request Phase
+				reqBitsCap 	:= 0;
+				rspBitsSend	:= 4 * (cpltSegStopIdx - cpltSegStartIdx);	--! response phase
+				-- make empty
+				reqMsgCap	:= (others => character(NUL));
 
 			elsif ( XCS = '0' ) then
 				-- receive command
@@ -305,11 +307,13 @@ begin
 							for i in 0 to (reqBitsCap/4 - 1) loop
 								if ( reqMsgCap(i+1) /= requestMsg(reqMsgStartIdx+i) ) then
 									Report "Request: IS=0x" & reqMsgCap(1 to reqBitsCap/4) & "; EXP=0x" & requestMsg(1 to reqBitsCap/4) & ";" severity warning;
-									GOOD <= '0';
+									GOOD 	<= false;	--! request failed
+									stage	:= NOMSG_S;	--! no answer
 									exit;
+								else
+									stage	:= TAR_S;	--! send response
 								end if;
 							end loop;
-							stage := TAR_S;
 						end if;
 					end if;
 				end if;
@@ -317,32 +321,41 @@ begin
 				if ( TAR_S = stage ) then
 					if ( falling_edge(SCK) ) then
 						if ( 0 = tarPend ) then
-							stage := RSP_S;
+							stage 	:= RSP_S;
+							tarPend	:= C_TAR_CYCLES;
 						end if;
 						tarPend := tarPend - 1;
 					end if;
 				end if;
 				-- send response
-				-- if ( RSP_S = stage ) then
-					-- if ( falling_edge(SCK) ) then
-						-- if ( character(NUL) /= espiRecRsp(rspBitsSend/4 + 1)) then
-							-- if ( 0 = rspBitsSend mod 4) then
-								-- SFR := chr2slv(espiRecRsp(rspBitsSend/4 + 1));
-							-- else
-								-- SFR	:= SFR(2 downto 0) & '0';
-							-- end if;
-							-- MISO	<= SFR(3);
-							-- rspBitsSend := rspBitsSend + 1;
-						-- else
-							-- MISO <= 'Z';
-						-- end if;
-					-- end if;
-				-- end if;
+				if ( RSP_S = stage ) then
+					if ( falling_edge(SCK) ) then
+						if ( cpltSegStartIdx <= cpltSegStopIdx) then
+							-- reload SFR
+							if ( 0 = (rspBitsSend mod 4) ) then
+								if ( 0 < rspBitsSend ) then
+									SFR := chr2slv(completeMsg(cpltSegStartIdx));	--! load new quadruple
+								end if;
+								cpltSegStartIdx	:= cpltSegStartIdx + 1;				--! prepare for next load
+							else
+								SFR	:= SFR(2 downto 0) & '0';
+							end if;
+							-- release to line
+							MISO <= SFR(3);
+							-- check for end of transmission
+							if ( 0 < rspBitsSend ) then
+								rspBitsSend := rspBitsSend - 1;
+							else
+								MISO 	<= 'Z';
+								stage	:= NOMSG_S;
+							end if;
+						end if;
+					end if;
+				end if;
 			else
-				-- reset internal
-				reqMsgCap := (others => character(NUL));
-				-- lines now pulled
-				MISO <= 'Z';
+				-- prepare for next activation
+				
+				MISO 		<= 'Z';							--! line disable
 			end if;
 		end if;
 	end process p_espiSlave;
