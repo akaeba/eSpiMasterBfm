@@ -21,7 +21,7 @@
 #
 sim/**/work
 sim/**/*.wlf
-sim/**/*.cr.mpi
+sim/**/*.cr.mti
 #
 
 
