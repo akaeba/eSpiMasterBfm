@@ -20,6 +20,8 @@
 # Exclude all subdirectories, f.e. compiled hdl code
 #
 sim/**/work
+sim/**/*.wlf
+sim/**/*.cr.mpi
 #
 
 
