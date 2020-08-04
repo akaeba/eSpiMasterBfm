@@ -2,6 +2,7 @@ onerror {resume}
 quietly WaveActivateNextPane {} 0
 add wave -noupdate -expand -group Misc /espistaticslave_tb/XRESET
 add wave -noupdate -expand -group Misc /espistaticslave_tb/p_stimuli/good
+add wave -noupdate -expand -group Misc /espistaticslave_tb/SLGOOD
 add wave -noupdate -expand -group ESPI /espistaticslave_tb/XCS
 add wave -noupdate -expand -group ESPI /espistaticslave_tb/SCK
 add wave -noupdate -expand -group ESPI /espistaticslave_tb/MOSI
@@ -15,6 +16,9 @@ add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqMsgStartIdx
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqMsgStopIdx
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqBitsPend
+add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/cpltSegStartIdx
+add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/cpltSegStopIdx
+add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/rspBitsSend
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqBitsCap
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqMsgCap
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/totalSeg
@@ -22,7 +26,7 @@ add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/SFR
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/str1
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {230028 ps} 0}
+WaveRestoreCursors {{Cursor 1} {418694 ps} 0}
 quietly wave cursor active 1
 configure wave -namecolwidth 382
 configure wave -valuecolwidth 105
