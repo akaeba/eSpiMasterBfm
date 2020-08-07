@@ -45,7 +45,8 @@ architecture sim of eSpiStaticSlave_tb is
     -- Constant
         -- Test
 		constant loopIter	: integer 	:= 20;    	--! number of test loop iteration
-        constant doTest0	: boolean 	:= true;  	--! test0: CRC8
+        constant doTest0	: boolean 	:= true;  	--! Test0: Send/Receive Byte
+		constant doTest1	: boolean 	:= true;  	--! Test1: 
 		-- DUT
 		constant TP			: time		:= 20 ns;	--! clock period
 		constant MAXMSGLEN	: integer	:= 100;
@@ -97,6 +98,7 @@ begin
         -- tb help variables
             variable good   : boolean	:= true;
 			variable slv08	: std_logic_vector(7 downto 0);
+			variable slv04	: std_logic_vector(3 downto 0);
 		-- DUT
     begin
 
@@ -124,6 +126,8 @@ begin
 		if ( doTest0 or DO_ALL_TEST ) then
 			Report "Test0: Send/Receive Byte";
 			-- load message
+			REQMSG			<= (others => character(NUL));
+			CMPMSG			<= (others => character(NUL));
 			REQMSG(1 to 2) 	<= "55";
 			CMPMSG(1 to 2)	<= "AA";
 			LDMSG			<= '1';
@@ -153,7 +157,7 @@ begin
 			end loop;
 			-- Response
 			slv08 := (others => '0');
-			for i in 0 to 7 loop
+			for i in 0 to slv08'length-1 loop
 				wait for TP/2;
 				SCK	<= '1';
 				slv08 := slv08(slv08'left-1 downto slv08'right) & MISO;	--! capture data
@@ -165,6 +169,72 @@ begin
 			-- check
 			assert ( x"aa" = slv08 ) report "  Error: Expected 0xAA" severity warning;
             if not ( x"aa" = slv08 ) then good := false; end if;
+			wait for 10*TP;
+		end if;
+		-------------------------
+		
+		
+        -------------------------
+        -- Test1: Send/Receive Quadruple
+        -------------------------
+		if ( doTest1 or DO_ALL_TEST ) then
+			Report "Test1: Send/Receive Quadruple";
+			-- load message
+			REQMSG			<= (others => character(NUL));
+			CMPMSG			<= (others => character(NUL));
+			REQMSG(1 to 1) 	<= "B";
+			CMPMSG(1 to 1)	<= "C";
+			LDMSG			<= '1';
+			wait for TP;
+			LDMSG			<= '0';
+			-- sent Request
+				-- Bit3
+			XCS		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit2
+			SCK		<= '0';
+			MOSI	<= '0';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit1
+			SCK		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit 0
+			SCK		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+			MOSI	<= 'Z';
+			-- TAR
+			for i in 0 to 1 loop
+				SCK	<= '0';
+				wait for TP/2;
+				SCK	<= '1';
+				wait for TP/2;
+			end loop;
+			-- Response
+			slv04 := (others => '0');
+			for i in 0 to slv04'length-1 loop
+				SCK	<= '0';
+				wait for TP/2;
+				SCK	<= '1';
+				slv04 := slv04(slv04'left-1 downto slv04'right) & MISO;	--! capture data
+				wait for TP/2;
+			end loop;
+			SCK	<= '0';
+			wait for TP/2;
+			XCS	<= '1';
+			-- check 
+			assert ( x"c" = slv04 ) report "  Error: Expected 0xC" severity warning;
+            if not ( x"c" = slv04 ) then good := false; end if;
 			wait for 10*TP;
 		end if;
 		-------------------------

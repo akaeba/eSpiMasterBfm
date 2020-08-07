@@ -353,7 +353,8 @@ begin
                     end if;
                 end if;
             else
-                MISO <= 'Z';    --! line disable
+                tarPend := C_TAR_CYCLES;    --! restore for next cycle
+                MISO    <= 'Z';             --! line disable
             end if;
         end if;
     end process p_espiSlave;

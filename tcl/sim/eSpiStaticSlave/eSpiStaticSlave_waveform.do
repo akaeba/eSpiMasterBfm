@@ -21,12 +21,13 @@ add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/rspBitsSend
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqBitsCap
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/reqMsgCap
+add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/tarPend
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/totalSeg
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/currentSeg
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/SFR
 add wave -noupdate -expand -group eSpiSlave /espistaticslave_tb/DUT/p_espiSlave/str1
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {418694 ps} 0}
+WaveRestoreCursors {{Cursor 2} {601917 ps} 0}
 quietly wave cursor active 1
 configure wave -namecolwidth 382
 configure wave -valuecolwidth 105
@@ -42,4 +43,4 @@ configure wave -griddelta 40
 configure wave -timeline 0
 configure wave -timelineunits ps
 update
-WaveRestoreZoom {0 ps} {1005010 ps}
+WaveRestoreZoom {79317 ps} {1574773 ps}
