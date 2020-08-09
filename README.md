@@ -4,23 +4,25 @@ Enhanced SPI Master Bus Functional Model
 
 ## Features
 
-The _eSpiMasterBfm_ provides VHDL procedures to interact with an eSPI endpoint. 
+The _eSpiMasterBfm_ provides VHDL procedures to interact with an eSPI endpoint.
 Currently are procedures available for:
  * IO Read/Write
  * Memory Read/Write
  * Endpoint Configuration
- 
+
 
 ## Enhanced Serial Peripheral Interface (ESPI)
- 
+
 
 
 ## File Listing
 
-| File                                                                                                | Remark            |
-| --------------------------------------------------------------------------------------------------- | ----------------- |
-| [eSpiMasterBfm.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd)      | BFM package       |
-| [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd) | Testbench for BFM |
+| File                                                                                                    | Group | Remark                                                                 |
+| ------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------------------------------------------- |
+| [eSpiMasterBfm.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd)          | BFM   | provides VHDL procedures to interact with an eSPI Slave                |
+| [eSpiStaticSlave.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiStaticSlave.vhd)      | BFM   | ASCII hex request/completion checking slave, supports eSpiMasterBfm TB |
+| [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)     | TB    | checks functionality of _eSpiMasterBfm_                                |
+| [eSpiStaticSlave_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiStaticSlave_tb.vhd) | TB    | checks functionality of _eSpiStaticSlave_                              |
 
 
 ## How-to use
