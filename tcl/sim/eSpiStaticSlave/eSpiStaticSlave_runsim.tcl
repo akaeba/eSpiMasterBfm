@@ -24,4 +24,4 @@ vsim -novopt -t 1ps work.eSpiStaticSlave_tb
 do "../tcl/sim/eSpiStaticSlave/eSpiStaticSlave_waveform.do"
 
 # sim until finish
-#run 3.5 ms
+run 2 us
