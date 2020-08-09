@@ -46,7 +46,8 @@ architecture sim of eSpiStaticSlave_tb is
         -- Test
 		constant loopIter	: integer 	:= 20;    	--! number of test loop iteration
         constant doTest0	: boolean 	:= true;  	--! Test0: Send/Receive Byte
-		constant doTest1	: boolean 	:= true;  	--! Test1: 
+		constant doTest1	: boolean 	:= true;  	--! Test1: Send/Receive Quadruple
+		constant doTest2	: boolean 	:= true;	--! Test2: Multi CSn activation transmissions
 		-- DUT
 		constant TP			: time		:= 20 ns;	--! clock period
 		constant MAXMSGLEN	: integer	:= 100;
@@ -239,7 +240,126 @@ begin
 		end if;
 		-------------------------
 		
+
+		-------------------------
+        -- Test2: Multi CSn activation transmissions
+        -------------------------
+		if ( doTest2 or DO_ALL_TEST ) then
+			Report "Test2: Multi CSn activation transmissions";
+			-- load message
+			REQMSG			<= (others => character(NUL));
+			CMPMSG			<= (others => character(NUL));
+			REQMSG(1 to 3) 	<= "B" & character(LF) & "D";
+			CMPMSG(1 to 3)	<= "C" & character(LF) & "E";
+			LDMSG			<= '1';
+			wait for TP;
+			LDMSG			<= '0';
+			----
+			-- First CSN activation
+			-- sent Request
+				-- Bit3
+			XCS		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit2
+			SCK		<= '0';
+			MOSI	<= '0';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit1
+			SCK		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit 0
+			SCK		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+			MOSI	<= 'Z';
+			-- TAR
+			for i in 0 to 1 loop
+				SCK	<= '0';
+				wait for TP/2;
+				SCK	<= '1';
+				wait for TP/2;
+			end loop;
+			-- Response
+			slv04 := (others => '0');
+			for i in 0 to slv04'length-1 loop
+				SCK	<= '0';
+				wait for TP/2;
+				SCK	<= '1';
+				slv04 := slv04(slv04'left-1 downto slv04'right) & MISO;	--! capture data
+				wait for TP/2;
+			end loop;
+			SCK	<= '0';
+			wait for TP/2;
+			XCS	<= '1';
+			-- check 
+			assert ( x"c" = slv04 ) report "  Error: Expected 0xC" severity warning;
+            if not ( x"c" = slv04 ) then good := false; end if;
+			wait for TP;
+			----
+			-- Second CSN activation
+			-- sent Request
+				-- Bit3
+			XCS		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit2
+			SCK		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit1
+			SCK		<= '0';
+			MOSI	<= '0';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+				-- Bit 0
+			SCK		<= '0';
+			MOSI	<= '1';
+			wait for TP/2;
+			SCK		<= '1';
+			wait for TP/2;
+			MOSI	<= 'Z';
+			-- TAR
+			for i in 0 to 1 loop
+				SCK	<= '0';
+				wait for TP/2;
+				SCK	<= '1';
+				wait for TP/2;
+			end loop;
+			-- Response
+			slv04 := (others => '0');
+			for i in 0 to slv04'length-1 loop
+				SCK	<= '0';
+				wait for TP/2;
+				SCK	<= '1';
+				slv04 := slv04(slv04'left-1 downto slv04'right) & MISO;	--! capture data
+				wait for TP/2;
+			end loop;
+			SCK	<= '0';
+			wait for TP/2;
+			XCS	<= '1';
+			-- check 
+			assert ( x"e" = slv04 ) report "  Error: Expected 0xE" severity warning;
+            if not ( x"e" = slv04 ) then good := false; end if;
+			wait for 10*TP;
+		end if;
+		-------------------------
 		
+
         -------------------------
         -- Report TB
         -------------------------
