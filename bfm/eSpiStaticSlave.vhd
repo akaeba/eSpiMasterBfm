@@ -260,14 +260,15 @@ begin
 
         else    --! bring it on the line
             if ( falling_edge(XCS) ) then
+                -- update from last transmission
+                reqMsgStartIdx  := reqMsgStopIdx + 1;
+                cpltSegStartIdx := cpltSegStopIdx + 1;
+                currentSeg      := currentSeg + 1;
                 -- check segment
-                if ( currentSeg >= totalSeg ) then
+                if ( currentSeg > totalSeg ) then
                     GOOD <= false;  --! something went wrong
                     Report "More XCS divided telegrams requested then expected" severity warning;
                 end if;
-                -- update from last transmission
-                reqMsgStartIdx := reqMsgStopIdx + 1;
-                cpltSegStartIdx := cpltSegStopIdx + 1;
                 -- determine new stop indexes
                 for i in reqMsgStartIdx to requestMsg'length loop
                     if ( character(NUL) = requestMsg(i) or character(LF) = completeMsg(i) ) then
@@ -306,7 +307,7 @@ begin
                         if ( 0 = reqBitsPend ) then
                             for i in 0 to (reqBitsCap/4 - 1) loop
                                 if ( reqMsgCap(i+1) /= requestMsg(reqMsgStartIdx+i) ) then
-                                    Report "Request: IS=0x" & reqMsgCap(1 to reqBitsCap/4) & "; EXP=0x" & requestMsg(1 to reqBitsCap/4) & ";" severity warning;
+                                    Report "Request: IS=0x" & reqMsgCap(1 to reqBitsCap/4) & "; EXP=0x" & requestMsg(reqMsgStartIdx to reqMsgStartIdx + reqBitsCap/4 - 1) & ";" severity warning;
                                     GOOD    <= false;   --! request failed
                                     stage   := NOMSG_S; --! no answer
                                     exit;
@@ -346,8 +347,13 @@ begin
                             if ( 0 < rspBitsSend ) then
                                 rspBitsSend := rspBitsSend - 1;
                             else
+                                -- single/multi CSn request?
+                                if ( currentSeg > totalSeg ) then   --! Single CSn
+                                    stage := NOMSG_S;
+                                else                                --! multi CSN
+                                    stage := CMD_S;
+                                end if;
                                 MISO    <= 'Z';
-                                stage   := NOMSG_S;
                             end if;
                         end if;
                     end if;
