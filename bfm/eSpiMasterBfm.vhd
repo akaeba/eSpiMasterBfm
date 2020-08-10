@@ -113,7 +113,7 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);    --! status
                     variable response   : out tESpiRsp                          --! slave response
                 );
-            -- w/o status, response, regs, instead print to console
+            -- w/o status, response, regs, instead prints direct to log
             procedure GET_CONFIGURATION
                 (
                     variable this   : inout tESpiBfm;
@@ -121,7 +121,6 @@ package eSpiMasterBfm is
                     signal SCK      : out std_logic;
                     signal DIO      : inout std_logic_vector(3 downto 0);
                     constant adr    : in std_logic_vector(15 downto 0);     --! config address
-                    variable config : out std_logic_vector(31 downto 0);    --! config data
                     variable good   : inout boolean                         --! procedure state
                 );
 
@@ -960,7 +959,7 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- GET_CONFIGURATION w/o status, response
+        -- GET_CONFIGURATION, prints direct to log
         --   @see Figure 22: GET_CONFIGURATION Command
         procedure GET_CONFIGURATION
             (
@@ -969,20 +968,22 @@ package body eSpiMasterBfm is
                 signal SCK      : out std_logic;
                 signal DIO      : inout std_logic_vector(3 downto 0);
                 constant adr    : in std_logic_vector(15 downto 0);
-                variable config : out std_logic_vector(31 downto 0);
                 variable good   : inout boolean
             ) is
             variable sts : std_logic_vector(15 downto 0);   --! wrapper variable for status
+            variable cfg : std_logic_vector(31 downto 0);   --! wrapper for config
             variable rsp : tESpiRsp;
         begin
             -- get configuration
-            GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, sts, rsp );
+            GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp );
             -- in case of no output print to console
             if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             -- Function is good?
             if ( ACCEPT /= rsp ) then
                 good := false;
                 if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
+            else
+                Report "GET_CONFIGURATION: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(cfg) & ";";  -- print to log
             end if;
         end procedure GET_CONFIGURATION;
         --***************************
