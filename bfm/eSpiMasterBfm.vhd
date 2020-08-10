@@ -407,6 +407,22 @@ package body eSpiMasterBfm is
         constant C_CT_MEMWR64       : std_logic_vector(7 downto 0)  := "00000011";  --! 64 bit addressing Memory Write Request. Support of upstream Memory Write 64 is mandatory for eSPI slaves that are bus mastering capable.
         --***************************
 
+        --***************************
+        -- Status Register, Figure 16: Slave’s Status Register Definition
+        constant C_STS_PC_FREE          : integer := 0;     --! Peripheral Posted/Completion Rx Queue Free
+        constant C_STS_NP_FREE          : integer := 1;     --! Peripheral Non-Posted Rx Queue Free
+        constant C_STS_VWIRE_FREE       : integer := 2;     --! Virtual Wire Rx Queue Free
+        constant C_STS_OOB_FREE         : integer := 3;     --! OOB Posted Rx Queue Free
+        constant C_STS_PC_AVAIL         : integer := 4;     --! Peripheral Posted/Completion Tx Queue Avail
+        constant C_STS_NP_AVAIL         : integer := 5;     --! Peripheral Non-Posted Tx Queue Avail
+        constant C_STS_VWIRE_AVAIL      : integer := 6;     --! Virtual Wire Tx Queue Avail
+        constant C_STS_OOB_AVAIL        : integer := 7;     --! OOB Posted Tx Queue Avail
+        constant C_STS_FLASH_C_FREE     : integer := 8;     --! Flash Completion Rx Queue Free
+        constant C_STS_FLASH_NP_FREE    : integer := 9;     --! Flash Non-Posted Rx Queue Free
+        constant C_STS_FLASH_C_AVAIL    : integer := 12;    --! Flash Completion Tx Queue Avail
+        constant C_STS_FLASH_NP_AVAIL   : integer := 13;    --! Flash Non-Posted Tx Queue Avail
+        --***************************
+
     ----------------------------------------------
 
 
@@ -610,19 +626,19 @@ package body eSpiMasterBfm is
         begin
             -- convert
             ret :=  character(LF) &
-                    "     Status           : 0x"    & to_hstring(sts)                                                                                               & character(LF) &
-                    "       PC_FREE        : "      & integer'image(to_integer(unsigned(sts(00 downto 00)))) & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF) &
-                    "       NP_FREE        : "      & integer'image(to_integer(unsigned(sts(01 downto 01)))) & "       Peripheral Non-Posted Rx Queue Free"         & character(LF) &
-                    "       VWIRE_FREE     : "      & integer'image(to_integer(unsigned(sts(02 downto 02)))) & "       Virtual Wire Rx Queue Free"                  & character(LF) &
-                    "       OOB_FREE       : "      & integer'image(to_integer(unsigned(sts(03 downto 03)))) & "       OOB Posted Rx Queue Free"                    & character(LF) &
-                    "       PC_AVAIL       : "      & integer'image(to_integer(unsigned(sts(04 downto 04)))) & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF) &
-                    "       NP_AVAIL       : "      & integer'image(to_integer(unsigned(sts(05 downto 05)))) & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF) &
-                    "       VWIRE_AVAIL    : "      & integer'image(to_integer(unsigned(sts(06 downto 06)))) & "       Virtual Wire Tx Queue Avail"                 & character(LF) &
-                    "       OOB_AVAIL      : "      & integer'image(to_integer(unsigned(sts(07 downto 07)))) & "       OOB Posted Tx Queue Avail"                   & character(LF) &
-                    "       FLASH_C_FREE   : "      & integer'image(to_integer(unsigned(sts(08 downto 08)))) & "       Flash Completion Rx Queue Free"              & character(LF) &
-                    "       FLASH_NP_FREE  : "      & integer'image(to_integer(unsigned(sts(09 downto 09)))) & "       Flash Non-Posted Rx Queue Free"              & character(LF) &
-                    "       FLASH_C_AVAIL  : "      & integer'image(to_integer(unsigned(sts(12 downto 12)))) & "       Flash Completion Tx Queue Avail"             & character(LF) &
-                    "       FLASH_NP_AVAIL : "      & integer'image(to_integer(unsigned(sts(13 downto 13)))) & "       Flash Non-Posted Tx Queue Avail"             & character(LF);
+                    "     Status           : 0x"    & to_hstring(sts)                                                                                                                                   & character(LF) &
+                    "       PC_FREE        : "      & integer'image(to_integer(unsigned(sts(C_STS_PC_FREE        downto C_STS_PC_FREE))))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF) &
+                    "       NP_FREE        : "      & integer'image(to_integer(unsigned(sts(C_STS_NP_FREE        downto C_STS_NP_FREE))))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF) &
+                    "       VWIRE_FREE     : "      & integer'image(to_integer(unsigned(sts(C_STS_VWIRE_FREE     downto C_STS_VWIRE_FREE))))     & "       Virtual Wire Rx Queue Free"                  & character(LF) &
+                    "       OOB_FREE       : "      & integer'image(to_integer(unsigned(sts(C_STS_OOB_FREE       downto C_STS_OOB_FREE))))       & "       OOB Posted Rx Queue Free"                    & character(LF) &
+                    "       PC_AVAIL       : "      & integer'image(to_integer(unsigned(sts(C_STS_PC_AVAIL       downto C_STS_PC_AVAIL))))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF) &
+                    "       NP_AVAIL       : "      & integer'image(to_integer(unsigned(sts(C_STS_NP_AVAIL       downto C_STS_NP_AVAIL))))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF) &
+                    "       VWIRE_AVAIL    : "      & integer'image(to_integer(unsigned(sts(C_STS_VWIRE_AVAIL    downto C_STS_VWIRE_AVAIL))))    & "       Virtual Wire Tx Queue Avail"                 & character(LF) &
+                    "       OOB_AVAIL      : "      & integer'image(to_integer(unsigned(sts(C_STS_OOB_AVAIL      downto C_STS_OOB_AVAIL))))      & "       OOB Posted Tx Queue Avail"                   & character(LF) &
+                    "       FLASH_C_FREE   : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_C_FREE   downto C_STS_FLASH_C_FREE))))   & "       Flash Completion Rx Queue Free"              & character(LF) &
+                    "       FLASH_NP_FREE  : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_FREE  downto C_STS_FLASH_NP_FREE))))  & "       Flash Non-Posted Rx Queue Free"              & character(LF) &
+                    "       FLASH_C_AVAIL  : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_C_AVAIL  downto C_STS_FLASH_C_AVAIL))))  & "       Flash Completion Tx Queue Avail"             & character(LF) &
+                    "       FLASH_NP_AVAIL : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_AVAIL downto C_STS_FLASH_NP_AVAIL)))) & "       Flash Non-Posted Tx Queue Avail"             & character(LF);
             -- release
             return ret;
         end function sts2str;
