@@ -336,6 +336,7 @@ begin
         -------------------------
 		if ( doTest8 or DO_ALL_TEST ) then
 			Report "Test8: IORD";
+			Report "  Slave Responds directly";
 			-- load message
             REQMSG			<= (others => character(NUL));
             CMPMSG			<= (others => character(NUL));
@@ -348,7 +349,24 @@ begin
 			-- Request BFM
 			IORD ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, x"0080", slv8, good );	--! read data byte from io space adr 0x80
 			-- check
-			
+			assert ( x"01" = slv8 ) report "IORD:  Read value unequal 0x01" severity warning;
+            if not ( x"01" = slv8 ) then good := false; end if;
+			wait for 1 us;
+			Report "  Slave Responds responds with DEFER";
+			-- load message
+            REQMSG			<= (others => character(NUL));
+            CMPMSG			<= (others => character(NUL));
+			REQMSG(1 to 14)	<= "4000800F"	& character(LF)	& "0107" 				& character(NUL);	--! sent Request 		(BFM to Slave)
+			CMPMSG(1 to 26)	<= "015F03AD"	& character(LF) & "080F0001154F039F"	& character(NUL);	--! received response 	(Slave to BFM)
+			LDMSG			<= '1';
+			wait for eSpiMasterBfm.TSpiClk/2;
+			LDMSG			<= '0';
+			wait for eSpiMasterBfm.TSpiClk/2;
+			-- Request BFM
+			IORD ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, x"0080", slv8, good );	--! read data byte from io space adr 0x80
+			-- check
+			assert ( x"15" = slv8 ) report "IORD:  Read value unequal 0x15" severity warning;
+            if not ( x"15" = slv8 ) then good := false; end if;
 			wait for 1 us;
 		end if;
 		-------------------------
