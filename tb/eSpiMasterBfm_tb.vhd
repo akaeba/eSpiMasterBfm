@@ -347,6 +347,7 @@ begin
             LDMSG           <= '0';
             wait for eSpiMasterBfm.TSpiClk/2;
             -- Request BFM
+            slv8 := (others => 'X');                                            --! make invalid
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, x"0080", slv8, good ); --! read data byte from io space adr 0x80
             -- check
             assert ( x"01" = slv8 ) report "IORD:  Read value unequal 0x01" severity warning;
@@ -363,6 +364,7 @@ begin
             LDMSG           <= '0';
             wait for eSpiMasterBfm.TSpiClk/2;
             -- Request BFM
+            slv8 := (others => 'X');                                            --! make invalid
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, x"0080", slv8, good ); --! read data byte from io space adr 0x80
             -- check
             assert ( x"15" = slv8 ) report "IORD:  Read value unequal 0x15" severity warning;
