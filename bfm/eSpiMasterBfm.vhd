@@ -67,6 +67,8 @@ package eSpiMasterBfm is
             sigSkew     : time;         --! defines Signal Skew to prevent timing errors in back-anno
             verbose     : natural;      --! message level; 0: no message, 1: errors, 2: error + warnings
             tiout       : time;         --! time out when master give up an interaction
+            tioutAlert  : natural;      --! number of clock cycles before BFM gives with time out up
+            tioutRd     : natural;      --! number of Get Status Cycles before data read gives up
         end record tESpiBfm;
     -----------------------------
 
@@ -353,6 +355,27 @@ end package eSpiMasterBfm;
 package body eSpiMasterBfm is
 
     ----------------------------------------------
+    -- Constant BFM Handling
+    ----------------------------------------------
+
+        --***************************
+        -- Message Levels
+        constant C_MSG_ERROR    : integer := 0;
+        constant C_MSG_WARN     : integer := 1;
+        constant C_MSG_INFO     : integer := 2;
+        --***************************
+
+
+        --***************************
+        -- Time-out
+        constant C_TIOUT_CYC_ALERT  : integer := 100;   --! number of clock cycles before BFM gives with time out up
+        constant C_TIOUT_CYC_RD     : integer := 20;    --! number of status retries for read completion before BFM gives uo
+        --***************************
+
+    ----------------------------------------------
+
+
+    ----------------------------------------------
     -- Constant eSPI Handling
     ----------------------------------------------
 
@@ -424,19 +447,6 @@ package body eSpiMasterBfm is
 
     ----------------------------------------------
 
-
-    ----------------------------------------------
-    -- Constant BFM Handling
-    ----------------------------------------------
-
-        --***************************
-        -- Message Levels
-        constant C_MSG_ERROR    : integer := 0;
-        constant C_MSG_WARN     : integer := 1;
-        constant C_MSG_INFO     : integer := 2;
-        --***************************
-
-    ----------------------------------------------
 
 
     ----------------------------------------------
@@ -660,12 +670,14 @@ package body eSpiMasterBfm is
             ) is
         begin
             -- common handle
-            this.TSpiClk    := 50 ns;   --! default clock is 20MHz
-            this.crcSlvEna  := false;   --! out of reset is CRC disabled
-            this.spiMode    := SINGLE;  --! Default mode, out of reset
-            this.sigSkew    := 0 ns;    --! no skew between clock edge and data defined
-            this.verbose    := 0;       --! all messages disabled
-            this.tiout      := 100 us;  --! 100us master time out for wait
+            this.TSpiClk    := 50 ns;               --! default clock is 20MHz
+            this.crcSlvEna  := false;               --! out of reset is CRC disabled
+            this.spiMode    := SINGLE;              --! Default mode, out of reset
+            this.sigSkew    := 0 ns;                --! no skew between clock edge and data defined
+            this.verbose    := 0;                   --! all messages disabled
+            this.tiout      := 100 us;              --! 100us master time out for wait
+            this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
             -- signals
             CSn <= '1';
             SCK <= '0';
@@ -1125,6 +1137,104 @@ package body eSpiMasterBfm is
             end if;
         end procedure GET_STATUS;
         --***************************
+
+    ----------------------------------------------
+
+
+
+    ----------------------------------------------
+    -- Help Procedures, handles complex common interactions
+    ----------------------------------------------
+
+        --***************************
+        -- Poll for PC_AVAIL and fetch data
+        --  @see Figure 20: GET_STATUS Command
+        --  @see Figure 25: Deferred Master Initiated Non-Posted Transaction
+        --  @see Figure 36: Peripheral Memory Read Packet Format
+        --  @see Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
+        procedure RD_DEFER_PC_AVAIL
+            (
+                variable this       : inout tESpiBfm;
+                signal CSn          : out   std_logic;                      --! Slave select
+                signal SCK          : out   std_logic;                      --! Shift Clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! data
+                variable data       : out   tMemX08;                        --! read data, 1/2/4 Bytes supported
+                variable status     : inout std_logic_vector(15 downto 0);  --! slave status
+                variable response   : out   tESpiRsp                        --! command response
+
+            ) is
+            variable tiout      : natural;                          --! counter for tiout
+            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable sts        : std_logic_vector(15 downto 0);    --! internal status
+            variable msg        : tMemX08(0 to data'length + 6);    --! +1Byte Response, +3Byte Header, +2Byte Status
+            variable dlen_slv   : std_logic_vector(11 downto 0);    --! data field length
+            variable dlen       : integer range 0 to 1024;          --! data length of completion packet
+            variable cycTyp     : std_logic_vector(7 downto 0);     --! cycle type, @see:
+            variable tag        : std_logic_vector(3 downto 0);     --! tag, @see:
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Acquires read data after DEFER"; end if;
+            -- check for PC_AVAIL
+            sts     := status;      --! handles internal status
+            tiout   := 0;
+            while ( ('0' = sts(C_STS_PC_AVAIL)) and tiout < this.tioutRd ) loop --! no PC_AVAIL, wait for it
+                -- check slave status
+                    -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
+                GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
+                if ( ACCEPT /= rsp ) then
+                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: GET_STATUS failed with '" & rsp2str(rsp) & "'" severity error; end if;
+                    rsp := FATAL_ERROR;     --! make to fail
+                    sts := (others => '0'); --! no valid data
+                    exit;                   --! leave loop
+                end if;
+                -- inc tiout counter
+                tiout := tiout + 1;
+            end loop;
+            -- check for reach tiout
+            if ( (tiout = this.tioutRd) and ('0' = sts(C_STS_PC_AVAIL)) ) then
+                rsp := NO_RESPONSE; --! no data available
+                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: No data available in allowed response time" severity warning; end if;
+            end if;
+            -- fetch data from slave
+            if ( (ACCEPT = rsp) and ('1' = sts(C_STS_PC_AVAIL)) ) then  --! no ero and data is available
+                -- user message
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: PC_AVAIL"; end if;
+                -- assemble Posted completion message
+                msg     := (others => (others => '0')); --! init message array
+                msg(0)  := C_GET_PC;                    --! request posted completion
+                -- @see: Figure 36: Peripheral Memory Read Packet Format
+                -- @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
+                -- numRxByte: +1Byte Response, +3Byte Header, +2Byte Status
+                    -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
+                spiXcv(this, msg, CSn, SCK, DIO, 1, data'length+6, rsp);    --! CRC added and checked by transceiver procedure
+                -- slave has the data?
+                if ( ACCEPT = rsp ) then
+                    -- disassemble read packet, @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
+                    cycTyp      := msg(1);                                              --! cycle type
+                    tag         := msg(2)(7 downto 4);                                  --! tag
+                    dlen_slv    := msg(2)(3 downto 0) & msg(3);                         --! intermediate
+                    dlen        := to_integer(unsigned(dlen_slv));                      --! data length
+                    data        := msg(4 to data'length + 4 - 1);                       --! data
+                    sts         := msg(4 + data'length + 2) & msg(4 + data'length + 1); --! status register
+                    -- Some Info
+                    if ( this.verbose > C_MSG_INFO ) then
+                        -- TODO
+
+                    end if;
+                    -- check
+                    if ( dlen /= data'length ) then
+                        if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Request not completely completed, pad with zeros" severity warning; end if;
+                    end if;
+                end if;
+            else
+                sts := (others => '0'); --! make invalid
+            end if;
+            -- propagate back
+            response    := rsp;
+            status      := sts;
+        end procedure RD_DEFER_PC_AVAIL;
+        --***************************
+
     ----------------------------------------------
 
 
@@ -1484,55 +1594,14 @@ package body eSpiMasterBfm is
             spiXcv(this, msg, CSn, SCK, DIO, 3, data'length+3, rsp);    --! CRC added and checked by transceiver procedure
             -- slave has the data?
             if ( ACCEPT = rsp ) then                                --! data is in response
-                data    := msg(1 to data'length - 1 + 1);           --! data bytes
+                -- data ready
                 sts     := msg(data'length+2) & msg(data'length+1); --! status register
-            elsif ( DEFER = rsp ) then     --! Wait, Figure 25: Deferred Master Initiated Non-Posted Transaction
-                -- assemble status
+                data    := msg(1 to data'length - 1 + 1);           --! data bytes
+            elsif ( DEFER = rsp ) then  --! Wait, Figure 25: Deferred Master Initiated Non-Posted Transaction
+                -- wait for data
                 sts := msg(2) & msg(1); --! status
-                -- check for PC_AVAIL, otherwise wait for alert
-                while ( sts(4) = '0' ) loop
-                    -- user message
-                    if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD:DEFER: no PC_AVAIL wait for #ALERT"; end if;
-                    -- wait for alert
-                    while ( ALERTn /= '0' ) loop
-                        wait for this.TSpiClk/8;    --! wait for core
-                        tiout := tiout + 1;         --! increment counter
-                        if ( tiout > 8 * (this.tiout/this.TSpiClk) ) then
-                            rsp := NO_RESPONSE;
-                            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD: After DEFER no reponse within " & time'image(this.tiout); end if;
-                            exit;
-                        end if;
-                    end loop;
-                    -- check status
-                    if ( DEFER = rsp ) then
-                        -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
-                        GET_STATUS ( this, CSn, SCK, DIO, sts, rspGetSts );     --! check for PC_AVAIL
-                        if ( ACCEPT /= rspGetSts ) then
-                            rsp := FATAL_ERROR;
-                            exit;
-                        end if;
-                    else
-                        exit;
-                    end if;
-                end loop;
-                -- DEFER and PC_AVAIL, fetch data
-                if ( DEFER = rsp and sts(4) = '1' ) then
-                    -- user message
-                    if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD:DEFER: PC_AVAIL "; end if;
-                    -- assemble Posted completion message
-                    msg     := (others => (others => '0')); --! init message array
-                    msg(0)  := C_GET_PC;                    --! request posted completion
-                        -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
-                    -- numRxByte: +1Byte Response, +3Byte Header, +2Byte Status
-                    spiXcv(this, msg, CSn, SCK, DIO, 1, data'length+6, rsp);    --! CRC added and checked by transceiver procedure
-                else
-                    rsp := FATAL_ERROR;
-                end if;
-                -- slave has now the data
-                if ( ACCEPT = rsp ) then
-                    sts     := msg(4 + data'length + 2) & msg(4 + data'length + 1); --! status register
-                    data    := msg(4 to data'length + 4 - 1);                       --! @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
-                end if;
+                    -- RD_DEFER_PC_AVAIL( this, CSn, SCK, DIO, data, status, response )
+                RD_DEFER_PC_AVAIL( this, CSn, SCK, DIO, data, sts, rsp );
             else
                 sts := (others => '0'); --! invalid
             end if;
@@ -1747,6 +1816,17 @@ package body eSpiMasterBfm is
         --***************************
 
     ----------------------------------------------
+
+
+
+    ----------------------------------------------
+    -- Print to Console
+    ----------------------------------------------
+
+
+    ----------------------------------------------
+
+
 
 end package body eSpiMasterBfm;
 --------------------------------------------------------------------------
