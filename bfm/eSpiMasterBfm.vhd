@@ -75,8 +75,7 @@ package eSpiMasterBfm is
 
     -----------------------------
     -- Functions (public)
-        function crc8 ( msg : in tMemX08 ) return std_logic_vector;                     --! crc8:       calculate crc from a message
-        function sts2str ( sts : in std_logic_vector(15 downto 0) ) return string;      --! sts2str:    convert slave status register into a human readable string
+        function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8:       calculate crc from a message
     -----------------------------
 
 
@@ -628,10 +627,40 @@ package body eSpiMasterBfm is
 
 
         --***************************
+        -- ct2str
+        --   print decoded cycle type in human readable form to string
+        function ct2str ( ct : std_logic_vector(7 downto 0) ) return string is
+            variable ret : string(1 to 50) := (others => character(NUL));   --! make empty
+            variable len : integer;                                         --! shorts string to allow concat w/o print abort
+        begin
+            -- convert
+            if ( std_match(ct, C_CT_MEMRD32) ) then
+                ret(1 to 7) := "MEMRD32";
+                len         := 7;
+            elsif ( std_match(ct, C_CT_MEMRD64) ) then
+                ret(1 to 7) := "MEMRD64";
+                len         := 7;
+            elsif ( std_match(ct, C_CT_MEMWR32) ) then
+                ret(1 to 7) := "MEMWR32";
+                len         := 7;
+            elsif ( std_match(ct, C_CT_MEMWR64) ) then
+                ret(1 to 7) := "MEMWR64";
+                len         := 7;
+            else
+                ret(1 to 7) := "UNKNOWN";
+                len         := 7;
+            end if;
+            -- release
+            return ret(1 to len);
+        end function ct2str;
+        --***************************
+
+
+        --***************************
         -- sts2str
         --   print status register to string in a human-readable way
         function sts2str ( sts : in std_logic_vector(15 downto 0) ) return string is
-            variable ret : string(1 to 808);
+            variable ret : string(1 to 807);
         begin
             -- convert
             ret :=  character(LF) &
@@ -647,7 +676,7 @@ package body eSpiMasterBfm is
                     "       FLASH_C_FREE   : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_C_FREE   downto C_STS_FLASH_C_FREE))))   & "       Flash Completion Rx Queue Free"              & character(LF) &
                     "       FLASH_NP_FREE  : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_FREE  downto C_STS_FLASH_NP_FREE))))  & "       Flash Non-Posted Rx Queue Free"              & character(LF) &
                     "       FLASH_C_AVAIL  : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_C_AVAIL  downto C_STS_FLASH_C_AVAIL))))  & "       Flash Completion Tx Queue Avail"             & character(LF) &
-                    "       FLASH_NP_AVAIL : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_AVAIL downto C_STS_FLASH_NP_AVAIL)))) & "       Flash Non-Posted Tx Queue Avail"             & character(LF);
+                    "       FLASH_NP_AVAIL : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_AVAIL downto C_STS_FLASH_NP_AVAIL)))) & "       Flash Non-Posted Tx Queue Avail";
             -- release
             return ret;
         end function sts2str;
@@ -1218,8 +1247,12 @@ package body eSpiMasterBfm is
                     sts         := msg(4 + data'length + 2) & msg(4 + data'length + 1); --! status register
                     -- Some Info
                     if ( this.verbose > C_MSG_INFO ) then
-                        -- TODO
-
+                        -- print to console log
+                        Report                                                                character(LF) &
+                                "     PC Details:"                                          & character(LF) &
+                                "       Cycle Type : "      & ct2str(cycTyp)                & character(LF) &
+                                "       Tag        : 0x"    & to_hstring(tag)               & character(LF) &
+                                "       Length     : "      & integer'image(dlen)   & "d";
                     end if;
                     -- check
                     if ( dlen /= data'length ) then
