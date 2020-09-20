@@ -422,10 +422,15 @@ package body eSpiMasterBfm is
 
         --***************************
         -- Cycle Type Encodings, Table 6: Cycle Types
-        constant C_CT_MEMRD32       : std_logic_vector(7 downto 0)  := "00000000";  --! 32 bit addressing Memory Read Request. LPC Memory Read and LPC Bus Master Memory Read requests are mapped to this cycle type.
-        constant C_CT_MEMRD64       : std_logic_vector(7 downto 0)  := "00000010";  --! 64 bit addressing Memory Read Request. Support of upstream Memory Read 64 is mandatory for eSPI slaves that are bus mastering capable.
-        constant C_CT_MEMWR32       : std_logic_vector(7 downto 0)  := "00000001";  --! 32 bit addressing Memory Write Request. LPC Memory Write and LPC Bus Master Memory Write requests are mapped to this cycle type.
-        constant C_CT_MEMWR64       : std_logic_vector(7 downto 0)  := "00000011";  --! 64 bit addressing Memory Write Request. Support of upstream Memory Write 64 is mandatory for eSPI slaves that are bus mastering capable.
+        constant C_CT_MEMRD32           : std_logic_vector(7 downto 0)  := "00000000";  --! 32 bit addressing Memory Read Request. LPC Memory Read and LPC Bus Master Memory Read requests are mapped to this cycle type.
+        constant C_CT_MEMRD64           : std_logic_vector(7 downto 0)  := "00000010";  --! 64 bit addressing Memory Read Request. Support of upstream Memory Read 64 is mandatory for eSPI slaves that are bus mastering capable.
+        constant C_CT_MEMWR32           : std_logic_vector(7 downto 0)  := "00000001";  --! 32 bit addressing Memory Write Request. LPC Memory Write and LPC Bus Master Memory Write requests are mapped to this cycle type.
+        constant C_CT_MEMWR64           : std_logic_vector(7 downto 0)  := "00000011";  --! 64 bit addressing Memory Write Request. Support of upstream Memory Write 64 is mandatory for eSPI slaves that are bus mastering capable.
+        constant C_CT_MSG               : std_logic_vector(7 downto 0)  := "000---00";  --! Message Request.
+        constant C_CT_MSG_W_DAT         : std_logic_vector(7 downto 0)  := "000---01";  --! Message Request with data payload.
+        constant C_CT_CPL_OK_WO_DAT     : std_logic_vector(7 downto 0)  := "00000110";  --! Successful Completion Without Data. Corresponds to I/O Write.
+        constant C_CT_CPL_OK_W_DAT      : std_logic_vector(7 downto 0)  := "00001--1";  --! Successful Completion With Data. Corresponds to Memory Read or I/O Read.
+        constant C_CT_CPL_FAIL_W_DAT    : std_logic_vector(7 downto 0)  := "00001--0";  --! Unsuccessful Completion Without Data. Corresponds to Memory or I/O.
         --***************************
 
         --***************************
@@ -635,17 +640,32 @@ package body eSpiMasterBfm is
         begin
             -- convert
             if ( std_match(ct, C_CT_MEMRD32) ) then
-                ret(1 to 7) := "MEMRD32";
-                len         := 7;
+                len             := 7;
+                ret(1 to len)   := "MEMRD32";
             elsif ( std_match(ct, C_CT_MEMRD64) ) then
-                ret(1 to 7) := "MEMRD64";
-                len         := 7;
+                len             := 7;
+                ret(1 to len)   := "MEMRD64";
             elsif ( std_match(ct, C_CT_MEMWR32) ) then
-                ret(1 to 7) := "MEMWR32";
-                len         := 7;
+                len             := 7;
+                ret(1 to len)   := "MEMWR32";
             elsif ( std_match(ct, C_CT_MEMWR64) ) then
-                ret(1 to 7) := "MEMWR64";
-                len         := 7;
+                len             := 7;
+                ret(1 to len)   := "MEMWR64";
+            elsif ( std_match(ct, C_CT_MSG) ) then
+                len             := 7;
+                ret(1 to len)   := "Message";
+            elsif ( std_match(ct, C_CT_MSG_W_DAT) ) then
+                len             := 17;
+                ret(1 to len)   := "Message with Data";
+            elsif ( std_match(ct, C_CT_CPL_OK_WO_DAT) ) then
+                len             := 34;
+                ret(1 to len)   := "Successful Completion Without Data";
+            elsif ( std_match(ct, C_CT_CPL_OK_W_DAT) ) then
+                len             := 31;
+                ret(1 to len)   := "Successful Completion With Data";
+            elsif ( std_match(ct, C_CT_CPL_FAIL_W_DAT) ) then
+                len             := 36;
+                ret(1 to len)   := "Unsuccessful Completion Without Data";
             else
                 ret(1 to 7) := "UNKNOWN";
                 len         := 7;
