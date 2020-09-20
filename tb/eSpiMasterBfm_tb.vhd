@@ -49,12 +49,13 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest0    : boolean := true;  --! test0: CRC8
         constant doTest1    : boolean := true;  --! test1: GET_CONFIGURATION
         constant doTest2    : boolean := true;  --! test2: SET_CONFIGURATION
-        constant doTest3    : boolean := true;  --! test2: GET_STATUS
-        constant doTest4    : boolean := true;  --! test3: MEMWR32
-        constant doTest5    : boolean := true;  --! test4: MEMRD32
-        constant doTest6    : boolean := true;  --! test5: RESET
-        constant doTest7    : boolean := true;  --! test6: IOWR
-        constant doTest8    : boolean := true;  --! test7: IORD
+        constant doTest3    : boolean := true;  --! test3: GET_STATUS
+        constant doTest4    : boolean := true;  --! test4: MEMWR32
+        constant doTest5    : boolean := true;  --! test5: MEMRD32
+        constant doTest6    : boolean := true;  --! test6: RESET
+        constant doTest7    : boolean := true;  --! test7: IOWR
+        constant doTest8    : boolean := true;  --! test8: IORD
+        constant doTest9    : boolean := true;  --! test9: VWIRE XPLTRST
     -----------------------------
 
 
@@ -374,9 +375,41 @@ begin
         -------------------------
 
 
-
-
-
+        -------------------------
+        -- Test8: IORD
+        -------------------------
+        if ( doTest9 or DO_ALL_TEST ) then
+            Report "Test9: VWIRE XPLTRST";
+            Report "  XPLTRST = 0";
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 11) <= "0400031110" & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 9)  <= "084F03C0"   & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            LDMSG           <= '0';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            -- Request BFM
+                -- VW_PLTRST( this, CSn, SCK, DIO, XPLTRST, good )
+            VW_PLTRST( eSpiMasterBfm, CSn, SCK, DIO, '0', good );
+            wait for 1 us;
+            Report "  XPLTRST = 1";
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 11) <= "0400032289" & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 9)  <= "084F03C0"   & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            LDMSG           <= '0';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            -- Request BFM
+                -- VW_PLTRST( this, CSn, SCK, DIO, XPLTRST, good )
+            VW_PLTRST( eSpiMasterBfm, CSn, SCK, DIO, '1', good );
+            wait for 1 us;
+        end if;
+        -------------------------
 
 
 
