@@ -376,7 +376,7 @@ begin
 
 
         -------------------------
-        -- Test8: IORD
+        -- Test8: VWIRE XPLTRST
         -------------------------
         if ( doTest9 or DO_ALL_TEST ) then
             Report "Test9: VWIRE XPLTRST";
