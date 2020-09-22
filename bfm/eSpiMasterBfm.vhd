@@ -38,6 +38,8 @@ package eSpiMasterBfm is
     -- Data typs
         -- memory organization
         type tMemX08 is array (natural range <>) of std_logic_vector (7 downto 0);  --! Byte orientated memory array
+        type slv32 is array (natural range <>) of std_logic_vector (31 downto 0);   --! unconstrained array
+        type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --!
 
         -- SPI transceiver mode
         type tSpiXcvMode is
@@ -339,6 +341,17 @@ package eSpiMasterBfm is
                     signal SCK          : out std_logic;                        --! shift clock
                     signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                     constant XPLTRST    : bit;                                  --! active low reset, assert/de-assert
+                    variable good       : inout boolean                         --! successful
+                );
+
+
+        -- Print: Slave Configuration Registers to Console Log
+            procedure PRT_CFG_REGS
+                (
+                    variable this       : inout tESpiBfm;
+                    signal CSn          : out std_logic;                        --! slave select
+                    signal SCK          : out std_logic;                        --! shift clock
+                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                     variable good       : inout boolean                         --! successful
                 );
 
@@ -1846,6 +1859,8 @@ package body eSpiMasterBfm is
             ) is
                 variable vwData : std_logic_vector(7 downto 0);             --! Modifier of PLTRST
         begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST"; end if;
             -- assert/deassert reset?
             if ( XPLTRST = '0' ) then   -- assert
                 -- user message
@@ -1876,6 +1891,58 @@ package body eSpiMasterBfm is
     -- Print to Console
     ----------------------------------------------
 
+        --***************************
+        -- Prints: Slave Configuration Registers to Console Log
+        procedure PRT_CFG_REGS
+            (
+                variable this       : inout tESpiBfm;
+                signal CSn          : out std_logic;                        --! slave select
+                signal SCK          : out std_logic;                        --! shift clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                variable good       : inout boolean                         --! successful
+            ) is
+                constant adrs   : slv16(0 to 5) := (C_DEV_IDENT, C_GEN_CAP_CFG, C_CH0_CAP_CFG, C_CH1_CAP_CFG, C_CH2_CAP_CFG, C_CH3_CAP_CFG);    --! buffer slave regs
+                variable sts    : std_logic_vector(15 downto 0);    --! dummy variable
+                variable rsp    : tESpiRsp;                         --! request response status
+                variable cfgStr : string(1 to 313);                 --! string for config print to console
+                variable cfg    : std_logic_vector(31 downto 0);    --! temp variable for config
+                variable tmpStr : string(1 to 10);
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:PRT_CFG_REGS"; end if;
+            -- template for console print, blanks are filled
+            cfgStr  :=  (others => character(NUL)); --! init
+            cfgStr  :=  character(LF) &
+                        "     eSPI Slave Configuration:"                 & character(LF) &
+                        "       DevId                      :           " & character(LF) &
+                        "       General                    :           " & character(LF) &
+                        "       Peripheral Channel   (Ch0) :           " & character(LF) &
+                        "       Virtual Wire Channel (Ch1) :           " & character(LF) &
+                        "       OOB Message Channel  (Ch2) :           " & character(LF) &
+                        "       Flash Access Channel (Ch3) :           ";
+            -- acquire data
+            for i in 0 to (adrs'length - 1) loop
+                -- prepare
+                cfg     := (others => '0');             -- init
+                tmpStr  := (others => character(' '));  -- blank string
+                -- request slave
+                    -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, status, response );
+                GET_CONFIGURATION( this, CSn, SCK, DIO, adrs(i), cfg, sts, rsp );
+                -- check response and prepare data
+                if ( ACCEPT = rsp ) then
+                    tmpStr := "0x" & to_hstring(cfg);
+                else
+                    if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:PRT_CFG_REGS Failed read from ADR 0x" & to_hstring(adrs(i)); end if;
+                    tmpStr(1 to 4)  := "FAIL";
+                    good            := false;
+                end if;
+                -- insert
+                cfgStr(68+i*47 to 68+i*47+tmpStr'length) := tmpStr;
+            end loop;
+            -- print config
+            Report cfgStr;
+        end procedure PRT_CFG_REGS;
+        --***************************
 
     ----------------------------------------------
 
