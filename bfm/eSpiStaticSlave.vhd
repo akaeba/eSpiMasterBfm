@@ -271,13 +271,13 @@ begin
                 end if;
                 -- determine new stop indexes
                 for i in reqMsgStartIdx to requestMsg'length loop
-                    if ( character(NUL) = requestMsg(i) or character(LF) = completeMsg(i) ) then
+                    if ( (character(NUL) = requestMsg(i)) or (character(LF) = requestMsg(i)) ) then
                         reqMsgStopIdx := i;
                         exit;
                     end if;
                 end loop;
                 for i in cpltSegStartIdx to completeMsg'length loop
-                    if ( character(NUL) = completeMsg(i) or character(LF) = completeMsg(i) ) then
+                    if ( (character(NUL) = completeMsg(i)) or (character(LF) = completeMsg(i)) ) then
                         cpltSegStopIdx := i;
                         exit;
                     end if;
