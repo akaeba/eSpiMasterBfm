@@ -479,7 +479,8 @@ package body eSpiMasterBfm is
             -- init
             remainder := (others => '0');
             -- calculate crc
-            -- SRC: https://barrgroup.com/embedded-systems/how-to/crc-calculation-c-code
+            -- @see: https://barrgroup.com/embedded-systems/how-to/crc-calculation-c-code
+            -- @see: https://crccalc.com
             -- iterate over byte messages
             for i in msg'low to msg'high loop
                 remainder := remainder xor msg(i);  --! add new message
