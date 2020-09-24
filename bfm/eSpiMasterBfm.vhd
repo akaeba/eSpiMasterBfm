@@ -1937,7 +1937,7 @@ package body eSpiMasterBfm is
                     good            := false;
                 end if;
                 -- insert
-                cfgStr(68+i*47 to 68+i*47+tmpStr'length) := tmpStr;
+                cfgStr(68+i*47+1 to 68+i*47+tmpStr'length) := tmpStr;
             end loop;
             -- print config
             Report cfgStr;
