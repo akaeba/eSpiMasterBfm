@@ -46,16 +46,18 @@ architecture sim of eSpiMasterBfm_tb is
     -- Constant
         -- Test
         constant loopIter   : integer := 20;    --! number of test loop iteration
-        constant doTest0    : boolean := true;  --! test0: CRC8
-        constant doTest1    : boolean := true;  --! test1: GET_CONFIGURATION
-        constant doTest2    : boolean := true;  --! test2: SET_CONFIGURATION
-        constant doTest3    : boolean := true;  --! test3: GET_STATUS
-        constant doTest4    : boolean := true;  --! test4: MEMWR32
-        constant doTest5    : boolean := true;  --! test5: MEMRD32
-        constant doTest6    : boolean := true;  --! test6: RESET
-        constant doTest7    : boolean := true;  --! test7: IOWR
-        constant doTest8    : boolean := true;  --! test8: IORD
-        constant doTest9    : boolean := true;  --! test9: VWIRE XPLTRST
+        constant doTest0    : boolean := true;  --! test0:  CRC8
+        constant doTest1    : boolean := true;  --! test1:  GET_CONFIGURATION
+        constant doTest2    : boolean := true;  --! test2:  SET_CONFIGURATION
+        constant doTest3    : boolean := true;  --! test3:  GET_STATUS
+        constant doTest4    : boolean := true;  --! test4:  MEMWR32
+        constant doTest5    : boolean := true;  --! test5:  MEMRD32
+        constant doTest6    : boolean := true;  --! test6:  RESET
+        constant doTest7    : boolean := true;  --! test7:  IOWR
+        constant doTest8    : boolean := true;  --! test8:  IORD
+        constant doTest9    : boolean := true;  --! test9:  VWIRE XPLTRST
+        constant doTest10   : boolean := true;  --! test10: PRT_CFG_REGS, prints configuration regs to console
+
     -----------------------------
 
 
@@ -69,8 +71,8 @@ architecture sim of eSpiMasterBfm_tb is
         signal XRESET   : std_logic;
         -- ESPI Static Slave
         signal slvGood  : boolean;              --! all request to slave good?
-        signal REQMSG   : string(1 to 100);     --! request message
-        signal CMPMSG   : string(1 to 100);     --! complete message, if request was ok
+        signal REQMSG   : string(1 to 150);     --! request message
+        signal CMPMSG   : string(1 to 150);     --! complete message, if request was ok
         signal LDMSG    : std_logic;            --! load message on rising edge
     -----------------------------
 
@@ -80,7 +82,8 @@ begin
     -- stimuli process
     p_stimuli : process
         -- tb help variables
-            variable good   : boolean   := true;
+            variable good       : boolean := true;
+            variable tmpBool    : boolean := true;
         -- DUT
             variable eSpiMasterBfm  : tESpiBfm;                                         --! eSPI Master bfm Handle
             variable eSpiMsg        : tMemX08(0 to 9);                                  --! eSPI Message
@@ -376,7 +379,7 @@ begin
 
 
         -------------------------
-        -- Test8: VWIRE XPLTRST
+        -- Test9: VWIRE XPLTRST
         -------------------------
         if ( doTest9 or DO_ALL_TEST ) then
             Report "Test9: VWIRE XPLTRST";
@@ -411,6 +414,32 @@ begin
         end if;
         -------------------------
 
+
+        -------------------------
+        -- Test10: PRT_CFG_REGS
+        -------------------------
+        if ( doTest10 or DO_ALL_TEST ) then
+            Report "Test10: PRT_CFG_REGS";
+            -- load message
+            REQMSG              <= (others => character(NUL));
+            CMPMSG              <= (others => character(NUL));
+            -- Slave Cfg Regs
+            --                      ADR=0x04                             ADR=0x08                             ADR=0x10                             ADR=0x20                             ADR=0x30                             ADR=0x40
+            REQMSG(1 to 54)     <=  "21000434"         & character(LF) & "21000810"         & character(LF) & "21001058"         & character(LF) & "210020C8"         & character(LF) & "210030B8"         & character(LF) & "210040EF"         & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 102)    <=  "0878563412000042" & character(LF) & "08111111110000B5" & character(LF) & "0822222222000054" & character(LF) & "083333333300000B" & character(LF) & "0844444444000091" & character(LF) & "FFFFFFFFFFFFFFFF" & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG               <= '1';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            LDMSG               <= '0';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            tmpBool             := true;
+            -- Request BFM
+                -- PRT_CFG_REGS( this, CSn, SCK, DIO, good )
+            PRT_CFG_REGS( eSpiMasterBfm, CSn, SCK, DIO, tmpBool );
+            assert ( tmpBool = false ) report "PRT_CFG_REGS:  One access needs to fail" severity warning;
+            if not ( tmpBool = false ) then good := false; end if;
+            wait for 1 us;
+        end if;
+        -------------------------
 
 
 
