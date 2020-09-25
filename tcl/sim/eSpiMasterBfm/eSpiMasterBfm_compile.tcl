@@ -25,8 +25,8 @@ set path_src "../bfm"
 
 # BFM
 #
-vcom -93 -novopt $path_src/eSpiMasterBfm.vhd;	# BFM used for TB
-vcom -93 -novopt $path_src/eSpiStaticSlave.vhd;	# needed for TB
+vcom -93 -novopt $path_src/eSpiMasterBfm.vhd;   # BFM used for TB
+vcom -93 -novopt $path_src/eSpiStaticSlave.vhd; # needed for TB
 #
 
 
