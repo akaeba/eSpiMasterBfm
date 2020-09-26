@@ -141,7 +141,7 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);
                     variable response   : out tESpiRsp
                 );
-            -- w/o status, response, regs, instead print to console
+            -- w/o status, response
             procedure SET_CONFIGURATION
                 (
                     variable this   : inout tESpiBfm;
@@ -240,18 +240,6 @@ package eSpiMasterBfm is
 
         -- IOWR
         --  @see Figure 26: Master Initiated Short Non-Posted Transaction
-            -- arbitrary number (1/2/4 bytes) of data, response and status register
-            procedure IOWR
-                (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;
-                    signal SCK          : out std_logic;
-                    signal DIO          : inout std_logic_vector(3 downto 0);
-                    constant adr        : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
-                    constant data       : in tMemX08;                           --! write data, 1/2/4 Bytes supported
-                    variable status     : out std_logic_vector(15 downto 0);    --! slave status
-                    variable response   : out tESpiRsp                          --! command response
-                );
             -- single data byte, w/o response and status register
             procedure IOWR
                 (
@@ -260,7 +248,7 @@ package eSpiMasterBfm is
                     signal SCK      : out std_logic;
                     signal DIO      : inout std_logic_vector(3 downto 0);
                     constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
-                    constant data   : in std_logic_vector(7 downto 0);      --! single data word
+                    constant data   : in std_logic_vector(7 downto 0);      --! byte access
                     variable good   : inout boolean                         --! successful?
                 );
 
@@ -1539,8 +1527,9 @@ package body eSpiMasterBfm is
 
         --***************************
         -- IOWR
-        -- PUT_IOWR_SHORT
-        --   @see Figure 26: Master Initiated Short Non-Posted Transaction
+        -- arbitrary number (1/2/4 bytes) of data, response and status register
+        --   PUT_IOWR_SHORT
+        --     @see Figure 26: Master Initiated Short Non-Posted Transaction
         procedure IOWR
             (
                 variable this       : inout tESpiBfm;
@@ -1588,7 +1577,8 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- IOWR_SHORT, w/o status and response register -> console print, except only one data word
+        -- IOWR - byte (8Bit)
+        --   w/o status and response register -> console print
         --   @see Figure 26: Master Initiated Short Non-Posted Transaction
         procedure IOWR
             (
@@ -1597,7 +1587,7 @@ package body eSpiMasterBfm is
                 signal SCK      : out std_logic;
                 signal DIO      : inout std_logic_vector(3 downto 0);
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
-                constant data   : in std_logic_vector(7 downto 0);      --! single data word
+                constant data   : in std_logic_vector(7 downto 0);      --! data byte
                 variable good   : inout boolean                         --! successful?
             ) is
             variable dBuf   : tMemX08(0 to 0);
