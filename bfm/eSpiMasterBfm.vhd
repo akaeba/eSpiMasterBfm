@@ -295,7 +295,6 @@ package eSpiMasterBfm is
                     signal CSn          : out std_logic;
                     signal SCK          : out std_logic;
                     signal DIO          : inout std_logic_vector(3 downto 0);
-                    signal ALERTn       : in std_logic;                         --! SLAVE requestes service
                     constant adr        : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                     variable data       : out tMemX08;                          --! read data, 1/2/4 Bytes supported
                     variable status     : out std_logic_vector(15 downto 0);    --! slave status
@@ -308,7 +307,6 @@ package eSpiMasterBfm is
                     signal CSn      : out std_logic;
                     signal SCK      : out std_logic;
                     signal DIO      : inout std_logic_vector(3 downto 0);
-                    signal ALERTn   : in std_logic;                         --! SLAVE requestes service
                     constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                     variable data   : out std_logic_vector(7 downto 0);     --! single data word
                     variable good   : inout boolean                         --! successful?
@@ -1758,7 +1756,6 @@ package body eSpiMasterBfm is
                 signal CSn          : out std_logic;
                 signal SCK          : out std_logic;
                 signal DIO          : inout std_logic_vector(3 downto 0);
-                signal ALERTn       : in std_logic;                         --! SLAVE requestes service
                 constant adr        : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data       : out tMemX08;                          --! read data, 1/2/4 Bytes supported
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
@@ -1815,7 +1812,6 @@ package body eSpiMasterBfm is
                 signal CSn      : out std_logic;
                 signal SCK      : out std_logic;
                 signal DIO      : inout std_logic_vector(3 downto 0);
-                signal ALERTn   : in std_logic;                         --! SLAVE requestes service
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data   : out std_logic_vector(7 downto 0);     --! single data word
                 variable good   : inout boolean                         --! successful?
@@ -1824,8 +1820,8 @@ package body eSpiMasterBfm is
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
-                -- IORD( this, CSn, SCK, DIO, ALERTn, adr, data, status, response )
-            IORD( this, CSn, SCK, DIO, ALERTn, adr, dBuf, sts, rsp );
+                -- IORD( this, CSn, SCK, DIO, adr, data, status, response )
+            IORD( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
