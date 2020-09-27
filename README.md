@@ -103,6 +103,7 @@ TODO
 Writes to IO mapped address space.
 
 ```vhdl
+IOWR(this, CSn, SCK, DIO, adr, data, good);         -- default, 8bit data
 IOWR_BYTE(this, CSn, SCK, DIO, adr, data, good);    -- 8bit data
 IOWR_WORD(this, CSn, SCK, DIO, adr, data, good);    -- 16bit data
 IOWR_DWORD(this, CSn, SCK, DIO, adr, data, good);   -- 32bit data
