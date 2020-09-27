@@ -11,6 +11,10 @@ Currently are procedures available for:
  * Endpoint Configuration
 
 
+## Releases
+
+
+
 ## Enhanced Serial Peripheral Interface (ESPI)
 
 
@@ -67,7 +71,7 @@ GET_CONFIGURATION(this, CSn, SCK, DIO, adr, good);                      -- print
 
 #### SET_CONFIGURATION
 
-Writes in to slaves configuration registers.
+Writes into slaves configuration registers.
 
 ```vhdl
 SET_CONFIGURATION(this, CSn, SCK, DIO, adr, config, status, response);  -- propagates slaves status regs back
@@ -98,11 +102,11 @@ TODO
 
 Writes to IO mapped address space.
 
-
-
-
-
-
+```vhdl
+IOWR_BYTE(this, CSn, SCK, DIO, adr, data, good);    -- 8bit data
+IOWR_WORD(this, CSn, SCK, DIO, adr, data, good);    -- 16bit data
+IOWR_DWORD(this, CSn, SCK, DIO, adr, data, good);   -- 32bit data
+```
 
 
 
