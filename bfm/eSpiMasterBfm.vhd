@@ -240,7 +240,41 @@ package eSpiMasterBfm is
 
         -- IOWR
         --  @see Figure 26: Master Initiated Short Non-Posted Transaction
-            -- single data byte, w/o response and status register
+            -- data byte, w/o response and status register
+            procedure IOWR_BYTE
+                (
+                    variable this   : inout tESpiBfm;
+                    signal CSn      : out std_logic;
+                    signal SCK      : out std_logic;
+                    signal DIO      : inout std_logic_vector(3 downto 0);
+                    constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
+                    constant data   : in std_logic_vector(7 downto 0);      --! data byte
+                    variable good   : inout boolean                         --! successful?
+                );
+            -- data word, w/o response and status register
+            procedure IOWR_WORD
+                (
+                    variable this   : inout tESpiBfm;
+                    signal CSn      : out std_logic;
+                    signal SCK      : out std_logic;
+                    signal DIO      : inout std_logic_vector(3 downto 0);
+                    constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
+                    constant data   : in std_logic_vector(15 downto 0);     --! data word
+                    variable good   : inout boolean                         --! successful?
+                );
+            -- dual data word, w/o response and status register
+            procedure IOWR_DWORD
+                (
+                    variable this   : inout tESpiBfm;
+                    signal CSn      : out std_logic;
+                    signal SCK      : out std_logic;
+                    signal DIO      : inout std_logic_vector(3 downto 0);
+                    constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
+                    constant data   : in std_logic_vector(31 downto 0);     --! dual data word
+                    variable good   : inout boolean                         --! successful?
+                );
+            -- Default IOWR is byte orientated access
+            -- data byte, w/o response and status register
             procedure IOWR
                 (
                     variable this   : inout tESpiBfm;
@@ -248,7 +282,7 @@ package eSpiMasterBfm is
                     signal SCK      : out std_logic;
                     signal DIO      : inout std_logic_vector(3 downto 0);
                     constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
-                    constant data   : in std_logic_vector(7 downto 0);      --! byte access
+                    constant data   : in std_logic_vector(7 downto 0);      --! data byte
                     variable good   : inout boolean                         --! successful?
                 );
 
@@ -1580,7 +1614,7 @@ package body eSpiMasterBfm is
         -- IOWR - byte (8Bit)
         --   w/o status and response register -> console print
         --   @see Figure 26: Master Initiated Short Non-Posted Transaction
-        procedure IOWR
+        procedure IOWR_BYTE
             (
                 variable this   : inout tESpiBfm;
                 signal CSn      : out std_logic;
@@ -1595,6 +1629,8 @@ package body eSpiMasterBfm is
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_BYTE"; end if;
             -- fill in data
             dBuf(0) := data;
                 -- IOWR( this, CSn, SCK, DIO, adr, data, status, response )
@@ -1607,8 +1643,109 @@ package body eSpiMasterBfm is
                 -- in case of no output print to console
                 if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
+        end procedure IOWR_BYTE;
+        --***************************
+
+
+        --***************************
+        -- IOWR - word (16Bit)
+        --   w/o status and response register -> console print
+        --   @see Figure 26: Master Initiated Short Non-Posted Transaction
+        procedure IOWR_WORD
+            (
+                variable this   : inout tESpiBfm;
+                signal CSn      : out std_logic;
+                signal SCK      : out std_logic;
+                signal DIO      : inout std_logic_vector(3 downto 0);
+                constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
+                constant data   : in std_logic_vector(15 downto 0);     --! data word
+                variable good   : inout boolean                         --! successful?
+            ) is
+            variable dBuf   : tMemX08(0 to 1);
+            variable fg     : boolean := true;                  --! state of function good
+            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable rsp    : tESpiRsp;                         --! decoded slave response
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_WORD"; end if;
+            -- fill in data
+            dBuf(0) := data(7 downto 0);
+            dBuf(1) := data(15 downto 8);
+                -- IOWR( this, CSn, SCK, DIO, adr, data, status, response )
+            IOWR( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+            -- Slave request good?
+            if ( ACCEPT /= rsp ) then
+                good := false;
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+            else
+                -- in case of no output print to console
+                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            end if;
+        end procedure IOWR_WORD;
+        --***************************
+
+
+        --***************************
+        -- IOWR - dual word (32Bit)
+        --   w/o status and response register -> console print
+        --   @see Figure 26: Master Initiated Short Non-Posted Transaction
+        procedure IOWR_DWORD
+            (
+                variable this   : inout tESpiBfm;
+                signal CSn      : out std_logic;
+                signal SCK      : out std_logic;
+                signal DIO      : inout std_logic_vector(3 downto 0);
+                constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
+                constant data   : in std_logic_vector(31 downto 0);     --! dual data word
+                variable good   : inout boolean                         --! successful?
+            ) is
+            variable dBuf   : tMemX08(0 to 3);
+            variable fg     : boolean := true;                  --! state of function good
+            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable rsp    : tESpiRsp;                         --! decoded slave response
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_WORD"; end if;
+            -- fill in data
+            dBuf(0) := data(7 downto 0);
+            dBuf(1) := data(15 downto 8);
+            dBuf(2) := data(23 downto 16);
+            dBuf(3) := data(31 downto 24);
+                -- IOWR( this, CSn, SCK, DIO, adr, data, status, response )
+            IOWR( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+            -- Slave request good?
+            if ( ACCEPT /= rsp ) then
+                good := false;
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+            else
+                -- in case of no output print to console
+                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            end if;
+        end procedure IOWR_DWORD;
+        --***************************
+
+
+        --***************************
+        -- IOWR - byte (8Bit)
+        --   w/o status and response register -> console print
+        --   default IOWR is byte orientated access
+        --   @see Figure 26: Master Initiated Short Non-Posted Transaction
+        procedure IOWR
+            (
+                variable this   : inout tESpiBfm;
+                signal CSn      : out std_logic;
+                signal SCK      : out std_logic;
+                signal DIO      : inout std_logic_vector(3 downto 0);
+                constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
+                constant data   : in std_logic_vector(7 downto 0);      --! data byte
+                variable good   : inout boolean                         --! successful?
+            ) is
+        begin
+                -- IOWR_BYTE( this, CSn, SCK, DIO, adr, data, good )
+            IOWR_BYTE( this, CSn, SCK, DIO, adr, data, good );          --! default IOWR is byte operation
         end procedure IOWR;
         --***************************
+
 
 
         --***************************
