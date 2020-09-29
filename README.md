@@ -110,6 +110,17 @@ IOWR_DWORD(this, CSn, SCK, DIO, adr, data, good);   -- 32bit data
 ```
 
 
+#### IORD
+
+Reads from IO mapped address space.
+
+```vhdl
+IORD(this, CSn, SCK, DIO, adr, data, good);         -- default, 8bit data
+IORD_BYTE(this, CSn, SCK, DIO, adr, data, good);    -- 8bit data
+IORD_WORD(this, CSn, SCK, DIO, adr, data, good);    -- 16bit data
+IORD_DWORD(this, CSn, SCK, DIO, adr, data, good);   -- 32bit data
+```
+
 
 ## References
 
