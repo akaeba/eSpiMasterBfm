@@ -1680,18 +1680,20 @@ package body eSpiMasterBfm is
                 constant data   : in std_logic_vector(15 downto 0);     --! data word
                 variable good   : inout boolean                         --! successful?
             ) is
-            variable dBuf   : tMemX08(0 to 1);
-            variable fg     : boolean := true;                  --! state of function good
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
-            variable rsp    : tESpiRsp;                         --! decoded slave response
+            variable dBuf       : tMemX08(0 to 1);
+            variable fg         : boolean := true;                  --! state of function good
+            variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable rsp        : tESpiRsp;                         --! decoded slave response
+            variable adr_word   : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_WORD"; end if;
-            -- fill in data
-            dBuf(0) := data(7 downto 0);
-            dBuf(1) := data(15 downto 8);
+            -- prepare
+            adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
+            dBuf(0)     := data(7 downto 0);                            --! fill in data
+            dBuf(1)     := data(15 downto 8);                           --!
                 -- IOWR( this, CSn, SCK, DIO, adr, data, status, response )
-            IOWR( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+            IOWR( this, CSn, SCK, DIO, adr_word, dBuf, sts, rsp );
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -1718,20 +1720,22 @@ package body eSpiMasterBfm is
                 constant data   : in std_logic_vector(31 downto 0);     --! dual data word
                 variable good   : inout boolean                         --! successful?
             ) is
-            variable dBuf   : tMemX08(0 to 3);
-            variable fg     : boolean := true;                  --! state of function good
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
-            variable rsp    : tESpiRsp;                         --! decoded slave response
+            variable dBuf       : tMemX08(0 to 3);
+            variable fg         : boolean := true;                  --! state of function good
+            variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable rsp        : tESpiRsp;                         --! decoded slave response
+            variable adr_dword  : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_DWORD"; end if;
-            -- fill in data
-            dBuf(0) := data(7 downto 0);
-            dBuf(1) := data(15 downto 8);
-            dBuf(2) := data(23 downto 16);
-            dBuf(3) := data(31 downto 24);
+            -- prepare
+            adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
+            dBuf(0)     := data(7 downto 0);                            --! fill in data
+            dBuf(1)     := data(15 downto 8);                           --!
+            dBuf(2)     := data(23 downto 16);                          --!
+            dBuf(3)     := data(31 downto 24);                          --!
                 -- IOWR( this, CSn, SCK, DIO, adr, data, status, response )
-            IOWR( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+            IOWR( this, CSn, SCK, DIO, adr_dword, dBuf, sts, rsp );
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -1877,16 +1881,18 @@ package body eSpiMasterBfm is
                 variable data   : out std_logic_vector(15 downto 0);    --! data word
                 variable good   : inout boolean                         --! successful?
             ) is
-            variable dBuf   : tMemX08(0 to 1);
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
-            variable rsp    : tESpiRsp;                         --! decoded slave response
+            variable dBuf       : tMemX08(0 to 1);
+            variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable rsp        : tESpiRsp;                         --! decoded slave response
+            variable adr_word   : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
             -- prepare
-            dBuf := (others => (others => '0'));    -- init
+            adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
+            dBuf        := (others => (others => '0'));                 --! init
                 -- IORD( this, CSn, SCK, DIO, adr, data, status, response )
-            IORD( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+            IORD( this, CSn, SCK, DIO, adr_word, dBuf, sts, rsp );
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -1916,16 +1922,18 @@ package body eSpiMasterBfm is
                 variable data   : out std_logic_vector(31 downto 0);    --! data dual word
                 variable good   : inout boolean                         --! successful?
             ) is
-            variable dBuf   : tMemX08(0 to 3);
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
-            variable rsp    : tESpiRsp;                         --! decoded slave response
+            variable dBuf       : tMemX08(0 to 3);
+            variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable rsp        : tESpiRsp;                         --! decoded slave response
+            variable adr_dword  : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
             -- prepare
-            dBuf := (others => (others => '0'));    -- init
+            adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
+            dBuf        := (others => (others => '0'));                 --! init
                 -- IORD( this, CSn, SCK, DIO, adr, data, status, response )
-            IORD( this, CSn, SCK, DIO, adr, dBuf, sts, rsp );
+            IORD( this, CSn, SCK, DIO, adr_dword, dBuf, sts, rsp );
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
