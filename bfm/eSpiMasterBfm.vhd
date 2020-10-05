@@ -918,7 +918,7 @@ package body eSpiMasterBfm is
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
                         end if;
                     else                                --! one bits per clock cycle are transfered
-                        SCK         <= '0';                                                         --! falling edge
+                        SCK                 <= '0';                                                 --! falling edge
                         wait for this.TSpiClk/2;                                                    --! half clock cycle
                         SCK                 <= '1';                                                 --! rising edge
                         slv1(0 downto 0)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));  --! help
@@ -933,6 +933,113 @@ package body eSpiMasterBfm is
 
         --***************************
         -- SPI Transceiver procedure
+        --   function can left after specified number of RX bytes and go on after
+        --     needed if response length is dynamically encoded in response
+        --   sends command to eSPI slave and captures response
+        --   the request is overwritten by the response
+        procedure spiXcv
+            (
+                variable this       : inout tESpiBfm;
+                variable msg        : inout tMemX08;
+                signal CSn          : out std_logic;
+                signal SCK          : out std_logic;                        --! shift clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                constant txByte     : in integer;                           --! request length of message in bytes
+                constant rxByte     : in integer;                           --! response length in bytes
+                constant intRxByte  : in integer;                           --! interrupts procedure after byte count
+                variable response   : out tESpiRsp                          --! Slaves response to performed request
+            ) is
+            variable crcMsg     : tMemX08(0 to msg'length); --! message with calculated CRC
+            variable rsp        : tESpiRsp;                 --! decoded slave response
+            variable intPkgDone : boolean;                  --! if true interrupt package is finished
+            variable rxStart    : integer;                  --! start index in message
+            variable rxStop     : integer;                  --! stop index in message
+        begin
+            -- entry message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv"; end if;
+            -- some checks
+            if ( (msg'length < txByte) or (msg'length < rxByte) ) then
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Not enough memory allocated" severity error; end if;
+                response := FATAL_ERROR;
+                return;
+            end if;
+            -- non-split or split packet (Part 1/2)?
+            if ( (-1 /= txByte) and (intRxByte = rxByte) ) then     --! packet in one shoot, w/o intermediate processing recorded
+                intPkgDone  := true;
+                rxStart     := 0;
+                rxStop      := rxByte;
+            elsif ( (-1 /= txByte) and (intRxByte < rxByte) ) then  --! packet is not fully fetched, cause intermediate processing and higher hierarchy is required
+                intPkgDone  := false;
+                rxStart     := 0;
+                rxStop      := intRxByte;
+            elsif ( (-1 = txByte) and (intRxByte < rxByte) ) then   --! fetch missing part of the packet
+                intPkgDone  := true;
+                rxStart     := intRxByte;
+                rxStop      := rxByte;
+            else
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Something went wrong" severity error; end if;
+                response := FATAL_ERROR;
+                return;
+            end if;
+            -- only send if number of tx bytes specified, otherwise in the middle of a packet
+            if ( -1 /= txByte ) then
+                -- prepare data
+                crcMsg(0 to txByte-1)    := msg(0 to txByte-1);          --! copy request
+                crcMsg(txByte)           := crc8(crcMsg(0 to txByte-1)); --! append CRC
+                -- print send message to console
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Tx: " & hexStr(crcMsg(0 to txByte)); end if;
+                -- start
+                CSn <= '0';                                         --! enable Slave
+                spiTx(this, crcMsg(0 to txByte), SCK, DIO);         --! write to slave
+                spiTar(this, SCK, DIO);                             --! change direction (write-to-read), two cycles
+                spiRx(this, crcMsg(0 to 0), SCK, DIO);              --! read only response field
+                while ( WAIT_STATE = decodeRsp(crcMsg(0)) ) loop    --! wait for response ready
+                    spiRx(this, crcMsg(0 to 0), SCK, DIO);          --! read from slave
+                end loop;
+                rsp := decodeRsp(crcMsg(0));    --! decode response
+            end if;
+            -- acquire RX packet
+            if ( ACCEPT = rsp ) then
+                -- fetch pending bytes
+                spiRx(this, crcMsg(rxStart+1 to rxStop), SCK, DIO); --! read from slave, in defer (1Byte) returns slave status (2Byte) and CRC (1Byte)
+            elsif ( DEFER = rsp ) then
+                -- fetch pending bytes
+                spiRx(this, crcMsg(1 to 3), SCK, DIO);  --! read from slave, in defer (1Byte) returns slave status (2Byte) and CRC (1Byte)
+                -- mark as finished packet
+                intPkgDone  := true;                    --! if it was planed as interrupted packet, after DEFER new read cycle
+                rxStop      := 3;
+            else
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Response not handled" severity error; end if;
+                response := FATAL_ERROR;
+                return;
+            end if;
+            -- packet finished, if yes terminate connection
+            if ( intPkgDone ) then
+                -- check CRC only for complete packet
+                if (not checkCRC(this, crcMsg(0 to rxStop))) then
+                    response := FATAL_ERROR; --! Table 4: Response Field Encodings, It is also the default response when fatal CRC error is detected on the command packet; Here: also used for response
+                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv:Rx:CRC failed" severity error; end if;
+                    return;
+                end if;
+                -- Terminate connection to slave
+                SCK <= '0';
+                wait for this.TSpiClk/2;    --! half clock cycle
+                CSn <= '1';
+                wait for this.TSpiClk;      --! limits CSn bandwidth to SCK
+            end if;
+            -- print receive message to console
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to rxStop)); end if;
+            -- copy message
+            msg(0 to rxStop-1) := crcMsg(0 to rxStop-1);    --! drop CRC
+            -- release response
+            response := rsp;
+        end procedure spiXcv;
+        --***************************
+
+
+        --***************************
+        -- SPI Transceiver procedure
+        --   w/o any interruption, all TX/RX bytes are transferred in one shoot
         --   sends command to eSPI slave and captures response
         --   the request is overwritten by the response
         procedure spiXcv
@@ -946,52 +1053,10 @@ package body eSpiMasterBfm is
                 constant numRxByte  : in integer;                           --! response length in bytes
                 variable response   : out tESpiRsp                          --! Slaves response to performed request
             ) is
-            variable crcMsg     : tMemX08(0 to msg'length); --! message with calculated CRC
-            variable crcMsgLen  : integer;                  --! length of CRC message
-            variable rsp        : tESpiRsp;                 --! decoded slave response
         begin
-            -- Prepare
-            crcMsg(0 to numTxByte-1)    := msg(0 to numTxByte-1);          -- copy request
-            crcMsg(numTxByte)           := crc8(crcMsg(0 to numTxByte-1)); -- append CRC
-            crcMsgLen                   := numTxByte + 1;                  -- set new message length
-            -- print send message to console
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Tx: " & hexStr(crcMsg(0 to crcMsgLen-1)); end if;
-            -- start
-            CSn <= '0';                                         --! enable Slave
-            spiTx(this, crcMsg(0 to crcMsgLen-1), SCK, DIO);    --! write to slave
-            spiTar(this, SCK, DIO);                             --! change direction (write-to-read), two cycles
-            spiRx(this, crcMsg(0 to 0), SCK, DIO);              --! read only response field
-            while ( WAIT_STATE = decodeRsp(crcMsg(0)) ) loop    --! wait for response ready
-                spiRx(this, crcMsg(0 to 0), SCK, DIO);          --! read from slave
-            end loop;
-            rsp := decodeRsp(crcMsg(0));    --! decode response
-            -- fetch all pending bytes
-            if ( (ACCEPT = rsp) or (DEFER = rsp) ) then     --! command accepted?
-                -- determine number of fetched bytes
-                if ( ACCEPT = rsp ) then
-                    crcMsgLen := numRxByte + 1; --! response message length
-                else
-                    crcMsgLen := 3 + 1;         --! in defer returns slave status (2Byte) and CRC (1 Byte)
-                end if;
-                -- fetch pending bytes
-                spiRx(this, crcMsg(1 to crcMsgLen-1), SCK, DIO);    --! read from slave
-                -- print receive message to console
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to crcMsgLen-1)); end if;
-                -- copy message
-                msg(0 to numRxByte-1) := crcMsg(0 to numRxByte-1);    --! drop CRC
-                -- check CRC
-                if (not checkCRC(this, crcMsg(0 to crcMsgLen-1))) then
-                    rsp := NO_RESPONSE; --! Table 4: Response Field Encodings, It is also the default response when fatal CRC error is detected on the command packet; Here: also used for response
-                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv:Rx:CRC failed" severity error; end if;
-                end if;
-            end if;
-            -- release final response
-            response := rsp;
-            -- Terminate connection to slave
-            SCK <= '0';
-            wait for this.TSpiClk/2;    --! half clock cycle
-            CSn <= '1';
-            wait for this.TSpiClk;      --! limits CSn bandwidth to SCK
+            -- map to interruptible transceiver procedure
+                -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response )
+            spiXcv( this, msg, CSn, SCK, DIO, numTxByte, numRxByte, numRxByte, response );
         end procedure spiXcv;
         --***************************
 
@@ -2094,6 +2159,63 @@ package body eSpiMasterBfm is
             end if;
         end procedure VWIREWR;
         --***************************
+
+
+        --***************************
+        -- Virtual Wire Channel Read
+        -- GET_VWIRE
+        --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
+        procedure VWIRERD
+            (
+                variable this       : inout tESpiBfm;
+                signal CSn          : out std_logic;                        --! slave select
+                signal SCK          : out std_logic;                        --! shift clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                variable vwireIdx   : out tMemX08;                          --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                variable vwireData  : out tMemX08;                          --! virtual wire data
+                variable status     : out std_logic_vector(15 downto 0);    --! slave status
+                variable response   : out tESpiRsp                          --! slave response to command
+            ) is
+            variable msg        : tMemX08(0 to 2*64 + 1 + 2);       --! max. 64 Wires in same packet, +1 response, +2 status
+            variable msgLen     : natural := 0;                     --! message length can vary
+            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable sts        : std_logic_vector(15 downto 0);    --! slaves status buffer
+            variable wireCnt    : natural := 0;                     --! number of virtual wires
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD"; end if;
+            -- check for virtual message available
+                -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
+            GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
+            if ( (ACCEPT = rsp) and '1' = sts(C_STS_VWIRE_AVAIL) ) then
+                -- message
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE"; end if;
+                --
+
+
+
+
+
+            else
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: no virtual wires available"; end if;
+                wireCnt := 0;
+            end if;
+
+
+
+
+
+
+
+
+        end procedure VWIRERD;
+        --***************************
+
+
+
+
+
+
 
     ----------------------------------------------
 
