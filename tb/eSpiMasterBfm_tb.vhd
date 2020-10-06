@@ -57,6 +57,7 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest8    : boolean := true;  --! test8:  IORD
         constant doTest9    : boolean := true;  --! test9:  VWIRE XPLTRST
         constant doTest10   : boolean := true;  --! test10: PRT_CFG_REGS, prints configuration regs to console
+		constant doTest11   : boolean := true;  --! test11: VWIRERD
 
     -----------------------------
 
@@ -92,6 +93,10 @@ begin
             variable response       : tESpiRsp;                                         --! slave response
             variable slv8           : std_logic_vector(7 downto 0);                     --! help
             variable memX08         : tMemX08(0 to 2);                                  --! help
+			-- temp
+            variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
+            variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
     begin
 
         -------------------------
@@ -440,6 +445,32 @@ begin
             wait for 1 us;
         end if;
         -------------------------
+		
+		
+        -------------------------
+        -- Test11: VWIRERD
+        -------------------------
+        if ( doTest10 or DO_ALL_TEST ) then
+            Report "Test11: VWIRERD";
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 5) 	<= "051B" 					& character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 23) <= "0802059904C006500F03E9"	& character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            LDMSG           <= '0';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            -- Request BFM
+				-- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+			VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+			
+			
+            wait for 1 us;
+        end if;
+        -------------------------
+		
+		
 
 
 
