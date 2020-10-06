@@ -372,6 +372,22 @@ package eSpiMasterBfm is
                     variable good       : inout boolean                         --! successful
                 );
 
+        -- VWIRERD
+        --  @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
+            -- arbitrary number (<64) of vwire data, response and status register
+            procedure VWIRERD
+                (
+                    variable this       : inout tESpiBfm;
+                    signal CSn          : out std_logic;                        --! slave select
+                    signal SCK          : out std_logic;                        --! shift clock
+                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                    variable vwireIdx   : out tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+                    variable vwireData  : out tMemX08(0 to 63);                 --! virtual wire data
+                    variable vwireLen   : out integer range 0 to 64;            --! number of wire pairs
+                    variable status     : out std_logic_vector(15 downto 0);    --! slave status
+                    variable response   : out tESpiRsp                          --! slave response to command
+                );
+
         -- System Event Virtual Wires
         -- Communication via "VWIREWR"
         --   @see Table 11: System Event Virtual Wires for Index=3
@@ -971,11 +987,12 @@ package body eSpiMasterBfm is
             elsif ( (-1 /= txByte) and (intRxByte < rxByte) ) then  --! packet is not fully fetched, cause intermediate processing and higher hierarchy is required
                 intPkgDone  := false;
                 rxStart     := 0;
-                rxStop      := intRxByte;
+                rxStop      := intRxByte-1;
             elsif ( (-1 = txByte) and (intRxByte < rxByte) ) then   --! fetch missing part of the packet
-                intPkgDone  := true;
-                rxStart     := intRxByte;
-                rxStop      := rxByte;
+                intPkgDone                  := true;
+                rxStart                     := intRxByte-1;
+                rxStop                      := rxByte;
+                crcMsg(0 to intRxByte-1)    := msg(0 to intRxByte-1);   --! restore in previos cycle fetched data
             else
                 if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Something went wrong" severity error; end if;
                 response := FATAL_ERROR;
@@ -1026,11 +1043,13 @@ package body eSpiMasterBfm is
                 wait for this.TSpiClk/2;    --! half clock cycle
                 CSn <= '1';
                 wait for this.TSpiClk;      --! limits CSn bandwidth to SCK
+                -- print receive message to console
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to rxStop)); end if;
+                -- copy message
+                msg(0 to rxStop-1) := crcMsg(0 to rxStop-1);    --! drop CRC
+            else
+                msg(0 to rxStop) := crcMsg(0 to rxStop);        --! interrupted packet needs no drop of CRC
             end if;
-            -- print receive message to console
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to rxStop)); end if;
-            -- copy message
-            msg(0 to rxStop-1) := crcMsg(0 to rxStop-1);    --! drop CRC
             -- release response
             response := rsp;
         end procedure spiXcv;
@@ -2171,8 +2190,9 @@ package body eSpiMasterBfm is
                 signal CSn          : out std_logic;                        --! slave select
                 signal SCK          : out std_logic;                        --! shift clock
                 signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                variable vwireIdx   : out tMemX08;                          --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                variable vwireData  : out tMemX08;                          --! virtual wire data
+                variable vwireIdx   : out tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                variable vwireData  : out tMemX08(0 to 63);                 --! virtual wire data
+                variable vwireLen   : out integer range 0 to 64;            --! number of wire pairs
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
                 variable response   : out tESpiRsp                          --! slave response to command
             ) is
@@ -2180,17 +2200,49 @@ package body eSpiMasterBfm is
             variable msgLen     : natural := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
             variable sts        : std_logic_vector(15 downto 0);    --! slaves status buffer
-            variable wireCnt    : natural := 0;                     --! number of virtual wires
+            variable wireCnt    : natural;                          --! number of virtual wires
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD"; end if;
+            -- init output
+            vwireIdx    := (others => (others => '0'));
+            vwireData   := (others => (others => '0'));
+            vwireLen    := 0;
             -- check for virtual message available
                 -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
             GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
             if ( (ACCEPT = rsp) and '1' = sts(C_STS_VWIRE_AVAIL) ) then
                 -- message
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE"; end if;
-                --
+                -- acquire count of virtual wires
+                msg     := (others => (others => '0')); -- clear
+                msg(0)  := C_GET_VWIRE;
+                    -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response );
+                spiXcv( this, msg, CSn, SCK, DIO, 1, msg'length, 2, rsp );
+                -- Slave Accepted Request?
+                if ( ACCEPT = rsp ) then
+                    -- extract wire count
+                    wireCnt := to_integer(unsigned(msg(1)(5 downto 0))) + 1;    --! 0-based counter
+                    -- fetch rest of packet
+                        -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response );
+                    spiXcv( this, msg, CSn, SCK, DIO, -1, 2+2*wireCnt+2, 2, rsp );  --! +2: two bytes in first request, *2: per virtual wire 2byte, +2: Status register has two bytes
+
+
+
+
+
+
+
+                    report "wireCnt " & integer'image(wireCnt);
+
+
+
+                else
+                    response := FATAL_ERROR;
+                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE: Slave Not accepted Request" severity error; end if;
+                    return;
+                end if;
+
 
 
 
@@ -2198,7 +2250,9 @@ package body eSpiMasterBfm is
 
             else
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: no virtual wires available"; end if;
-                wireCnt := 0;
+                response := rsp;
+                vwireLen := 0;
+                return;
             end if;
 
 
