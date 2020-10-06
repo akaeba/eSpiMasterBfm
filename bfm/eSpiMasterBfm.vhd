@@ -992,7 +992,7 @@ package body eSpiMasterBfm is
                 intPkgDone                  := true;
                 rxStart                     := intRxByte-1;
                 rxStop                      := rxByte;
-                crcMsg(0 to intRxByte-1)    := msg(0 to intRxByte-1);   --! restore in previos cycle fetched data
+                crcMsg(0 to intRxByte-1)    := msg(0 to intRxByte-1);   --! restore in previous cycle fetched data
             else
                 if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Something went wrong" severity error; end if;
                 response := FATAL_ERROR;
