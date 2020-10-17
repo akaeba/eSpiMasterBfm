@@ -41,6 +41,10 @@ package eSpiMasterBfm is
         type slv32 is array (natural range <>) of std_logic_vector (31 downto 0);   --! unconstrained array
         type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --!
 
+        -- System Event Virtual Wires
+        --   resolved index to name, required by print
+        type tSysEventName is array(2 to 7, 0 to 3) of string(1 to 22);
+
         -- SPI transceiver mode
         type tSpiXcvMode is
             (
@@ -77,7 +81,7 @@ package eSpiMasterBfm is
 
     -----------------------------
     -- Functions (public)
-        function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8:       calculate crc from a message
+        function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8: calculate crc from a message
     -----------------------------
 
 
@@ -387,6 +391,15 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);    --! slave status
                     variable response   : out tESpiRsp                          --! slave response to command
                 );
+            -- read wires, print to console only
+            procedure VWIRERD
+                (
+                    variable this       : inout tESpiBfm;
+                    signal CSn          : out std_logic;                        --! slave select
+                    signal SCK          : out std_logic;                        --! shift clock
+                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                    variable good       : inout boolean                         --! successful
+                );
 
         -- System Event Virtual Wires
         -- Communication via "VWIREWR"
@@ -440,6 +453,32 @@ package body eSpiMasterBfm is
         -- Time-out
         constant C_TIOUT_CYC_ALERT  : integer := 100;   --! number of clock cycles before BFM gives with time out up
         constant C_TIOUT_CYC_RD     : integer := 20;    --! number of status retries for read completion before BFM gives uo
+        --***************************
+
+    ----------------------------------------------
+
+
+    ----------------------------------------------
+    -- Early Help Functions
+    --   f.e. needed for constant initialization
+    ----------------------------------------------
+
+        --***************************
+        -- padStr
+        --   creates an string with a fixed length, padded with NUL
+        function padStr ( str : in string; pad : in character; len : in positive ) return string is
+            variable padedStr : string(1 to len);
+        begin
+            -- pad with null
+            padedStr := (others => pad);
+            -- check length
+            if ( str'length < len ) then
+                padedStr(1 to str'length) := str;
+            else
+                padedStr := str(1 to str'length);
+            end if;
+            return padedStr;
+        end function padStr;
         --***************************
 
     ----------------------------------------------
@@ -520,6 +559,19 @@ package body eSpiMasterBfm is
         constant C_STS_FLASH_NP_AVAIL   : integer := 13;    --! Flash Non-Posted Tx Queue Avail
         --***************************
 
+        --***************************
+        -- System Event Wires
+        --  @see 5.2.2.2 System Event Virtual Wires
+        --  @ https://stackoverflow.com/questions/17160878/how-to-declare-two-dimensional-arrays-and-their-elements-in-vhdl/17161967
+        constant C_SYSEVENT_NAME : tSysEventName := (   (padStr("SLP_S3#",              ' ', 22), padStr("SLP_S4#",     ' ', 22), padStr("SLP_S5#",        ' ', 22), padStr("RSV",                    ' ', 22)),
+                                                        (padStr("SUS_STAT#",            ' ', 22), padStr("PLTRST#",     ' ', 22), padStr("OOB_RST_WARN",   ' ', 22), padStr("RSV",                    ' ', 22)),
+                                                        (padStr("OOB_RST_ACK",          ' ', 22), padStr("RSV",         ' ', 22), padStr("WAKE#",          ' ', 22), padStr("PME#",                   ' ', 22)),
+                                                        (padStr("SLAVE_BOOT_LOAD_DONE", ' ', 22), padStr("ERROR_FATAL", ' ', 22), padStr("ERROR_NONFATAL", ' ', 22), padStr("SLAVE_BOOT_LOAD_STATUS", ' ', 22)),
+                                                        (padStr("SCI#",                 ' ', 22), padStr("SMI#",        ' ', 22), padStr("RCIN#",          ' ', 22), padStr("HOST_RST_ACK",           ' ', 22)),
+                                                        (padStr("HOST_RST_WARN",        ' ', 22), padStr("SMIOUT#",     ' ', 22), padStr("NMIOUT#",        ' ', 22), padStr("RSV",                    ' ', 22))
+                                                    );
+        --***************************
+
     ----------------------------------------------
 
 
@@ -553,8 +605,9 @@ package body eSpiMasterBfm is
             end loop;
             -- release
             return remainder;
-        end function;
+        end function crc8;
         --***************************
+
 
         --***************************
         -- TO_HSTRING (STD_ULOGIC_VECTOR)
@@ -772,6 +825,65 @@ package body eSpiMasterBfm is
             -- release
             return ret;
         end function sts2str;
+        --***************************
+
+
+        --***************************
+        -- vw2str
+        --   prints virtual wires in a human-readable way
+        function vw2str ( idx : tMemX08; data : tMemX08; len : natural ) return string is
+            constant nameLen    : natural           := C_SYSEVENT_NAME(C_SYSEVENT_NAME'low, C_SYSEVENT_NAME'low)'length;    --! get string length for memory allocation
+            constant blankPad   : string(1 to 7)    := "       ";                       --! blanks for entry alignment
+            constant lineLen    : natural           := nameLen + blankPad'length + 5;   --! str + ' : x' + NL
+            variable str        : string(1 to 4*len*lineLen + 32);                      --! 4: if system event wire, in one data are up to 4 wires encoded, +32 in case of len=0
+            variable strLen     : natural;                                              --! used number of characters
+            variable index      : integer;                                              --! idx converted to integer
+        begin
+            -- init
+            str     := (others => (character(NUL)));
+            strLen  := 0;
+            -- wires available
+            if ( 0 = len ) then
+                strLen              := 31;
+                str(1 to strLen)    := "     No virtual wires available";
+                return str(1 to strLen);
+            end if;
+            -- process IRQ as events
+            for i in 0 to len-1 loop
+                -- slv as integer needed
+                index := to_integer(unsigned(idx(i)));
+                -- IRQ event
+                --   @see Table 9: Virtual Wire Index Definition
+                if ( (0 <= index) and (index <= 1) ) then
+                    -- assemble IRQ String
+                    str(strLen+1 to strLen+lineLen) := blankPad                                                                                                         &
+                                                       padstr("IRQ" & integer'image(to_integer(unsigned(data(i)(data(0)'left downto data(0)'left)))) , ' ', nameLen)    &
+                                                       " : "        & integer'image(to_integer(unsigned(data(i)(data(0)'left-1 downto data(0)'right))))                 &
+                                                       character(LF);
+                    strLen := strLen + lineLen;
+                end if;
+            end loop;
+            -- process virtual wires
+            for i in 0 to len-1 loop
+                -- slv as integer needed
+                index := to_integer(unsigned(idx(i)));
+                -- check index for system event
+                if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
+                    -- iterate over bits of system event
+                    for j in C_SYSEVENT_NAME'range(2) loop
+                        -- valid?
+                        --   @see Table 9: Virtual Wire Index Definition
+                        if ( '1' = data(i)(j+4) ) then
+                            str(strLen+1 to strLen+lineLen) := blankPad & C_SYSEVENT_NAME(index,j) & " : "                  &
+                                                               integer'image(to_integer(unsigned(data(i)(j downto j)))) &
+                                                               character(LF);
+                            strLen := strLen + lineLen;
+                        end if;
+                    end loop;
+                end if;
+            end loop;
+            return str(1 to strLen-1);  --! drop last line feed
+        end function vw2str;
         --***************************
 
     ----------------------------------------------
@@ -2208,6 +2320,7 @@ package body eSpiMasterBfm is
             vwireIdx    := (others => (others => '0'));
             vwireData   := (others => (others => '0'));
             vwireLen    := 0;
+            status      := (others => '0');
             -- check for virtual message available
                 -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
             GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
@@ -2223,53 +2336,69 @@ package body eSpiMasterBfm is
                 if ( ACCEPT = rsp ) then
                     -- extract wire count
                     wireCnt := to_integer(unsigned(msg(1)(5 downto 0))) + 1;    --! 0-based counter
+                    if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: number available wires = " & integer'image(wireCnt); end if;
                     -- fetch rest of packet
                         -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response );
                     spiXcv( this, msg, CSn, SCK, DIO, -1, 2+2*wireCnt+2, 2, rsp );  --! +2: two bytes in first request, *2: per virtual wire 2byte, +2: Status register has two bytes
-
-
-
-
-
-
-
-                    report "wireCnt " & integer'image(wireCnt);
-
-
-
+                    -- align data to output
+                    for i in 0 to wireCnt - 1 loop
+                        vwireIdx(i)     := msg(i*2 + 2);    --! +1 Response, +1 wire count
+                        vwireData(i)    := msg(i*2 + 3);    --! +1 Response, +1 wire count, +1 wire index
+                    end loop;
+                    status      := msg((wireCnt-1)*2 + 2 + 3) & msg((wireCnt-1)*2 + 2 + 2); --! +1 Response, +1 wire count, +1/+2 status bytes
+                    response    := rsp;
+                    vwireLen    := wireCnt;
                 else
                     response := FATAL_ERROR;
                     if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE: Slave Not accepted Request" severity error; end if;
                     return;
                 end if;
-
-
-
-
-
-
             else
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: no virtual wires available"; end if;
                 response := rsp;
                 vwireLen := 0;
                 return;
             end if;
-
-
-
-
-
-
-
-
         end procedure VWIRERD;
         --***************************
 
 
-
-
-
-
+        --***************************
+        -- Virtual Wire Channel Read
+        -- GET_VWIRE
+        --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
+        procedure VWIRERD
+            (
+                variable this       : inout tESpiBfm;
+                signal CSn          : out std_logic;                        --! slave select
+                signal SCK          : out std_logic;                        --! shift clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                variable good       : inout boolean                         --! successful
+            ) is
+            variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+            variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
+            variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
+            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable sts        : std_logic_vector(15 downto 0);    --! slaves status buffer
+        begin
+            -- read wires and print
+                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+            VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, sts, rsp );
+            -- only if virtual wires available print to log
+            if ( ACCEPT = rsp ) then
+                    -- vw2str( idx, data, len)
+                Report character(LF) & "     Virtual Wires:" & character(LF) & vw2str(vwireIdx, vwireData, vwireLen);
+            end if;
+            --slave request good?
+            if ( ACCEPT /= rsp ) then
+                good := false;
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR:Slave " & rsp2str(rsp) severity error; end if;
+            else
+                -- in case of no output print to console
+                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            end if;
+        end procedure VWIRERD;
+        --***************************
 
     ----------------------------------------------
 
