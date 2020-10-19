@@ -857,8 +857,8 @@ package body eSpiMasterBfm is
                 if ( (0 <= index) and (index <= 1) ) then
                     -- assemble IRQ String
                     str(strLen+1 to strLen+lineLen) := blankPad                                                                                                         &
-                                                       padstr("IRQ" & integer'image(to_integer(unsigned(data(i)(data(0)'left downto data(0)'left)))) , ' ', nameLen)    &
-                                                       " : "        & integer'image(to_integer(unsigned(data(i)(data(0)'left-1 downto data(0)'right))))                 &
+                                                       padstr("IRQ" & integer'image(to_integer(unsigned(data(i)(data(0)'left-1 downto data(0)'right)))) , ' ', nameLen) &
+                                                       " : "        & integer'image(to_integer(unsigned(data(i)(data(0)'left downto data(0)'left))))                    &
                                                        character(LF);
                     strLen := strLen + lineLen;
                 end if;
@@ -874,7 +874,7 @@ package body eSpiMasterBfm is
                         -- valid?
                         --   @see Table 9: Virtual Wire Index Definition
                         if ( '1' = data(i)(j+4) ) then
-                            str(strLen+1 to strLen+lineLen) := blankPad & C_SYSEVENT_NAME(index,j) & " : "                  &
+                            str(strLen+1 to strLen+lineLen) := blankPad & C_SYSEVENT_NAME(index,j) & " : "              &
                                                                integer'image(to_integer(unsigned(data(i)(j downto j)))) &
                                                                character(LF);
                             strLen := strLen + lineLen;
@@ -2351,13 +2351,12 @@ package body eSpiMasterBfm is
                 else
                     response := FATAL_ERROR;
                     if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE: Slave Not accepted Request" severity error; end if;
-                    return;
                 end if;
             else
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: no virtual wires available"; end if;
-                response := rsp;
-                vwireLen := 0;
-                return;
+                response    := rsp;
+                status      := sts;
+                vwireLen    := 0;
             end if;
         end procedure VWIRERD;
         --***************************
