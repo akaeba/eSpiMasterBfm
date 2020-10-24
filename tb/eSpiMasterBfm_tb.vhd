@@ -57,7 +57,7 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest8    : boolean := true;  --! test8:  IORD
         constant doTest9    : boolean := true;  --! test9:  VWIRE XPLTRST
         constant doTest10   : boolean := true;  --! test10: PRT_CFG_REGS, prints configuration regs to console
-		constant doTest11   : boolean := true;  --! test11: VWIRERD
+        constant doTest11   : boolean := true;  --! test11: VWIRERD
 
     -----------------------------
 
@@ -93,7 +93,7 @@ begin
             variable response       : tESpiRsp;                                         --! slave response
             variable slv8           : std_logic_vector(7 downto 0);                     --! help
             variable memX08         : tMemX08(0 to 2);                                  --! help
-			-- temp
+            -- temp
             variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
             variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
             variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
@@ -426,17 +426,17 @@ begin
         if ( doTest10 or DO_ALL_TEST ) then
             Report "Test10: PRT_CFG_REGS";
             -- load message
-            REQMSG              <= (others => character(NUL));
-            CMPMSG              <= (others => character(NUL));
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
             -- Slave Cfg Regs
             --                      ADR=0x04                             ADR=0x08                             ADR=0x10                             ADR=0x20                             ADR=0x30                             ADR=0x40
-            REQMSG(1 to 54)     <=  "21000434"         & character(LF) & "21000810"         & character(LF) & "21001058"         & character(LF) & "210020C8"         & character(LF) & "210030B8"         & character(LF) & "210040EF"         & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 102)    <=  "0878563412000042" & character(LF) & "08111111110000B5" & character(LF) & "0822222222000054" & character(LF) & "083333333300000B" & character(LF) & "0844444444000091" & character(LF) & "FFFFFFFFFFFFFFFF" & character(NUL);   --! received response   (Slave to BFM)
-            LDMSG               <= '1';
+            REQMSG(1 to 54) <=  "21000434"         & character(LF) & "21000810"         & character(LF) & "21001058"         & character(LF) & "210020C8"         & character(LF) & "210030B8"         & character(LF) & "210040EF" & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 88) <=  "0878563412000042" & character(LF) & "08111111110000B5" & character(LF) & "0822222222000054" & character(LF) & "083333333300000B" & character(LF) & "0844444444000091" & character(LF) & "FF"       & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
             wait for eSpiMasterBfm.TSpiClk/2;
-            LDMSG               <= '0';
+            LDMSG           <= '0';
             wait for eSpiMasterBfm.TSpiClk/2;
-            tmpBool             := true;
+            tmpBool         := true;
             -- Request BFM
                 -- PRT_CFG_REGS( this, CSn, SCK, DIO, good )
             PRT_CFG_REGS( eSpiMasterBfm, CSn, SCK, DIO, tmpBool );
@@ -445,32 +445,43 @@ begin
             wait for 1 us;
         end if;
         -------------------------
-		
-		
+
+
         -------------------------
         -- Test11: VWIRERD
         -------------------------
-        if ( doTest10 or DO_ALL_TEST ) then
-            Report "Test11: VWIRERD";
+        if ( doTest11 or DO_ALL_TEST ) then
+            Report "Test11: VWIRERD - Status Wires";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 5) 	<= "051B" 					& character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 23) <= "0802059904C006500F03E9"	& character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 10) <= "25FB"       & character(LF) & "051B"                    & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 32) <= "084F03C0"   & character(LF) & "0802059904C006500F03E9"  & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for eSpiMasterBfm.TSpiClk/2;
             LDMSG           <= '0';
             wait for eSpiMasterBfm.TSpiClk/2;
             -- Request BFM
-				-- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
-			VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
-			
-			
+                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, good );
+            Report "Test11: VWIRERD - IRQ4";
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 10) <= "25FB"       & character(LF) & "051B"            & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 24) <= "084F03C0"   & character(LF) & "080000840F0325"  & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            LDMSG           <= '0';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            -- Request BFM
+                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, good );
             wait for 1 us;
         end if;
         -------------------------
-		
-		
+
+
 
 
 
