@@ -1079,9 +1079,11 @@ package body eSpiMasterBfm is
             ) is
             variable crcMsg     : tMemX08(0 to msg'length); --! message with calculated CRC
             variable rsp        : tESpiRsp;                 --! decoded slave response
-            variable intPkgDone : boolean;                  --! if true interrupt package is finished
             variable rxStart    : integer;                  --! start index in message
             variable rxStop     : integer;                  --! stop index in message
+            variable dropCRC    : boolean;                  --! if true CRC is from return message removed
+            variable termCon    : boolean;                  --! terminates connection to slave
+            variable prtRx      : boolean;                  --! print RX packet to console log
         begin
             -- entry message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv"; end if;
@@ -1093,15 +1095,21 @@ package body eSpiMasterBfm is
             end if;
             -- non-split or split packet (Part 1/2)?
             if ( (-1 /= txByte) and (intRxByte = rxByte) ) then     --! packet in one shoot, w/o intermediate processing recorded
-                intPkgDone  := true;
+                dropCRC     := true;
+                termCon     := true;
+                prtRx       := true;
                 rxStart     := 0;
                 rxStop      := rxByte;
             elsif ( (-1 /= txByte) and (intRxByte < rxByte) ) then  --! packet is not fully fetched, cause intermediate processing and higher hierarchy is required
-                intPkgDone  := false;
+                dropCRC     := false;
+                termCon     := false;
+                prtRx       := false;
                 rxStart     := 0;
                 rxStop      := intRxByte-1;
             elsif ( (-1 = txByte) and (intRxByte < rxByte) ) then   --! fetch missing part of the packet
-                intPkgDone                  := true;
+                dropCRC                     := true;
+                termCon                     := true;
+                prtRx                       := true;
                 rxStart                     := intRxByte-1;
                 rxStop                      := rxByte;
                 crcMsg(0 to intRxByte-1)    := msg(0 to intRxByte-1);   --! restore in previous cycle fetched data
@@ -1128,39 +1136,49 @@ package body eSpiMasterBfm is
                 rsp := decodeRsp(crcMsg(0));    --! decode response
             end if;
             -- acquire RX packet
-            if ( ACCEPT = rsp ) then
+            if ( ACCEPT = rsp ) then            --! all fine
                 -- fetch pending bytes
-                spiRx(this, crcMsg(rxStart+1 to rxStop), SCK, DIO); --! read from slave, in defer (1Byte) returns slave status (2Byte) and CRC (1Byte)
-            elsif ( DEFER = rsp ) then
+                spiRx(this, crcMsg(rxStart+1 to rxStop), SCK, DIO);
+            elsif ( DEFER = rsp ) then          --! defer (1Byte) returns slave status (2Byte) and CRC (1Byte)
                 -- fetch pending bytes
-                spiRx(this, crcMsg(1 to 3), SCK, DIO);  --! read from slave, in defer (1Byte) returns slave status (2Byte) and CRC (1Byte)
-                -- mark as finished packet
-                intPkgDone  := true;                    --! if it was planed as interrupted packet, after DEFER new read cycle
-                rxStop      := 3;
+                rxStop  := 3;                               --! in defer (1Byte) returns slave status (2Byte) and CRC (1Byte)
+                spiRx(this, crcMsg(1 to rxStop), SCK, DIO); --! read from slave,
+                -- mark as finished packet, if it was planed as interrupted packet, after DEFER new read cycle
+                dropCRC := true;                            --! only one byte fetched from slave
+                termCon := true;                            --! connection to slave can closed
+                prtRx   := true;
+            elsif ( NO_RESPONSE = rsp ) then
+                rxStop  := 0;
+                dropCRC := false;   --! only one byte fetched from slave
+                termCon := true;    --! connection to slave can closed
+                prtRx   := true;    --! print no response to console
             else
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Response not handled" severity error; end if;
-                response := FATAL_ERROR;
-                return;
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: unexpected response '" & rsp2str(rsp) & "'" severity error; end if;
+                termCon := true;    --! close slaves connection
             end if;
-            -- packet finished, if yes terminate connection
-            if ( intPkgDone ) then
-                -- check CRC only for complete packet
+            -- return CRC?
+            if ( dropCRC ) then
+                -- check crc
                 if (not checkCRC(this, crcMsg(0 to rxStop))) then
-                    response := FATAL_ERROR; --! Table 4: Response Field Encodings, It is also the default response when fatal CRC error is detected on the command packet; Here: also used for response
+                    rsp := FATAL_ERROR; --! Table 4: Response Field Encodings, It is also the default response when fatal CRC error is detected on the command packet; Here: also used for response
                     if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv:Rx:CRC failed" severity error; end if;
-                    return;
                 end if;
+                -- drop CRC
+                msg(0 to rxStop-1) := crcMsg(0 to rxStop-1);
+            else
+                msg(0 to rxStop) := crcMsg(0 to rxStop);    --! interrupted packet needs no drop of CRC
+            end if;
+            -- terminate slave connection
+            if ( termCon ) then
                 -- Terminate connection to slave
                 SCK <= '0';
                 wait for this.TSpiClk/2;    --! half clock cycle
                 CSn <= '1';
                 wait for this.TSpiClk;      --! limits CSn bandwidth to SCK
-                -- print receive message to console
+            end if;
+            -- print receive message to console
+            if ( prtRx ) then
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to rxStop)); end if;
-                -- copy message
-                msg(0 to rxStop-1) := crcMsg(0 to rxStop-1);    --! drop CRC
-            else
-                msg(0 to rxStop) := crcMsg(0 to rxStop);        --! interrupted packet needs no drop of CRC
             end if;
             -- release response
             response := rsp;
