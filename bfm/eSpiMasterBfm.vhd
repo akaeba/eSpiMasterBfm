@@ -942,7 +942,13 @@ package body eSpiMasterBfm is
                 -- iterate over bits in a single message byte
                 for j in msg(i)'high downto msg(i)'low loop
                     -- dispatch mode
-                    if ( DUAL = this.spiMode ) then     --! two bits per clock cycle are transfered
+                    if ( SINGLE = this.spiMode ) then   --! one bit per cycle transfered
+                        SCK     <= '0';                 --! falling edge
+                        DIO(0)  <= msg(i)(j);           --! assign data
+                        wait for this.TSpiClk/2;        --! half clock cycle
+                        SCK     <= '1';                 --! rising edge
+                        wait for this.TSpiClk/2;        --! half clock cycle
+                    elsif ( DUAL = this.spiMode ) then  --! two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK             <= '0';     --! falling edge
                             DIO(1 downto 0) <= msg(i)(j downto j-1);
@@ -958,12 +964,6 @@ package body eSpiMasterBfm is
                             SCK             <= '1';     --! rising edge
                             wait for this.TSpiClk/2;    --! half clock cycle
                         end if;
-                    else                            --! one bits per clock cycle are transfered
-                        SCK     <= '0';             --! falling edge
-                        DIO(0)  <= msg(i)(j);   --! assign data
-                        wait for this.TSpiClk/2;    --! half clock cycle
-                        SCK     <= '1';             --! rising edge
-                        wait for this.TSpiClk/2;    --! half clock cycle
                     end if;
                 end loop;
             end loop;
@@ -1029,7 +1029,14 @@ package body eSpiMasterBfm is
                 -- iterate over bits in a single message byte
                 for j in msg(i)'high downto msg(i)'low loop
                     -- dispatch mode
-                    if ( DUAL = this.spiMode ) then     --! two bits per clock cycle are transfered
+                    if ( SINGLE = this.spiMode ) then       --! one bit per clock cycle transferred
+                        SCK                 <= '0';                                                 --! falling edge
+                        wait for this.TSpiClk/2;                                                    --! half clock cycle
+                        SCK                 <= '1';                                                 --! rising edge
+                        slv1(0 downto 0)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));  --! help
+                        msg(i)(j)           := slv1(0);                                             --! capture data from line
+                        wait for this.TSpiClk/2;                                                    --! half clock cycle
+                    elsif ( DUAL = this.spiMode ) then     --! two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK                     <= '0';                                                 --! falling edge
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
@@ -1045,13 +1052,6 @@ package body eSpiMasterBfm is
                             msg(i)(j downto j-3)    := std_logic_vector(TO_01(unsigned(DIO(3 downto 0))));  --! capture data from line
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
                         end if;
-                    else                                --! one bits per clock cycle are transfered
-                        SCK                 <= '0';                                                 --! falling edge
-                        wait for this.TSpiClk/2;                                                    --! half clock cycle
-                        SCK                 <= '1';                                                 --! rising edge
-                        slv1(0 downto 0)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));  --! help
-                        msg(i)(j)           := slv1(0);                                             --! capture data from line
-                        wait for this.TSpiClk/2;                                                    --! half clock cycle
                     end if;
                 end loop;
             end loop;
