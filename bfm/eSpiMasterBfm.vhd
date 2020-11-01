@@ -416,6 +416,20 @@ package eSpiMasterBfm is
                     variable good       : inout boolean                         --! successful
                 );
 
+        -- Virtual Wire: Waits until is equal
+        --   waits until a virtual wire has the given value
+        --   @see Table 9: Virtual Wire Index Definition
+            procedure WAIT_VW_IS_EQ
+                (
+                    variable this       : inout tESpiBfm;
+                    signal CSn          : out std_logic;                        --! slave select
+                    signal SCK          : out std_logic;                        --! shift clock
+                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                    signal ALERTn       : in std_logic;                         --! Alert
+                    constant wireName   : in string;                            --! name of the virtual wire
+                    constant wireVal    : in bit;                               --! value of the virtual wire
+                    variable good       : inout boolean                         --! successful?
+                );
 
         -- Print: Slave Configuration Registers to Console Log
             procedure PRT_CFG_REGS
@@ -2509,7 +2523,7 @@ package body eSpiMasterBfm is
         --***************************
         -- Virtual Wire: Waits until is equal
         --   waits until a virtual wire has the given value
-        --   @see Table 9
+        --   @see Table 9: Virtual Wire Index Definition
         procedure WAIT_VW_IS_EQ
             (
                 variable this       : inout tESpiBfm;
