@@ -75,6 +75,7 @@ package eSpiMasterBfm is
             tiout       : time;         --! time out when master give up an interaction
             tioutAlert  : natural;      --! number of clock cycles before BFM gives with time out up
             tioutRd     : natural;      --! number of Get Status Cycles before data read gives up
+            alertMode   : boolean;      --! True: ALERT# pin for alert signaling used, False: DIO[1] signals alert
         end record tESpiBfm;
     -----------------------------
 
@@ -911,6 +912,7 @@ package body eSpiMasterBfm is
             this.tiout      := 100 us;              --! 100us master time out for wait
             this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.alertMode  := false;               --! in default is DIO[1] for alert signaling used
             -- signals
             CSn <= '1';
             SCK <= '0';
@@ -1556,6 +1558,45 @@ package body eSpiMasterBfm is
             response    := rsp;
             status      := sts;
         end procedure RD_DEFER_PC_AVAIL;
+        --***************************
+
+
+        --***************************
+        -- Wait Alert and get status from slave
+        --   is left with CSn = 0
+        --   @see Figure 20: GET_STATUS Command
+        procedure WAIT_ALERT
+            (
+                variable this       : inout tESpiBfm;                       --! common storage element
+                signal CSn          : out std_logic;                        --! slave select
+                signal SCK          : out std_logic;                        --! shift clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                signal ALERTn       : in std_logic                          --! slaves alert pin
+            ) is
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
+            -- wait for alert
+            while ( true ) loop
+                if ( this.alertMode ) then
+                    if ( '0' = to_bit(std_ulogic(ALERTn), '1') ) then
+                        wait for this.TSpiClk/2;        --! limit bandwidth
+                        CSn <= '0';                     --! ACK alert
+                        wait until rising_edge(ALERTn); --! wait for slave; true: from low value ('0' or 'L') to high value ('1' or 'H').
+                        exit;                           --! go on with status
+                    end if;
+                else
+                    if ( '0' = to_bit(std_ulogic(DIO(1)), '1') ) then
+                        wait for this.TSpiClk/2;
+                        CSn <= '0';
+                        wait until rising_edge(DIO(1));
+                        exit;
+                    end if;
+                end if;
+                wait for this.TSpiClk/2;
+            end loop;
+            wait for this.TSpiClk;  --! limit bandwidth
+        end procedure WAIT_ALERT;
         --***************************
 
     ----------------------------------------------
@@ -2422,11 +2463,11 @@ package body eSpiMasterBfm is
 
 
     ----------------------------------------------
-    -- System Event Virtual Wires
+    -- Virtual Wire Helper
     ----------------------------------------------
 
         --***************************
-        -- Vitual Wire: Manipulate PLTRST level
+        -- Virtual Wire: Manipulate PLTRST level
         -- Platform Reset: Command to indicate Platform Reset assertion and de-assertion.
         --   @see Table 11: System Event Virtual Wires for Index=3
         procedure VW_PLTRST
@@ -2438,7 +2479,7 @@ package body eSpiMasterBfm is
                 constant XPLTRST    : bit;                                  --! active low reset, assert/de-assert
                 variable good       : inout boolean                         --! successful
             ) is
-                variable vwData : std_logic_vector(7 downto 0);             --! Modifier of PLTRST
+            variable vwData : std_logic_vector(7 downto 0); --! Modifier of PLTRST
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST"; end if;
@@ -2464,6 +2505,89 @@ package body eSpiMasterBfm is
         end procedure VW_PLTRST;
         --***************************
 
+
+        --***************************
+        -- Virtual Wire: Waits until is equal
+        --   waits until a virtual wire has the given value
+        --   @see Table 9
+        procedure WAIT_VW_IS_EQ
+            (
+                variable this       : inout tESpiBfm;
+                signal CSn          : out std_logic;                        --! slave select
+                signal SCK          : out std_logic;                        --! shift clock
+                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
+                signal ALERTn       : in std_logic;                         --! Alert
+                constant wireName   : in string;                            --! name of the virtual wire
+                constant wireVal    : in bit;                               --! value of the virtual wire
+                variable good       : inout boolean                         --! successful?
+            ) is
+            variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+            variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
+            variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
+            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable sts        : std_logic_vector(15 downto 0);    --! slaves status buffer
+            variable vwIdx      : integer range 0 to 255;           --! current virtual wire
+            variable vwDat      : std_logic_vector(7 downto 0);     --! help variable
+            variable vwIdxNdl   : integer range 0 to 255;           --! virtual wire index to look for
+            variable slv8       : std_logic_vector(7 downto 0);     --! temporary variable
+            variable irqNum     : std_logic_vector(6 downto 0);     --! IRQ number
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ"; end if;
+            -- check search string
+            if ( wireName'length < 4 ) then
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: string not matchable" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- identify wire index
+            if ( "IRQ" = wireName(wireName'left to wireName'left+2) ) then  --! IRQ
+                -- str2int @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
+                -- convert IRQ to slv; MSB is index, MSB-1... IRQ number
+                slv8        := std_logic_vector(to_unsigned(integer'value(wireName(wireName'left+3 to wireName'right)), slv8'length));
+                vwIdxNdl    := to_integer(unsigned(slv8(7 downto 7)));  --! MSB is virtual wire index
+                irqNum      := slv8(irqNum'range);                      --! rest is IRQ number
+            -- todo: add system event wire
+            else    --! No match
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: VW name '" & wireName & "' not recognized" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- prepare, for wait loop
+            rsp := ACCEPT;
+            while ( ACCEPT = rsp ) loop
+                    -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+                VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, sts, rsp );
+                -- index match?
+                for i in 0 to vwireLen-1 loop
+                    -- extract from array
+                    vwIdx := to_integer(unsigned(vwireIdx(i)));
+                    vwDat := vwireData(i);
+                    -- match needle index
+                    if ( (0 <= vwIdxNdl) and (vwIdxNdl <= 1) ) then     --! IRQ
+                        if ( (vwIdx = vwIdxNdl) and (irqNum = vwDat(irqNum'range)) ) then   --! IRQ number matches?
+                            if ( to_stdulogic(wireVal) = vwDat(7) ) then                    --! interrupt level found?
+                                return;                                                     --! IRQ number and level matches
+                            end if;
+                        end if;
+                    elsif ( (2 <= vwIdxNdl) and (vwIdxNdl <= 7) ) then  --! System Event Wires
+                    -- todo
+
+                    else
+                        if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: Virtual Wire Index '" & integer'image(vwIdxNdl) & "' unknown" severity error; end if;
+                        good := false;
+                        return;
+                    end if;
+                end loop;
+                -- no new wires available, wait for Alert
+                if ( '0' = sts(C_STS_VWIRE_AVAIL) ) then
+                        -- WAIT_ALERT( this, CSn, SCK, DIO, ALERTn )
+                    WAIT_ALERT( this, CSn, SCK, DIO, ALERTn );  --! is left with CSn=0, second procedure is mandatory
+                end if;
+            end loop;
+        end procedure WAIT_VW_IS_EQ;
+        --***************************
+
     ----------------------------------------------
 
 
@@ -2482,12 +2606,12 @@ package body eSpiMasterBfm is
                 signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                 variable good       : inout boolean                         --! successful
             ) is
-                constant adrs   : slv16(0 to 5) := (C_DEV_IDENT, C_GEN_CAP_CFG, C_CH0_CAP_CFG, C_CH1_CAP_CFG, C_CH2_CAP_CFG, C_CH3_CAP_CFG);    --! buffer slave regs
-                variable sts    : std_logic_vector(15 downto 0);    --! dummy variable
-                variable rsp    : tESpiRsp;                         --! request response status
-                variable cfgStr : string(1 to 313);                 --! string for config print to console
-                variable cfg    : std_logic_vector(31 downto 0);    --! temp variable for config
-                variable tmpStr : string(1 to 10);
+            constant adrs   : slv16(0 to 5) := (C_DEV_IDENT, C_GEN_CAP_CFG, C_CH0_CAP_CFG, C_CH1_CAP_CFG, C_CH2_CAP_CFG, C_CH3_CAP_CFG);    --! buffer slave regs
+            variable sts    : std_logic_vector(15 downto 0);    --! dummy variable
+            variable rsp    : tESpiRsp;                         --! request response status
+            variable cfgStr : string(1 to 313);                 --! string for config print to console
+            variable cfg    : std_logic_vector(31 downto 0);    --! temp variable for config
+            variable tmpStr : string(1 to 10);
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:PRT_CFG_REGS"; end if;
