@@ -1597,6 +1597,7 @@ package body eSpiMasterBfm is
                         wait for this.TSpiClk/2;        --! limit bandwidth
                         CSn <= '0';                     --! ACK alert
                         wait until rising_edge(ALERTn); --! wait for slave; true: from low value ('0' or 'L') to high value ('1' or 'H').
+                        if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: ALERTn signals alert"; end if;
                         exit;                           --! go on with status
                     end if;
                 else
@@ -1604,6 +1605,7 @@ package body eSpiMasterBfm is
                         wait for this.TSpiClk/2;
                         CSn <= '0';
                         wait until rising_edge(DIO(1));
+                        if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: DIO[1] signals alert"; end if;
                         exit;
                     end if;
                 end if;
@@ -2543,7 +2545,7 @@ package body eSpiMasterBfm is
             variable vwIdx      : integer range 0 to 255;           --! current virtual wire
             variable vwDat      : std_logic_vector(7 downto 0);     --! help variable
             variable vwIdxNdl   : integer range 0 to 255;           --! virtual wire index to look for
-            variable slv8       : std_logic_vector(7 downto 0);     --! temporary variable
+            variable irqNumRaw  : std_logic_vector(7 downto 0);     --! temporary variable
             variable irqNum     : std_logic_vector(6 downto 0);     --! IRQ number
         begin
             -- user message
@@ -2558,9 +2560,9 @@ package body eSpiMasterBfm is
             if ( "IRQ" = wireName(wireName'left to wireName'left+2) ) then  --! IRQ
                 -- str2int @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
                 -- convert IRQ to slv; MSB is index, MSB-1... IRQ number
-                slv8        := std_logic_vector(to_unsigned(integer'value(wireName(wireName'left+3 to wireName'right)), slv8'length));
-                vwIdxNdl    := to_integer(unsigned(slv8(7 downto 7)));  --! MSB is virtual wire index
-                irqNum      := slv8(irqNum'range);                      --! rest is IRQ number
+                irqNumRaw   := std_logic_vector(to_unsigned(integer'value(wireName(wireName'left+3 to wireName'right)), irqNumRaw'length));
+                vwIdxNdl    := to_integer(unsigned(irqNumRaw(7 downto 7))); --! MSB is virtual wire index
+                irqNum      := irqNumRaw(irqNum'range);                     --! rest is IRQ number
             -- todo: add system event wire
             else    --! No match
                 if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: VW name '" & wireName & "' not recognized" severity error; end if;
@@ -2581,6 +2583,7 @@ package body eSpiMasterBfm is
                     if ( (0 <= vwIdxNdl) and (vwIdxNdl <= 1) ) then     --! IRQ
                         if ( (vwIdx = vwIdxNdl) and (irqNum = vwDat(irqNum'range)) ) then   --! IRQ number matches?
                             if ( to_stdulogic(wireVal) = vwDat(7) ) then                    --! interrupt level found?
+                                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: IRQ" & integer'image(to_integer(unsigned(irqNumRaw))) & "=" & integer'image(to_integer(unsigned(vwDat(7 downto 7)))) & " registered"; end if;
                                 return;                                                     --! IRQ number and level matches
                             end if;
                         end if;
