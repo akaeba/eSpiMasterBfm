@@ -35,11 +35,11 @@ library std;
 package eSpiMasterBfm is
 
     -----------------------------
-    -- Data typs
-        -- memory organization
+    -- Typs
+        -- Arrays
         type tMemX08 is array (natural range <>) of std_logic_vector (7 downto 0);  --! Byte orientated memory array
-        type slv32 is array (natural range <>) of std_logic_vector (31 downto 0);   --! unconstrained array
-        type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --!
+        type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --! unconstrained array
+        type tintx is array (natural range <>) of integer;                          --!
 
         -- System Event Virtual Wires
         --   resolved index to name, required by print
@@ -402,6 +402,19 @@ package eSpiMasterBfm is
                     variable good       : inout boolean                         --! successful
                 );
 
+        -- Virtual Wires Helper
+            -- VW_ADD: adds based on string virtual wire entry to list
+            procedure VW_ADD
+                (
+                    variable this   : inout tESpiBfm;   --! common storage element
+                    constant name   : in string;        --! Virtual wire name
+                    constant value  : in bit;           --! virtual wire value
+                    variable vwIdx  : inout tMemX08;    --! list with virtual wire indexes
+                    variable vwData : inout tMemX08;    --! list with virtual wire data
+                    variable vwLen  : inout natural;    --! effective list length
+                    variable good   : inout boolean     --! successful
+                );
+
         -- System Event Virtual Wires
         -- Communication via "VWIREWR"
         --   @see Table 11: System Event Virtual Wires for Index=3
@@ -683,10 +696,98 @@ package body eSpiMasterBfm is
 
 
         --***************************
+        -- upper
+        --   converts upper/lower letters to upper letters only
+        function upper
+            (
+                constant str : in string    --! mixed letter string
+            ) return string is
+            variable upperStr   : string(str'range);    --! converted upper string
+            variable intChar    : integer;              --! to character corresponding integer
+        begin
+            for i in str'range loop
+                intChar := character'pos(character(str(i)));
+                -- lower characters in ASCII table
+                --   @see: http://www.asciitable.com
+                if ( (intChar >= 97) and (intChar <= 122) ) then
+                    intChar := intChar - 32;    --! make upper
+                end if;
+                upperStr(i) := character'val(intChar);
+            end loop;
+            return upperStr;
+        end function upper;
+        --***************************
+
+
+        --***************************
+        -- trim
+        --   removes leading/trailing blanks from string
+        function trim
+            (
+                constant str : in string    --! input string
+            ) return string is
+            variable strStart   : positive;
+            variable strStop    : positive;
+            variable trimStr    : string(1 to str'length);
+        begin
+            -- init
+            strStart    := str'left;
+            strStop     := str'right;
+            -- determine leading blank index
+            for i in str'left to str'right loop
+                if ( character(' ') /= str(i) ) then
+                    strStart := i;
+                    exit;
+                end if;
+            end loop;
+            -- determine trailing blank indexes
+            for i in str'right downto strStart loop
+                if ( character(' ') /= str(i) ) then
+                    strStop := i;
+                    exit;
+                end if;
+            end loop;
+            -- empty string
+            if ( strStop = strStart ) then
+                return "";
+            end if;
+            -- assemble result string
+            trimStr(1 to (strStop-strStart)+1) := str(strStart to strStop);
+            return trimStr(1 to (strStop-strStart)+1);
+        end function trim;
+        --***************************
+
+
+        --***************************
+        -- match
+        --   returns true if string matches
+        function match
+            (
+                constant str1 : in string;  --! input string 1
+                constant str2 : in string   --! input string 2
+            ) return boolean is
+            constant cStr1 : string := trim(str1);
+            constant cStr2 : string := trim(str2);
+        begin
+            -- same length?
+            if ( cStr1'length /= cStr2'length ) then
+                return false;
+            end if;
+            -- match?
+            if ( upper(cStr1) = upper(cStr2) ) then
+                return true;
+            end if;
+            -- no match
+            return false;
+        end function match;
+        --***************************
+
+
+        --***************************
         -- hexStr
         --   converts byte array into hexadecimal string
         function hexStr ( msg : in tMemX08 ) return string is
-            variable str    : string(1 to (msg'length+1)*5+1);  --! 8bit per
+            variable str : string(1 to (msg'length+1)*5+1);  --! 8bit per
         begin
             -- init
             str := (others => NUL);
@@ -694,10 +795,8 @@ package body eSpiMasterBfm is
             for i in 0 to msg'length-1 loop
                 str(i*5+1 to i*5+5) := "0x" & to_hstring(msg(i)) & " ";
             end loop;
-            -- drop last blank
-            str((msg'length)*5+5) := character(NUL);
             -- return
-            return str;
+            return str(1 to (msg'length-1)*5+4);    --! +4 drops last blank
         end function hexStr;
         --***************************
 
@@ -846,7 +945,13 @@ package body eSpiMasterBfm is
         --***************************
         -- vw2str
         --   prints virtual wires in a human-readable way
-        function vw2str ( idx : tMemX08; data : tMemX08; len : natural ) return string is
+        function vw2str
+            (
+                constant idx    : in tMemX08;   --! slv array of virtual wire indexes
+                constant data   : in tMemX08;   --! slv array of virtual wire data
+                constant len    : in natural    --! array number of elements
+            )
+        return string is
             constant nameLen    : natural           := C_SYSEVENT_NAME(C_SYSEVENT_NAME'low, C_SYSEVENT_NAME'low)'length;    --! get string length for memory allocation
             constant blankPad   : string(1 to 7)    := "       ";                       --! blanks for entry alignment
             constant lineLen    : natural           := nameLen + blankPad'length + 5;   --! str + ' : x' + NL
@@ -899,6 +1004,34 @@ package body eSpiMasterBfm is
             end loop;
             return str(1 to strLen-1);  --! drop last line feed
         end function vw2str;
+        --***************************
+
+
+        --***************************
+        -- findSysWireIdx
+        --   finds virtual wire index based on name
+        --   returns two dimensional array: idx0: row, idx1: col
+        function sysWireIdx
+            (
+                constant name   : in string
+            ) return tintx is
+            variable matchIdx : tintx(0 to 1);
+        begin
+            -- init
+            matchIdx := (others => -1);
+            -- iterate over wire indexes
+            for i in C_SYSEVENT_NAME'range(1) loop
+                --iterate over entries in virtual wire index
+                for j in C_SYSEVENT_NAME'range(2) loop
+                    if ( match(name, C_SYSEVENT_NAME(i,j)) ) then
+                        matchIdx(0) := i;
+                        matchIdx(1) := j;
+                        exit;
+                    end if;
+                end loop;
+            end loop;
+            return matchIdx;
+        end function sysWireIdx;
         --***************************
 
     ----------------------------------------------
@@ -2481,6 +2614,84 @@ package body eSpiMasterBfm is
     ----------------------------------------------
     -- Virtual Wire Helper
     ----------------------------------------------
+
+        --***************************
+        -- Virtual Wire: Add Virtual wire
+        --   adds to vwIdx/vwData list an entry based on name/value
+        procedure VW_ADD
+            (
+                variable this   : inout tESpiBfm;   --! common storage element
+                constant name   : in string;        --! Virtual wire name
+                constant value  : in bit;           --! virtual wire value
+                variable vwIdx  : inout tMemX08;    --! list with virtual wire indexes
+                variable vwData : inout tMemX08;    --! list with virtual wire data
+                variable vwLen  : inout natural;    --! effective list length
+                variable good   : inout boolean     --! successful
+            ) is
+            constant cVwNoMatch : tintx(0 to 1) := (-1, -1);    --! pattern for no match
+            variable vwIndexAdd : tintx(0 to 1);                --! index add to list
+            variable irqNumSlv  : std_logic_vector(7 downto 0); --! IRQ number converted to SLV
+            variable vwPosAdd   : natural;                      --! add element on position
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD"; end if;
+            -- same memory allocated (length)?
+            if ( vwIdx'length /= vwData'length ) then
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: vwIdx/vwData have different length"; end if;
+                good := false;
+                return;
+            end if;
+            -- element can appended?
+            if ( vwLen >= vwIdx'length ) then
+                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VW_ADD: not enough memory to append additional virtual wire" severity warning; end if;
+                good := false;
+                return;
+            end if;
+            -- IRQ?
+            if ( "IRQ" = upper(name(name'left to name'left+2)) ) then
+                -- @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
+                -- @see Table 9: Virtual Wire Index Definition
+                -- MSB is index, MSB-1... IRQ number
+                irqNumSlv       := std_logic_vector(to_unsigned(integer'value(name(name'left+3 to name'right)), irqNumSlv'length));
+                vwIdx(vwLen)    := "0000000" & irqNumSlv(irqNumSlv'left);                                       --! MSB IRQ index
+                vwData(vwLen)   := to_stdulogic(value) & irqNumSlv(irqNumSlv'left-1 downto irqNumSlv'right);    --! MSB IRQ value, MSB-1... IRQ number
+                vwLen           := vwLen + 1;                                                                   --! element appended
+            -- System event virtual wire?
+            elsif ( sysWireIdx(name) /= cVwNoMatch ) then
+                -- prepare
+                vwIndexAdd  := sysWireIdx(name);    --! get system event wire index
+                vwPosAdd    := vwLen;               --! append on existing list
+                -- check if element can added on existing entry
+                for i in 0 to vwLen-1 loop
+                    if ( to_integer(unsigned(vwIdx(i))) = vwIndexAdd(0) ) then
+                        vwPosAdd := i;
+                        exit;
+                    end if;
+                end loop;
+                -- list length incremented?
+                if ( vwPosAdd = vwLen ) then
+                    vwIdx(vwPosAdd)     := (others => '0'); --! init
+                    vwData(vwPosAdd)    := (others => '0'); --! init
+                    vwLen               := vwLen + 1;       --! update length
+                end if;
+                -- add element to entry
+                vwIdx(vwPosAdd)                     := std_logic_vector(to_unsigned(vwIndexAdd(0), vwIdx(vwPosAdd)'length));    --! add virtual wire index
+                vwData(vwPosAdd)(vwIndexAdd(1))     := to_stdulogic(value);                                                     --! add value
+                vwData(vwPosAdd)(vwIndexAdd(1)+4)   := '1';                                                                     --! valid marked
+            else    --! No match
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: VW '" & name & "' not recognized" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- append info
+            if ( this.verbose > C_MSG_INFO ) then
+                Report  "eSpiMasterBfm:VW_ADD: Virtual Wires "                      & character(LF) &
+                        "     Index : " & hexStr(vwIdx(vwIdx'left to vwLen-1))      & character(LF) &
+                        "     Data  : " & hexStr(vwData(vwData'left to vwLen-1));
+            end if;
+        end procedure VW_ADD;
+        --***************************
+
 
         --***************************
         -- Virtual Wire: Manipulate PLTRST level
