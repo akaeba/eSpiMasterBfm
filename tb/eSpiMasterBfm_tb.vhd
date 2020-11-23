@@ -58,6 +58,7 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest9    : boolean := true;  --! test9:  VWIRE XPLTRST
         constant doTest10   : boolean := true;  --! test10: PRT_CFG_REGS, prints configuration regs to console
         constant doTest11   : boolean := true;  --! test11: VWIRERD
+        constant doTest12   : boolean := true;  --! test11: VW_ADD, adds virtual wires to a list
 
     -----------------------------
 
@@ -93,10 +94,10 @@ begin
             variable response       : tESpiRsp;                                         --! slave response
             variable slv8           : std_logic_vector(7 downto 0);                     --! help
             variable memX08         : tMemX08(0 to 2);                                  --! help
-            -- temp
-            variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
-            variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
-            variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
+            variable vwireIdx       : tMemX08(0 to 63);                                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwireData      : tMemX08(0 to 63);                                 --! virtual wire data
+            variable vwireLen       : integer range 0 to 64;                            --! number of wire pairs
+
     begin
 
         -------------------------
@@ -480,6 +481,42 @@ begin
             wait for 1 us;
         end if;
         -------------------------
+
+
+        -------------------------
+        -- Test11: VW_ADD
+        -------------------------
+        if ( doTest12 or DO_ALL_TEST ) then
+            Report "Test12: VW_ADD - Composes List of Virtual Wires";
+            vwireLen := 0;
+            VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vwireIdx, vwireData, vwireLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index
+            VW_ADD( eSpiMasterBfm, "IRQ12",                     '1', vwireIdx, vwireData, vwireLen, good );
+            VW_ADD( eSpiMasterBfm, "SUS_STAT#",                 '0', vwireIdx, vwireData, vwireLen, good );
+            VW_ADD( eSpiMasterBfm, "SLAVE_BOOT_LOAD_STATUS",    '1', vwireIdx, vwireData, vwireLen, good );
+            wait for 100 ns;
+            -- wire length
+            assert ( 3 = vwireLen ) Report "VW_ADD: Wrong list length" severity warning;
+            if not ( 3 = vwireLen ) then good := false; end if;
+            -- wire 0 (PLTRST#/SUS_STAT#)
+            assert ( x"03" = vwireIdx(0) )  Report "VW_ADD:Wire0: Wrong Index" severity warning;
+            if not ( x"03" = vwireIdx(0) )  then good := false; end if;
+            assert ( x"32" = vwireData(0) ) Report "VW_ADD:Wire0: Wrong Data" severity warning;
+            if not ( x"32" = vwireData(0) ) then good := false; end if;
+            -- wire 1 (IRQ12)
+            assert ( x"00" = vwireIdx(1) )  Report "VW_ADD:Wire1: Wrong Index" severity warning;
+            if not ( x"00" = vwireIdx(1) )  then good := false; end if;
+            assert ( x"8C" = vwireData(1) ) Report "VW_ADD:Wire1: Wrong Data" severity warning;
+            if not ( x"8C" = vwireData(1) ) then good := false; end if;
+            -- wire 1 (SLAVE_BOOT_LOAD_STATUS)
+            assert ( x"05" = vwireIdx(2) )  Report "VW_ADD:Wire2: Wrong Index" severity warning;
+            if not ( x"05" = vwireIdx(2) )  then good := false; end if;
+            assert ( x"88" = vwireData(2) ) Report "VW_ADD:Wire2: Wrong Data" severity warning;
+            if not ( x"88" = vwireData(2) ) then good := false; end if;
+            wait for 1 us;
+        end if;
+        -------------------------
+
+
 
 
 
