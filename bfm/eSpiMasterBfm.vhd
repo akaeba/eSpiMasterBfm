@@ -376,7 +376,7 @@ package eSpiMasterBfm is
                     constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
                     variable good       : inout boolean                         --! successful
                 );
-            -- single vwire instruction, wire via name selected, see 'C_SYSEVENT_NAME'
+            -- single vwire instruction, wire via name selected, see "System Event Virtual Wires" in spec or 'C_SYSEVENT_NAME' in bfm
             procedure VWIREWR
                 (
                     variable this   : inout tESpiBfm;
@@ -2498,8 +2498,7 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- Virtual Wire Channel Write: wire name and value
-        -- PUT_VWIRE
+        -- Virtual Wire Channel Write: wire name and value, see "System Event Virtual Wires" for proper names
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
         procedure VWIREWR
             (
@@ -2530,7 +2529,7 @@ package body eSpiMasterBfm is
             if ( vwAdd ) then
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: " & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))); end if;
             else
-                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VWIREWR: Failed" severity warning; end if;
+                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VWIREWR: " & name & " Failed" severity warning; end if;
                 good := false;
             end if;
         end procedure VWIREWR;
