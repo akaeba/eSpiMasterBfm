@@ -2599,7 +2599,7 @@ package body eSpiMasterBfm is
             --slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
                 if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
@@ -2706,29 +2706,29 @@ package body eSpiMasterBfm is
                 constant XPLTRST    : bit;                                  --! active low reset, assert/de-assert
                 variable good       : inout boolean                         --! successful
             ) is
-            variable vwData : std_logic_vector(7 downto 0); --! Modifier of PLTRST
+            variable vwireIdx   : tMemX08(0 to 1);  --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwireData  : tMemX08(0 to 1);  --! virtual wire data
+            variable vwireLen   : integer;
+            variable vwAdd      : boolean;
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST"; end if;
-            -- assert/deassert reset?
-            if ( XPLTRST = '0' ) then   -- assert
-                -- user message
-                if ( this.verbose > C_MSG_INFO ) then
-                    Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = 0";
-                end if;
-                -- prepare data
-                vwData := x"11";    --! activate PLTRST#, activate SUS_STAT#
-            else                        -- deassert
-                -- user message
-                if ( this.verbose > C_MSG_INFO ) then
-                    Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = 1";
-                end if;
-                -- prepare data
-                vwData := x"22";    --! deactivate PLTRST#, deactivate SUS_STAT#
+            -- build virtual wire
+            vwireLen    := 0;
+            vwAdd       := true;
+            VW_ADD( this, "PLTRST#", XPLTRST, vwireIdx, vwireData, vwireLen, vwAdd );   --! build virtual wire
+            -- write to endpoint
+            if ( vwAdd ) then
+                VWIREWR( this, CSn, SCK, DIO, vwireIdx(0), vwireData(0), vwAdd );
+            else
+                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VW_PLTRST: Failed to build virtual wire" severity warning; end if;
             end if;
-            -- perform command
-                -- VWIREWR ( this, CSn, SCK, DIO, vwireIdx, vwireData, good );
-            VWIREWR ( this, CSn, SCK, DIO, x"03", vwData, good );
+            -- successful?
+            if ( vwAdd ) then
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(XPLTRST)))); end if;
+            else
+                good := false;
+            end if;
         end procedure VW_PLTRST;
         --***************************
 
