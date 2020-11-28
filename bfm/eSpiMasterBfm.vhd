@@ -2720,13 +2720,12 @@ package body eSpiMasterBfm is
             -- write to endpoint
             if ( vwAdd ) then
                 VWIREWR( this, CSn, SCK, DIO, vwireIdx(0), vwireData(0), vwAdd );
-            else
-                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VW_PLTRST: Failed to build virtual wire" severity warning; end if;
             end if;
             -- successful?
             if ( vwAdd ) then
                 if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(XPLTRST)))); end if;
             else
+                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VW_PLTRST: Failed" severity warning; end if;
                 good := false;
             end if;
         end procedure VW_PLTRST;
