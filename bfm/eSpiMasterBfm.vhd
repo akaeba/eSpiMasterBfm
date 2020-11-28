@@ -376,6 +376,17 @@ package eSpiMasterBfm is
                     constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
                     variable good       : inout boolean                         --! successful
                 );
+            -- single vwire instruction, wire via name selected, see 'C_SYSEVENT_NAME'
+            procedure VWIREWR
+                (
+                    variable this   : inout tESpiBfm;
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                    constant name   : in string;                            --! Virtual wire name
+                    constant value  : in bit;                               --! virtual wire value
+                    variable good   : inout boolean                         --! successful
+                );
 
         -- VWIRERD
         --  @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
@@ -413,20 +424,6 @@ package eSpiMasterBfm is
                     variable vwData : inout tMemX08;    --! list with virtual wire data
                     variable vwLen  : inout natural;    --! effective list length
                     variable good   : inout boolean     --! successful
-                );
-
-        -- System Event Virtual Wires
-        -- Communication via "VWIREWR"
-        --   @see Table 11: System Event Virtual Wires for Index=3
-            -- PLTRST
-            procedure VW_PLTRST
-                (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;                        --! slave select
-                    signal SCK          : out std_logic;                        --! shift clock
-                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant XPLTRST    : bit;                                  --! active low reset, assert/de-assert
-                    variable good       : inout boolean                         --! successful
                 );
 
         -- Virtual Wire: Waits until is equal
@@ -2501,6 +2498,46 @@ package body eSpiMasterBfm is
 
 
         --***************************
+        -- Virtual Wire Channel Write: wire name and value
+        -- PUT_VWIRE
+        --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
+        procedure VWIREWR
+            (
+                variable this   : inout tESpiBfm;
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                constant name   : in string;                            --! Virtual wire name
+                constant value  : in bit;                               --! virtual wire value
+                variable good   : inout boolean                         --! successful
+            ) is
+            variable vwireIdx   : tMemX08(0 to 1);  --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwireData  : tMemX08(0 to 1);  --! virtual wire data
+            variable vwireLen   : integer;
+            variable vwAdd      : boolean;
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR"; end if;
+            -- build virtual wire
+            vwireLen    := 0;
+            vwAdd       := true;
+            VW_ADD( this, name, value, vwireIdx, vwireData, vwireLen, vwAdd );   --! build virtual wire
+            -- write to endpoint
+            if ( vwAdd ) then
+                VWIREWR( this, CSn, SCK, DIO, vwireIdx(0), vwireData(0), vwAdd );
+            end if;
+            -- successful?
+            if ( vwAdd ) then
+                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: " & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))); end if;
+            else
+                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VWIREWR: Failed" severity warning; end if;
+                good := false;
+            end if;
+        end procedure VWIREWR;
+        --***************************
+
+
+        --***************************
         -- Virtual Wire Channel Read
         -- GET_VWIRE
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
@@ -2690,45 +2727,6 @@ package body eSpiMasterBfm is
                         "     Data  : " & hexStr(vwData(vwData'left to vwLen-1));
             end if;
         end procedure VW_ADD;
-        --***************************
-
-
-        --***************************
-        -- Virtual Wire: Manipulate PLTRST level
-        -- Platform Reset: Command to indicate Platform Reset assertion and de-assertion.
-        --   @see Table 11: System Event Virtual Wires for Index=3
-        procedure VW_PLTRST
-            (
-                variable this       : inout tESpiBfm;
-                signal CSn          : out std_logic;                        --! slave select
-                signal SCK          : out std_logic;                        --! shift clock
-                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                constant XPLTRST    : bit;                                  --! active low reset, assert/de-assert
-                variable good       : inout boolean                         --! successful
-            ) is
-            variable vwireIdx   : tMemX08(0 to 1);  --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
-            variable vwireData  : tMemX08(0 to 1);  --! virtual wire data
-            variable vwireLen   : integer;
-            variable vwAdd      : boolean;
-        begin
-            -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST"; end if;
-            -- build virtual wire
-            vwireLen    := 0;
-            vwAdd       := true;
-            VW_ADD( this, "PLTRST#", XPLTRST, vwireIdx, vwireData, vwireLen, vwAdd );   --! build virtual wire
-            -- write to endpoint
-            if ( vwAdd ) then
-                VWIREWR( this, CSn, SCK, DIO, vwireIdx(0), vwireData(0), vwAdd );
-            end if;
-            -- successful?
-            if ( vwAdd ) then
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_PLTRST: XPLTRST = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(XPLTRST)))); end if;
-            else
-                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VW_PLTRST: Failed" severity warning; end if;
-                good := false;
-            end if;
-        end procedure VW_PLTRST;
         --***************************
 
 
