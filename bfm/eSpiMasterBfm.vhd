@@ -353,18 +353,6 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);    --! slave status
                     variable response   : out tESpiRsp                          --! slave response to command
                 );
-            -- single vwire instruction, response and status register
-            procedure VWIREWR
-                (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;                        --! slave select
-                    signal SCK          : out std_logic;                        --! shift clock
-                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant vwireIdx   : in std_logic_vector(7 downto 0);      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                    constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
-                    variable status     : out std_logic_vector(15 downto 0);    --! slave status
-                    variable response   : out tESpiRsp                          --! slave response to command
-                );
             -- single vwire instruction, w/o response and status register
             procedure VWIREWR
                 (
@@ -2438,34 +2426,6 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- Virtual Wire Channel Write, except only one data word
-        -- PUT_VWIRE
-        --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
-        procedure VWIREWR
-            (
-                variable this       : inout tESpiBfm;
-                signal CSn          : out std_logic;                        --! slave select
-                signal SCK          : out std_logic;                        --! shift clock
-                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                constant vwireIdx   : in std_logic_vector(7 downto 0);      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
-                variable status     : out std_logic_vector(15 downto 0);    --! slave status
-                variable response   : out tESpiRsp                          --! slave response to command
-            ) is
-            variable idx    : tMemX08(0 to 0);  --! vwireIdx
-            variable data   : tMemX08(0 to 0);  --! vwireData
-        begin
-            -- fill in data
-            idx(0)  := vwireIdx;
-            data(0) := vwireData;
-            -- call more general function
-                -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, status, response );
-            VWIREWR( this, CSn, SCK, DIO, idx, data, status, response );
-        end procedure VWIREWR;
-        --***************************
-
-
-        --***************************
         -- Virtual Wire Channel Write, w/o status/response register, prints it values to console, except only one data word
         -- PUT_VWIRE
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
@@ -2479,12 +2439,17 @@ package body eSpiMasterBfm is
                 constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
                 variable good       : inout boolean                         --! successful
             ) is
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable idx    : tMemX08(0 to 0);                  --! vwireIdx
+            variable data   : tMemX08(0 to 0);                  --! vwireData
+            variable sts    : std_logic_vector(15 downto 0);    --! needed for stuck
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
+            -- fill in data
+            idx(0)  := vwireIdx;
+            data(0) := vwireData;
             -- call more general function
                 -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, status, response );
-            VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, sts, rsp );
+            VWIREWR( this, CSn, SCK, DIO, idx, data, sts, rsp );
             -- Slave response good?
             if ( ACCEPT /= rsp ) then
                 good := false;
