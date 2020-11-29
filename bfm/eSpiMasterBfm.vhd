@@ -993,30 +993,43 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- findSysWireIdx
-        --   finds virtual wire index based on name
-        --   returns two dimensional array: idx0: row, idx1: col
-        function sysWireIdx
+        -- newVW
+        --   creates virtual wire index/value pair based on name/value
+        --   returns array with virtual wire index (idx0) and data (idx1)
+        function newVW
             (
-                constant name   : in string
-            ) return tintx is
-            variable matchIdx : tintx(0 to 1);
+                constant name   : in string;    --! virtual wire name
+                constant value  : in bit        --! virtual wire value
+            ) return tMemX08 is
+            variable virtWire   : tMemX08(0 to 1);              --! virtual wire index/value pair
+            variable irqNumSlv  : std_logic_vector(7 downto 0); --! helps for IRQ creation
         begin
             -- init
-            matchIdx := (others => -1);
-            -- iterate over wire indexes
+            virtWire    := (others => (others => '-')); --! no wire created
+            -- IRQ?
+            if ( "IRQ" = upper(name(name'left to name'left+2)) ) then
+                -- @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
+                -- @see Table 9: Virtual Wire Index Definition
+                -- MSB is index, MSB-1... IRQ number
+                irqNumSlv   := std_logic_vector(to_unsigned(integer'value(name(name'left+3 to name'right)), irqNumSlv'length));
+                virtWire(0) := "0000000" & irqNumSlv(irqNumSlv'left);                                       --! MSB IRQ index
+                virtWire(1) := to_stdulogic(value) & irqNumSlv(irqNumSlv'left-1 downto irqNumSlv'right);    --! MSB IRQ value, MSB-1... IRQ number
+                return virtWire;
+            end if;
+            -- system event virtual wire?
             for i in C_SYSEVENT_NAME'range(1) loop
                 --iterate over entries in virtual wire index
                 for j in C_SYSEVENT_NAME'range(2) loop
                     if ( match(name, C_SYSEVENT_NAME(i,j)) ) then
-                        matchIdx(0) := i;
-                        matchIdx(1) := j;
-                        exit;
+                        virtWire(0)         := std_logic_vector(to_unsigned(i, virtWire(0)'length));    --! virtual wire index
+                        virtWire(1)(j+4)    := '1';                                                     --! virtual wire data, value is valid
+                        virtWire(1)(j)      := to_stdulogic(value);                                     --! virtual wire value
+                        return virtWire;
                     end if;
                 end loop;
             end loop;
-            return matchIdx;
-        end function sysWireIdx;
+            return virtWire;
+        end function newVW;
         --***************************
 
     ----------------------------------------------
@@ -2618,7 +2631,7 @@ package body eSpiMasterBfm is
 
         --***************************
         -- Virtual Wire: Add Virtual wire
-        --   adds to vwIdx/vwData list an entry based on name/value
+        --   adds to vwIdx/vwData list a new entry
         procedure VW_ADD
             (
                 variable this   : inout tESpiBfm;   --! common storage element
@@ -2629,10 +2642,9 @@ package body eSpiMasterBfm is
                 variable vwLen  : inout natural;    --! effective list length
                 variable good   : inout boolean     --! successful
             ) is
-            constant cVwNoMatch : tintx(0 to 1) := (-1, -1);    --! pattern for no match
-            variable vwIndexAdd : tintx(0 to 1);                --! index add to list
-            variable irqNumSlv  : std_logic_vector(7 downto 0); --! IRQ number converted to SLV
-            variable vwPosAdd   : natural;                      --! add element on position
+            constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   -- not valid element
+            variable appendElem     : tMemX08(0 to 1);                                  --! shall appended on virtual wire list
+            variable vwPosAdd       : natural;                                          --! add element on position
         begin
             -- user message
             if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD"; end if;
@@ -2648,42 +2660,38 @@ package body eSpiMasterBfm is
                 good := false;
                 return;
             end if;
-            -- IRQ?
-            if ( "IRQ" = upper(name(name'left to name'left+2)) ) then
-                -- @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
-                -- @see Table 9: Virtual Wire Index Definition
-                -- MSB is index, MSB-1... IRQ number
-                irqNumSlv       := std_logic_vector(to_unsigned(integer'value(name(name'left+3 to name'right)), irqNumSlv'length));
-                vwIdx(vwLen)    := "0000000" & irqNumSlv(irqNumSlv'left);                                       --! MSB IRQ index
-                vwData(vwLen)   := to_stdulogic(value) & irqNumSlv(irqNumSlv'left-1 downto irqNumSlv'right);    --! MSB IRQ value, MSB-1... IRQ number
-                vwLen           := vwLen + 1;                                                                   --! element appended
-            -- System event virtual wire?
-            elsif ( sysWireIdx(name) /= cVwNoMatch ) then
-                -- prepare
-                vwIndexAdd  := sysWireIdx(name);    --! get system event wire index
-                vwPosAdd    := vwLen;               --! append on existing list
-                -- check if element can added on existing entry
-                for i in 0 to vwLen-1 loop
-                    if ( to_integer(unsigned(vwIdx(i))) = vwIndexAdd(0) ) then
-                        vwPosAdd := i;
-                        exit;
-                    end if;
-                end loop;
-                -- list length incremented?
-                if ( vwPosAdd = vwLen ) then
-                    vwIdx(vwPosAdd)     := (others => '0'); --! init
-                    vwData(vwPosAdd)    := (others => '0'); --! init
-                    vwLen               := vwLen + 1;       --! update length
-                end if;
-                -- add element to entry
-                vwIdx(vwPosAdd)                     := std_logic_vector(to_unsigned(vwIndexAdd(0), vwIdx(vwPosAdd)'length));    --! add virtual wire index
-                vwData(vwPosAdd)(vwIndexAdd(1))     := to_stdulogic(value);                                                     --! add value
-                vwData(vwPosAdd)(vwIndexAdd(1)+4)   := '1';                                                                     --! valid marked
-            else    --! No match
+            -- create element to append
+                -- newVW( name, value )
+            appendElem := newVW( name, value );
+            -- is valid?
+            if ( appendElem = notValidElem ) then
                 if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: VW '" & name & "' not recognized" severity error; end if;
                 good := false;
                 return;
             end if;
+            -- add to existing list
+            vwPosAdd := vwIdx'left + vwLen; --! append
+            for i in 0 to vwLen-1 loop
+                -- index exist in list
+                if ( vwIdx(vwIdx'left+i) = appendElem(0) ) then
+                    -- check if element exist in list, max two transitions for a virtual wire allowed
+                    if ( std_match(vwData(vwData'left+i), appendElem(1)) ) then
+                        if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD: '" & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))) & "' exists in list, no add"; end if;
+                        return;
+                    end if;
+                    -- capture add position
+                    vwPosAdd := vwIdx'left + i; --! insert
+                end if;
+            end loop;
+            -- Append mode?
+            if ( vwPosAdd = vwLen ) then
+                vwIdx(vwPosAdd)     := (others => '0'); --! init
+                vwData(vwPosAdd)    := (others => '0'); --! init
+                vwLen               := vwLen + 1;       --! update length
+            end if;
+            -- append/insert
+            vwIdx(vwPosAdd)     := appendElem(0);                                                           --! index
+            vwData(vwPosAdd)    := vwData(vwPosAdd) or to_stdlogicvector(to_bitvector(appendElem(1), '0')); --! data, contents don't cares
             -- append info
             if ( this.verbose > C_MSG_INFO ) then
                 Report  "eSpiMasterBfm:VW_ADD: Virtual Wires "                      & character(LF) &
