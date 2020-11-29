@@ -1005,7 +1005,7 @@ package body eSpiMasterBfm is
             variable irqNumSlv  : std_logic_vector(7 downto 0); --! helps for IRQ creation
         begin
             -- init
-            virtWire    := (others => (others => '-')); --! no wire created
+            virtWire := (others => (others => '-'));    --! no wire created
             -- IRQ?
             if ( "IRQ" = upper(name(name'left to name'left+2)) ) then
                 -- @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
