@@ -39,7 +39,6 @@ package eSpiMasterBfm is
         -- Arrays
         type tMemX08 is array (natural range <>) of std_logic_vector (7 downto 0);  --! Byte orientated memory array
         type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --! unconstrained array
-        type tintx is array (natural range <>) of integer;                          --!
 
         -- System Event Virtual Wires
         --   resolved index to name, required by print
@@ -1032,6 +1031,39 @@ package body eSpiMasterBfm is
         end function newVW;
         --***************************
 
+
+        --***************************
+        -- isVW
+        --   checks if virtual wire list has element with name/value
+        function isVW
+            (
+                constant name       : in string;    --! virtual wire name
+                constant value      : in bit;       --! virtual wire value
+                constant vwireIdx   : tMemX08;      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                constant vwireData  : tMemX08       --! virtual wire data
+            ) return boolean is
+            constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   --! not valid element
+            variable virtWire       : tMemX08(0 to 1);                                  --! virtual wire index/value pair
+        begin
+            -- same length?
+            if ( vwireIdx'length /= vwireData'length ) then
+                return false;
+            end if;
+            -- build match vector
+                -- newVW( name, value )
+            virtWire := newVW( name, value );   --! create needle for match
+            -- virtual wire build?
+            if ( notValidElem = virtWire ) then
+                return false;
+            end if;
+            -- search in list
+            for i in vwireIdx'left to vwireIdx'right loop
+                if ( std_match(vwireIdx(i), virtWire(0)) and std_match(vwireData(i), virtWire(1)) ) then
+                    return true;    --! virtual wire in list
+                end if;
+            end loop;
+            return false;   --! no name/value match
+        end function isVW;
     ----------------------------------------------
 
 
@@ -2642,7 +2674,7 @@ package body eSpiMasterBfm is
                 variable vwLen  : inout natural;    --! effective list length
                 variable good   : inout boolean     --! successful
             ) is
-            constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   -- not valid element
+            constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   --! not valid element
             variable appendElem     : tMemX08(0 to 1);                                  --! shall appended on virtual wire list
             variable vwPosAdd       : natural;                                          --! add element on position
         begin
