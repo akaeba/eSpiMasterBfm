@@ -685,7 +685,8 @@ package body eSpiMasterBfm is
         function upper
             (
                 constant str : in string    --! mixed letter string
-            ) return string is
+            )
+        return string is
             variable upperStr   : string(str'range);    --! converted upper string
             variable intChar    : integer;              --! to character corresponding integer
         begin
@@ -999,7 +1000,8 @@ package body eSpiMasterBfm is
             (
                 constant name   : in string;    --! virtual wire name
                 constant value  : in bit        --! virtual wire value
-            ) return tMemX08 is
+            )
+        return tMemX08 is
             variable virtWire   : tMemX08(0 to 1);              --! virtual wire index/value pair
             variable irqNumSlv  : std_logic_vector(7 downto 0); --! helps for IRQ creation
         begin
@@ -1041,7 +1043,8 @@ package body eSpiMasterBfm is
                 constant value      : in bit;       --! virtual wire value
                 constant vwireIdx   : tMemX08;      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
                 constant vwireData  : tMemX08       --! virtual wire data
-            ) return boolean is
+            )
+        return boolean is
             constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   --! not valid element
             variable virtWire       : tMemX08(0 to 1);                                  --! virtual wire index/value pair
         begin
@@ -1064,6 +1067,37 @@ package body eSpiMasterBfm is
             end loop;
             return false;   --! no name/value match
         end function isVW;
+        --***************************
+
+
+        --***************************
+        -- dcIfEq
+        --   returns slv with don't care ('-') elements in bits which are equal
+        function dcIfEq
+            (
+                constant oldListElem    : std_logic_vector(7 downto 0); --! old element of list
+                constant elem2Chk       : std_logic_vector(7 downto 0)  --! received virtual wire
+            )
+        return std_logic_vector is
+            variable newListElem    : std_logic_vector(7 downto 0); --! common return value
+        begin
+            -- init
+            newListElem := (others => 'X'); --! make invalid
+            -- compare bitwise
+            for i in oldListElem'range loop
+                if ( ('-' = oldListElem(i)) or ('-' = elem2Chk(i)) ) then
+                    newListElem(i) := '-';
+                elsif ( oldListElem(i) = elem2Chk(i) ) then
+                    newListElem(i) := '-';
+                else
+                    newListElem(i) := oldListElem(i);
+                end if;
+            end loop;
+            -- return
+            return newListElem;
+        end function dcIfEq;
+        --***************************
+
     ----------------------------------------------
 
 
@@ -2673,7 +2707,8 @@ package body eSpiMasterBfm is
                 variable vwData : inout tMemX08;    --! list with virtual wire data
                 variable vwLen  : inout natural;    --! effective list length
                 variable good   : inout boolean     --! successful
-            ) is
+            )
+        is
             constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   --! not valid element
             variable appendElem     : tMemX08(0 to 1);                                  --! shall appended on virtual wire list
             variable vwPosAdd       : natural;                                          --! add element on position
@@ -2740,6 +2775,109 @@ package body eSpiMasterBfm is
         --   @see Table 9: Virtual Wire Index Definition
         procedure WAIT_VW_IS_EQ
             (
+                variable this   : inout tESpiBfm;
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                signal ALERTn   : in std_logic;                         --! Alert
+                variable vwIdx  : in tMemX08;                           --! virtual wire indexes to wait for
+                variable vwData : in tMemX08;                           --! virtual wire data to wait for
+                variable good   : inout boolean;                        --! successful?
+                constant order  : in boolean                            --! true: virtual wires has to come in order of provided EQ list; false: any order is allowed
+            )
+        is
+            constant cVwRcv     : std_logic_vector(7 downto 0) := (others => '-');  --! template for all don't care
+            variable rsp        : tESpiRsp;                                         --! Slaves response to performed request
+            variable sts        : std_logic_vector(15 downto 0);                    --! slaves status buffer
+            variable vwIdxNdl   : tMemX08(0 to vwIdx'length-1);                     --! virtual wire indexes, Needle List, all this wires have to occur for leave
+            variable vwDatNdl   : tMemX08(0 to vwData'length-1);                    --! virtual wire data
+            variable vwIdxHs    : tMemX08(0 to 63);                                 --! on alert updated virtual wire list from slave, is matched with needles
+            variable vwDatHs    : tMemX08(0 to 63);                                 --! updated virtual wire data
+            variable vwHsLen    : integer range 0 to 64;                            --! number of wire pairs
+            variable ndlStart   : integer;                                          --! start index of list compare
+            variable waitDone   : boolean;                                          --! waiting for wires finished
+        begin
+            -- user message
+            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ"; end if;
+            -- same length
+            if ( vwIdx'length /= vwData'length ) then
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: vwIdx/vwData have different length"; end if;
+                good := false;
+                return;
+            end if;
+            -- empty list
+            if ( 0 = vwIdx'length ) then
+                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: empty list provided"; end if;
+                good := false;
+                return;
+            end if;
+            -- copy, needle list is modified while wire receive
+            vwIdxNdl := vwIdx;
+            vwDatNdl := vwData;
+            -- prepare
+            rsp         := ACCEPT;  --! slaves response state
+            waitDone    := false;   --! wait/poll for wires not finished
+            ndlStart    := 0;       --! start index of needle list compare
+            while ( (ACCEPT = rsp) and (false = waitDone) ) loop
+                -- fetch new wires
+                    -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
+                VWIRERD( this, CSn, SCK, DIO, vwIdxHs, vwDatHs, vwHsLen, sts, rsp );
+                -- response good?
+                if ( ACCEPT /= rsp ) then
+                    good := false;
+                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: unexpected response '" & rsp2str(rsp) & "'" severity error; end if;
+                    exit;
+                end if;
+                -- Wires?
+                if ( 0 < vwHsLen ) then --! avail and fetched
+                    -- virtual wire wait list
+                    for i in ndlStart to vwIdxNdl'length - 1 loop
+                        -- current received list
+                        for j in 0 to vwHsLen - 1 loop      --! marks wires in wait list as received
+                            if ( vwIdxHs(i) = vwIdxNdl(j) ) then    --! same index?
+                                vwDatNdl(i) := dcIfEq( vwDatNdl(i), vwDatHs(j) );   --! make matched bits to don't care
+                            end if;
+                        end loop;
+                        -- order requested: abort if virtual wires of start element are not fully sent by slave
+                        if ( order ) then
+                            if ( cVwRcv /= vwDatNdl(i) ) then
+                                ndlStart := i;  -- go on with wait for new wire
+                                exit;           --! leave wait virtual wire clear list
+                            end if;
+                        end if;
+                    end loop;
+                    -- print all received wires to console
+                    if ( this.verbose > C_MSG_INFO ) then Report character(LF) & "     Virtual Wires:" & character(LF) & vw2str(vwIdxHs, vwDatHs, vwHsLen); end if;
+                    -- check for completed list
+                    for i in 0 to vwDatNdl'length - 1 loop
+                        if ( cVwRcv = vwDatNdl(i) ) then
+                            -- list end?
+                            if ( i = vwDatNdl'length - 1 ) then
+                                waitDone := true;   --! all wires received, wait can end.
+                            end if;
+                            -- message
+                            if ( this.verbose > C_MSG_INFO ) then Report "     Virtual Wire " & integer'image(i) & " complete received"; end if;
+                        end if;
+                    end loop;
+                end if;
+                -- wait only if not completed
+                if ( false = waitDone ) then
+                        -- WAIT_ALERT( this, CSn, SCK, DIO, ALERTn )
+                    WAIT_ALERT( this, CSn, SCK, DIO, ALERTn );  --! wait for new wires
+                end if;
+            end loop;
+            -- print status register
+            if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! print last received status register from Slave
+        end procedure WAIT_VW_IS_EQ;
+        --***************************
+
+
+        --***************************
+        -- Virtual Wire: Waits until is equal
+        --   waits until a virtual wire has the given value
+        --   @see Table 9: Virtual Wire Index Definition
+        procedure WAIT_VW_IS_EQ
+            (
                 variable this       : inout tESpiBfm;
                 signal CSn          : out std_logic;                        --! slave select
                 signal SCK          : out std_logic;                        --! shift clock
@@ -2748,72 +2886,23 @@ package body eSpiMasterBfm is
                 constant wireName   : in string;                            --! name of the virtual wire
                 constant wireVal    : in bit;                               --! value of the virtual wire
                 variable good       : inout boolean                         --! successful?
-            ) is
-            variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-            variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
-            variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
-            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
-            variable sts        : std_logic_vector(15 downto 0);    --! slaves status buffer
-            variable vwIdx      : integer range 0 to 255;           --! current virtual wire
-            variable vwDat      : std_logic_vector(7 downto 0);     --! help variable
-            variable vwIdxNdl   : integer range 0 to 255;           --! virtual wire index to look for
-            variable irqNumRaw  : std_logic_vector(7 downto 0);     --! temporary variable
-            variable irqNum     : std_logic_vector(6 downto 0);     --! IRQ number
+            )
+        is
+            variable vwIndex    : tMemX08(0 to 0);  --! virtual wire index
+            variable vwData     : tMemX08(0 to 0);  --! virtual wire data
+            variable vwLen      : integer;          --! length of virtual wire
+            variable inGood     : boolean := true;  --! internal good
         begin
-            -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ"; end if;
-            -- check search string
-            if ( wireName'length < 4 ) then
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: string not matchable" severity error; end if;
-                good := false;
-                return;
-            end if;
-            -- identify wire index
-            if ( "IRQ" = wireName(wireName'left to wireName'left+2) ) then  --! IRQ
-                -- str2int @see https://stackoverflow.com/questions/7271092/how-to-convert-a-string-to-integer-in-vhdl
-                -- convert IRQ to slv; MSB is index, MSB-1... IRQ number
-                irqNumRaw   := std_logic_vector(to_unsigned(integer'value(wireName(wireName'left+3 to wireName'right)), irqNumRaw'length));
-                vwIdxNdl    := to_integer(unsigned(irqNumRaw(7 downto 7))); --! MSB is virtual wire index
-                irqNum      := irqNumRaw(irqNum'range);                     --! rest is IRQ number
-            -- todo: add system event wire
-            else    --! No match
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: VW name '" & wireName & "' not recognized" severity error; end if;
-                good := false;
-                return;
-            end if;
-            -- prepare, for wait loop
-            rsp := ACCEPT;
-            while ( ACCEPT = rsp ) loop
-                    -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
-                VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, sts, rsp );
-                -- index match?
-                for i in 0 to vwireLen-1 loop
-                    -- extract from array
-                    vwIdx := to_integer(unsigned(vwireIdx(i)));
-                    vwDat := vwireData(i);
-                    -- match needle index
-                    if ( (0 <= vwIdxNdl) and (vwIdxNdl <= 1) ) then     --! IRQ
-                        if ( (vwIdx = vwIdxNdl) and (irqNum = vwDat(irqNum'range)) ) then   --! IRQ number matches?
-                            if ( to_stdulogic(wireVal) = vwDat(7) ) then                    --! interrupt level found?
-                                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: IRQ" & integer'image(to_integer(unsigned(irqNumRaw))) & "=" & integer'image(to_integer(unsigned(vwDat(7 downto 7)))) & " registered"; end if;
-                                return;                                                     --! IRQ number and level matches
-                            end if;
-                        end if;
-                    elsif ( (2 <= vwIdxNdl) and (vwIdxNdl <= 7) ) then  --! System Event Wires
-                    -- todo
-
-                    else
-                        if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_WAIT_IS_EQ: Virtual Wire Index '" & integer'image(vwIdxNdl) & "' unknown" severity error; end if;
-                        good := false;
-                        return;
-                    end if;
-                end loop;
-                -- no new wires available, wait for Alert
-                if ( '0' = sts(C_STS_VWIRE_AVAIL) ) then
-                        -- WAIT_ALERT( this, CSn, SCK, DIO, ALERTn )
-                    WAIT_ALERT( this, CSn, SCK, DIO, ALERTn );  --! is left with CSn=0, second procedure is mandatory
-                end if;
-            end loop;
+            -- init
+            vwIndex := (others => (others => '0'));
+            vwData  := (others => (others => '0'));
+            vwLen   := 0;
+            -- add wire
+                -- VW_ADD( this, name, value, vwIdx, vwData, vwLen, good );
+            VW_ADD( this, wireName, wireVal, vwIndex, vwData, vwLen, inGood );
+            -- go in wait
+                -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIdx, vwData, good, order )
+            WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIndex(0 to vwLen-1), vwData(0 to vwLen-1), good, false );
         end procedure WAIT_VW_IS_EQ;
         --***************************
 
