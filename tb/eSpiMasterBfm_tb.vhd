@@ -58,7 +58,8 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest9    : boolean := true;  --! test9:  VWIRE Name
         constant doTest10   : boolean := true;  --! test10: PRT_CFG_REGS, prints configuration regs to console
         constant doTest11   : boolean := true;  --! test11: VWIRERD
-        constant doTest12   : boolean := true;  --! test11: VW_ADD, adds virtual wires to a list
+        constant doTest12   : boolean := true;  --! test12: VW_ADD, adds virtual wires to a list
+        constant doTest13   : boolean := true;  --! test13: WAIT_VW_IS_EQ
 
     -----------------------------
 
@@ -484,7 +485,7 @@ begin
 
 
         -------------------------
-        -- Test11: VW_ADD
+        -- Test12: VW_ADD
         -------------------------
         if ( doTest12 or DO_ALL_TEST ) then
             Report "Test12: VW_ADD - Composes List of Virtual Wires";
@@ -517,8 +518,25 @@ begin
         -------------------------
 
 
-
-
+        -------------------------
+        -- Test13: WAIT_VW_IS_EQ
+        -------------------------
+        if ( doTest13 or DO_ALL_TEST ) then
+            Report "Test13: WAIT_VW_IS_EQ - Waits until the Virtual Wires with Value are read";
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 10) <= "25FB"       & character(LF) & "051B"            & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 24) <= "084F03C0"   & character(LF) & "080000840F0325"  & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            LDMSG           <= '0';
+            wait for eSpiMasterBfm.TSpiClk/2;
+            -- Request BFM
+                -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, wireName, wireVal, good )
+            WAIT_VW_IS_EQ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, "IRQ4", '1', good );
+        end if;
+        -------------------------
 
 
 
