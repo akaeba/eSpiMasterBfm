@@ -2841,13 +2841,13 @@ package body eSpiMasterBfm is
                         -- order requested: abort if virtual wires of start element are not fully sent by slave
                         if ( order ) then
                             if ( cVwRcv /= vwDatNdl(i) ) then
-                                ndlStart := i;  -- go on with wait for new wire
+                                ndlStart := i;  --! go on with wait for new wire
                                 exit;           --! leave wait virtual wire clear list
                             end if;
                         end if;
                     end loop;
                     -- print all received wires to console
-                    if ( this.verbose > C_MSG_INFO ) then Report character(LF) & "     Virtual Wires:" & character(LF) & vw2str(vwIdxHs, vwDatHs, vwHsLen); end if;
+                    if ( this.verbose > C_MSG_INFO ) then Report character(LF) & "  Virtual Wires:" & character(LF) & vw2str(vwIdxHs, vwDatHs, vwHsLen); end if;
                     -- check for completed list
                     for i in 0 to vwDatNdl'length - 1 loop
                         if ( cVwRcv = vwDatNdl(i) ) then
@@ -2856,7 +2856,7 @@ package body eSpiMasterBfm is
                                 waitDone := true;   --! all wires received, wait can end.
                             end if;
                             -- message
-                            if ( this.verbose > C_MSG_INFO ) then Report "     Virtual Wire " & integer'image(i) & " complete received"; end if;
+                            if ( this.verbose > C_MSG_INFO ) then Report "  Virtual Wire " & integer'image(i) & " complete received"; end if;
                         end if;
                     end loop;
                 end if;
