@@ -34,6 +34,16 @@ library std;
 -- eSpiMasterBfm: eSPI Master Bus functional model package
 package eSpiMasterBfm is
 
+    ----------------------------------------------
+    -- BFM Message Levels
+    ----------------------------------------------
+        constant C_MSG_NO       : integer := 0;
+        constant C_MSG_ERROR    : integer := 1;
+        constant C_MSG_WARN     : integer := 2;
+        constant C_MSG_INFO     : integer := 3;
+    ----------------------------------------------
+
+
     -----------------------------
     -- Typs
         -- Arrays
@@ -454,14 +464,6 @@ package body eSpiMasterBfm is
     ----------------------------------------------
 
         --***************************
-        -- Message Levels
-        constant C_MSG_ERROR    : integer := 0;
-        constant C_MSG_WARN     : integer := 1;
-        constant C_MSG_INFO     : integer := 2;
-        --***************************
-
-
-        --***************************
         -- Time-out
         constant C_TIOUT_CYC_ALERT  : integer := 100;   --! number of clock cycles before BFM gives with time out up
         constant C_TIOUT_CYC_RD     : integer := 20;    --! number of status retries for read completion before BFM gives uo
@@ -582,6 +584,14 @@ package body eSpiMasterBfm is
                                                         (padStr("SCI#",                 ' ', 22), padStr("SMI#",        ' ', 22), padStr("RCIN#",          ' ', 22), padStr("HOST_RST_ACK",           ' ', 22)),
                                                         (padStr("HOST_RST_WARN",        ' ', 22), padStr("SMIOUT#",     ' ', 22), padStr("NMIOUT#",        ' ', 22), padStr("RSV",                    ' ', 22))
                                                     );
+        --***************************
+
+        --***************************
+        -- Timing Parameters
+        --  @see Table 22: AC Timing Specification
+        constant C_TINIT        : time      := 1 us;                    --! eSPI Reset# Deassertion to First Transaction (GET_CONFIGURATION)
+        constant C_TINIT_FREQ   : integer   := 20_000_000;              --! Initial Bus Frequency upon eSPI Reset# Deassertion
+        constant C_TCLK         : time      := 1 sec / C_TINIT_FREQ;    --! ESPI init clock frequency
         --***************************
 
     ----------------------------------------------
@@ -795,7 +805,7 @@ package body eSpiMasterBfm is
             if ( this.crcSlvEna ) then
                 if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
                     ret := false;
-                    if ( this.verbose > C_MSG_ERROR ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then
                         Report "eSpiMasterBfm:checkCRC rcv=0x" & to_hstring(msg(msg'length-1)) & "; calc=0x" & to_hstring(crc8(msg(0 to msg'length-2))) & ";" severity error;
                     end if;
                 end if;
@@ -1102,7 +1112,7 @@ package body eSpiMasterBfm is
 
 
     ----------------------------------------------
-    -- "init"
+    -- init
     ----------------------------------------------
         --***************************
         -- init
@@ -1115,11 +1125,11 @@ package body eSpiMasterBfm is
             ) is
         begin
             -- common handle
-            this.TSpiClk    := 50 ns;               --! default clock is 20MHz
+            this.TSpiClk    := C_TCLK;              --! default clock is 20MHz
             this.crcSlvEna  := false;               --! out of reset is CRC disabled
             this.spiMode    := SINGLE;              --! Default mode, out of reset
             this.sigSkew    := 0 ns;                --! no skew between clock edge and data defined
-            this.verbose    := 0;                   --! all messages disabled
+            this.verbose    := C_MSG_NO;            --! all messages disabled
             this.tiout      := 100 us;              --! 100us master time out for wait
             this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
@@ -1299,10 +1309,10 @@ package body eSpiMasterBfm is
             variable prtRx      : boolean;                  --! print RX packet to console log
         begin
             -- entry message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv"; end if;
             -- some checks
             if ( (msg'length < txByte) or (msg'length < rxByte) ) then
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Not enough memory allocated" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Not enough memory allocated" severity error; end if;
                 response := FATAL_ERROR;
                 return;
             end if;
@@ -1327,7 +1337,7 @@ package body eSpiMasterBfm is
                 rxStop                      := rxByte;
                 crcMsg(0 to intRxByte-1)    := msg(0 to intRxByte-1);   --! restore in previous cycle fetched data
             else
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Something went wrong" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: Something went wrong" severity error; end if;
                 response := FATAL_ERROR;
                 return;
             end if;
@@ -1337,7 +1347,7 @@ package body eSpiMasterBfm is
                 crcMsg(0 to txByte-1)    := msg(0 to txByte-1);          --! copy request
                 crcMsg(txByte)           := crc8(crcMsg(0 to txByte-1)); --! append CRC
                 -- print send message to console
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Tx: " & hexStr(crcMsg(0 to txByte)); end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Tx: " & hexStr(crcMsg(0 to txByte)); end if;
                 -- start
                 CSn <= '0';                                         --! enable Slave
                 spiTx(this, crcMsg(0 to txByte), SCK, DIO);         --! write to slave
@@ -1366,7 +1376,7 @@ package body eSpiMasterBfm is
                 termCon := true;    --! connection to slave can closed
                 prtRx   := true;    --! print no response to console
             else
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: unexpected response '" & rsp2str(rsp) & "'" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv: unexpected response '" & rsp2str(rsp) & "'" severity error; end if;
                 termCon := true;    --! close slaves connection
             end if;
             -- return CRC?
@@ -1374,7 +1384,7 @@ package body eSpiMasterBfm is
                 -- check crc
                 if (not checkCRC(this, crcMsg(0 to rxStop))) then
                     rsp := FATAL_ERROR; --! Table 4: Response Field Encodings, It is also the default response when fatal CRC error is detected on the command packet; Here: also used for response
-                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv:Rx:CRC failed" severity error; end if;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiXcv:Rx:CRC failed" severity error; end if;
                 end if;
                 -- drop CRC
                 msg(0 to rxStop-1) := crcMsg(0 to rxStop-1);
@@ -1391,7 +1401,7 @@ package body eSpiMasterBfm is
             end if;
             -- print receive message to console
             if ( prtRx ) then
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to rxStop)); end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:spiXcv:Rx: " & hexStr(crcMsg(0 to rxStop)); end if;
             end if;
             -- release response
             response := rsp;
@@ -1440,7 +1450,7 @@ package body eSpiMasterBfm is
             ) is
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:RESET"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RESET"; end if;
             -- select slave
             CSn <= '0';
             DIO <= (others => '1');
@@ -1479,7 +1489,7 @@ package body eSpiMasterBfm is
             variable rsp    : tESpiRsp;                                             --! Slaves response to performed request
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:GET_CONFIGURATION"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:GET_CONFIGURATION"; end if;
             -- build command
             msg     := (others => (others => '0')); --! clear
             msg(0)  := C_GET_CONFIGURATION;         --! Command
@@ -1521,11 +1531,11 @@ package body eSpiMasterBfm is
             -- get configuration
             GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp );
             -- in case of no output print to console
-            if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             -- Function is good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
             else
                 Report "GET_CONFIGURATION: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(cfg) & ";";  -- print to log
             end if;
@@ -1553,7 +1563,7 @@ package body eSpiMasterBfm is
             variable rsp    : tESpiRsp;                                             --! Slaves response to performed request
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:SET_CONFIGURATION"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:SET_CONFIGURATION"; end if;
             -- build command
             msg     := (others => (others => '0')); --! clear
             msg(0)  := C_SET_CONFIGURATION;         --! Command
@@ -1599,11 +1609,11 @@ package body eSpiMasterBfm is
             -- get configuration
             SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, sts, rsp );
             -- in case of no output print to console
-            if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             -- Slave good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
             end if;
         end procedure SET_CONFIGURATION;
         --***************************
@@ -1661,11 +1671,11 @@ package body eSpiMasterBfm is
                 -- GET_STATUS(this, CSn, SCK, DIO, status, response, good)
             GET_STATUS(this, CSn, SCK, DIO, sts, rsp);
             -- in case of no output print to console
-            if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_STATUS:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_STATUS:Slave " & rsp2str(rsp) severity error; end if;
             end if;
         end procedure GET_STATUS;
         --***************************
@@ -1705,7 +1715,7 @@ package body eSpiMasterBfm is
             variable tag        : std_logic_vector(3 downto 0);     --! tag, @see:
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Acquires read data after DEFER"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Acquires read data after DEFER"; end if;
             -- check for PC_AVAIL
             sts     := status;      --! handles internal status
             tiout   := 0;
@@ -1714,7 +1724,7 @@ package body eSpiMasterBfm is
                     -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
                 GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
                 if ( ACCEPT /= rsp ) then
-                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: GET_STATUS failed with '" & rsp2str(rsp) & "'" severity error; end if;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: GET_STATUS failed with '" & rsp2str(rsp) & "'" severity error; end if;
                     rsp := FATAL_ERROR;     --! make to fail
                     sts := (others => '0'); --! no valid data
                     exit;                   --! leave loop
@@ -1725,12 +1735,12 @@ package body eSpiMasterBfm is
             -- check for reach tiout
             if ( (tiout = this.tioutRd) and ('0' = sts(C_STS_PC_AVAIL)) ) then
                 rsp := NO_RESPONSE; --! no data available
-                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: No data available in allowed response time" severity warning; end if;
+                if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: No data available in allowed response time" severity warning; end if;
             end if;
             -- fetch data from slave
             if ( (ACCEPT = rsp) and ('1' = sts(C_STS_PC_AVAIL)) ) then  --! no ero and data is available
                 -- user message
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: PC_AVAIL"; end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: PC_AVAIL"; end if;
                 -- assemble Posted completion message
                 msg     := (others => (others => '0')); --! init message array
                 msg(0)  := C_GET_PC;                    --! request posted completion
@@ -1749,7 +1759,7 @@ package body eSpiMasterBfm is
                     data        := msg(4 to data'length + 4 - 1);                       --! data
                     sts         := msg(4 + data'length + 2) & msg(4 + data'length + 1); --! status register
                     -- Some Info
-                    if ( this.verbose > C_MSG_INFO ) then
+                    if ( this.verbose >= C_MSG_INFO ) then
                         -- print to console log
                         Report                                                                character(LF) &
                                 "     PC Details:"                                          & character(LF) &
@@ -1759,7 +1769,7 @@ package body eSpiMasterBfm is
                     end if;
                     -- check
                     if ( dlen /= data'length ) then
-                        if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Request not completely completed, pad with zeros" severity warning; end if;
+                        if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Request not completely completed, pad with zeros" severity warning; end if;
                     end if;
                 end if;
             else
@@ -1786,7 +1796,7 @@ package body eSpiMasterBfm is
             ) is
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
             -- wait for alert
             while ( true ) loop
                 if ( this.alertMode ) then
@@ -1794,7 +1804,7 @@ package body eSpiMasterBfm is
                         wait for this.TSpiClk/2;        --! limit bandwidth
                         CSn <= '0';                     --! ACK alert
                         wait until rising_edge(ALERTn); --! wait for slave; true: from low value ('0' or 'L') to high value ('1' or 'H').
-                        if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: ALERTn signals alert"; end if;
+                        if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: ALERTn signals alert"; end if;
                         exit;                           --! go on with status
                     end if;
                 else
@@ -1802,7 +1812,7 @@ package body eSpiMasterBfm is
                         wait for this.TSpiClk/2;
                         CSn <= '0';
                         wait until rising_edge(DIO(1));
-                        if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: DIO[1] signals alert"; end if;
+                        if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: DIO[1] signals alert"; end if;
                         exit;
                     end if;
                 end if;
@@ -1845,14 +1855,14 @@ package body eSpiMasterBfm is
             -- determine instruction type
             if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then    --! PUT_MEMWR32_SHORT; Figure 35: Short Peripheral Memory or Short I/O Write Packet Format (Master Initiated only)
                 -- user message
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT"; end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_MEMWR32_SHORT"; end if;
                 -- build instruction
                 dLenSlv := std_logic_vector(to_unsigned(data'length - 1, dLenSlv'length));  --! number of bytes
                 msg(0)  := C_PUT_MEMWR32_SHORT & dLenSlv(1 downto 0);
                 msgLen  := msgLen + 1;
             else                                                                        --! PUT_NP; Figure 34: Peripheral Memory Write Packet Format
                 -- user message
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_PC"; end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32: PUT_PC"; end if;
                 -- build instruction
                 dLenSlv := std_logic_vector(to_unsigned(data'length, dLenSlv'length));  --! number of bytes
                 msg(0)  := C_PUT_PC;                                                    --! Posted Completion Command
@@ -1910,10 +1920,10 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure MEMWR32;
         --***************************
@@ -1941,10 +1951,10 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure MEMWR32;
         --***************************
@@ -1975,7 +1985,7 @@ package body eSpiMasterBfm is
             -- determine instruction type
             if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then    --! CMD: PUT_MEMWR32_SHORT
                 -- user message
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:MEMRD32: PUT_MEMRD32_SHORT instruction"; end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:MEMRD32: PUT_MEMRD32_SHORT instruction"; end if;
                 -- build instruction
                 dataLenSlv  := std_logic_vector(to_unsigned(data'length - 1, dataLenSlv'length));   --! number of bytes
                 msg(0)      := C_PUT_MEMRD32_SHORT & dataLenSlv(1 downto 0);                        --! assemble command
@@ -2029,10 +2039,10 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMRD32:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMRD32:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
             -- fill in data
             data := dBuf(0);
@@ -2067,10 +2077,10 @@ package body eSpiMasterBfm is
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR: PUT_IOWR_SHORT"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR: PUT_IOWR_SHORT"; end if;
             -- check length
             if not ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then    --! PUT_IOWR_SHORT; Figure 26: Master Initiated Short Non-Posted Transaction
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
                 return;         --! leave procedure
             end if;
             -- prepare data packet
@@ -2117,7 +2127,7 @@ package body eSpiMasterBfm is
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_BYTE"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_BYTE"; end if;
             -- fill in data
             dBuf(0) := data;
                 -- IOWR( this, CSn, SCK, DIO, adr, data, status, response )
@@ -2125,10 +2135,10 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure IOWR_BYTE;
         --***************************
@@ -2155,7 +2165,7 @@ package body eSpiMasterBfm is
             variable adr_word   : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_WORD"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_WORD"; end if;
             -- prepare
             adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
             dBuf(0)     := data(7 downto 0);                            --! fill in data
@@ -2165,10 +2175,10 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure IOWR_WORD;
         --***************************
@@ -2195,7 +2205,7 @@ package body eSpiMasterBfm is
             variable adr_dword  : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_DWORD"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_DWORD"; end if;
             -- prepare
             adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
             dBuf(0)     := data(7 downto 0);                            --! fill in data
@@ -2207,10 +2217,10 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure IOWR_DWORD;
         --***************************
@@ -2261,10 +2271,10 @@ package body eSpiMasterBfm is
             variable sts        : std_logic_vector(15 downto 0);    --! help variable for status
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD: PUT_IORD_SHORT"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD: PUT_IORD_SHORT"; end if;
             -- check length
             if not ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then    --! PUT_IOWR_SHORT; Figure 26: Master Initiated Short Non-Posted Transaction
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
                 response := FATAL_ERROR;    --! invalid data length used
                 return;                     --! leave procedure
             end if;
@@ -2315,7 +2325,7 @@ package body eSpiMasterBfm is
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_BYTE"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_BYTE"; end if;
             -- prepare
             dBuf := (others => (others => '0'));    -- init
                 -- IORD( this, CSn, SCK, DIO, adr, data, status, response )
@@ -2324,10 +2334,10 @@ package body eSpiMasterBfm is
             if ( ACCEPT /= rsp ) then
                 good := false;
                 data := (others => '0');    --! make invalid
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
                 -- release data
                 data := dBuf(0);
             end if;
@@ -2355,7 +2365,7 @@ package body eSpiMasterBfm is
             variable adr_word   : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
             -- prepare
             adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
             dBuf        := (others => (others => '0'));                 --! init
@@ -2365,10 +2375,10 @@ package body eSpiMasterBfm is
             if ( ACCEPT /= rsp ) then
                 good := false;
                 data := (others => '0');    --! make invalid
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
                 -- release data
                 data := dBuf(1) & dBuf(0);
             end if;
@@ -2396,7 +2406,7 @@ package body eSpiMasterBfm is
             variable adr_dword  : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
             -- prepare
             adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
             dBuf        := (others => (others => '0'));                 --! init
@@ -2406,10 +2416,10 @@ package body eSpiMasterBfm is
             if ( ACCEPT /= rsp ) then
                 good := false;
                 data := (others => '0');    --! make invalid
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
                 -- release data
                 data := dBuf(3) & dBuf(2) & dBuf(1) & dBuf(0);
             end if;
@@ -2467,15 +2477,15 @@ package body eSpiMasterBfm is
             variable rsp    : tESpiRsp;                             --! Slaves response to performed request
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: PUT_VWIRE instruction"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: PUT_VWIRE instruction"; end if;
             -- some checks
             if ( vwireIdx'length /= vwireData'length ) then
                 response := FATAL_ERROR;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR: vwireIdx and vwireData needs same length" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR: vwireIdx and vwireData needs same length" severity error; end if;
             end if;
             if ( vwireIdx'length > 63 ) then
                 response := FATAL_ERROR;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR: maximal length for vwire commands of 64 exceeded" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR: maximal length for vwire commands of 64 exceeded" severity error; end if;
             end if;
             -- init
             msg := (others => (others => '0'));
@@ -2532,10 +2542,10 @@ package body eSpiMasterBfm is
             -- Slave response good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure VWIREWR;
         --***************************
@@ -2560,7 +2570,7 @@ package body eSpiMasterBfm is
             variable vwAdd      : boolean;
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR"; end if;
             -- build virtual wire
             vwireLen    := 0;
             vwAdd       := true;
@@ -2571,9 +2581,9 @@ package body eSpiMasterBfm is
             end if;
             -- successful?
             if ( vwAdd ) then
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: " & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))); end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: " & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))); end if;
             else
-                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VWIREWR: " & name & " Failed" severity warning; end if;
+                if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:VWIREWR: " & name & " Failed" severity warning; end if;
                 good := false;
             end if;
         end procedure VWIREWR;
@@ -2603,7 +2613,7 @@ package body eSpiMasterBfm is
             variable wireCnt    : natural;                          --! number of virtual wires
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD"; end if;
             -- init output
             vwireIdx    := (others => (others => '0'));
             vwireData   := (others => (others => '0'));
@@ -2614,7 +2624,7 @@ package body eSpiMasterBfm is
             GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
             if ( (ACCEPT = rsp) and '1' = sts(C_STS_VWIRE_AVAIL) ) then
                 -- message
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE"; end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE"; end if;
                 -- acquire count of virtual wires
                 msg     := (others => (others => '0')); -- clear
                 msg(0)  := C_GET_VWIRE;
@@ -2624,7 +2634,7 @@ package body eSpiMasterBfm is
                 if ( ACCEPT = rsp ) then
                     -- extract wire count
                     wireCnt := to_integer(unsigned(msg(1)(5 downto 0))) + 1;    --! 0-based counter
-                    if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: number available wires = " & integer'image(wireCnt); end if;
+                    if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: number available wires = " & integer'image(wireCnt); end if;
                     -- fetch rest of packet
                         -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response );
                     spiXcv( this, msg, CSn, SCK, DIO, -1, 2+2*wireCnt+2, 2, rsp );  --! +2: two bytes in first request, *2: per virtual wire 2byte, +2: Status register has two bytes
@@ -2638,10 +2648,10 @@ package body eSpiMasterBfm is
                     vwireLen    := wireCnt;
                 else
                     response := FATAL_ERROR;
-                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE: Slave Not accepted Request" severity error; end if;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE: Slave Not accepted Request" severity error; end if;
                 end if;
             else
-                if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: no virtual wires available"; end if;
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD: no virtual wires available"; end if;
                 response    := rsp;
                 status      := sts;
                 vwireLen    := 0;
@@ -2679,10 +2689,10 @@ package body eSpiMasterBfm is
             --slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             end if;
         end procedure VWIRERD;
         --***************************
@@ -2714,16 +2724,16 @@ package body eSpiMasterBfm is
             variable vwPosAdd       : natural;                                          --! add element on position
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD"; end if;
             -- same memory allocated (length)?
             if ( vwIdx'length /= vwData'length ) then
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: vwIdx/vwData have different length"; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: vwIdx/vwData have different length"; end if;
                 good := false;
                 return;
             end if;
             -- element can appended?
             if ( vwLen >= vwIdx'length ) then
-                if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:VW_ADD: not enough memory to append additional virtual wire" severity warning; end if;
+                if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:VW_ADD: not enough memory to append additional virtual wire" severity warning; end if;
                 good := false;
                 return;
             end if;
@@ -2732,7 +2742,7 @@ package body eSpiMasterBfm is
             appendElem := newVW( name, value );
             -- is valid?
             if ( appendElem = notValidElem ) then
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: VW '" & name & "' not recognized" severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: VW '" & name & "' not recognized" severity error; end if;
                 good := false;
                 return;
             end if;
@@ -2743,7 +2753,7 @@ package body eSpiMasterBfm is
                 if ( vwIdx(vwIdx'left+i) = appendElem(0) ) then
                     -- check if element exist in list, max two transitions for a virtual wire allowed
                     if ( std_match(vwData(vwData'left+i), appendElem(1)) ) then
-                        if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD: '" & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))) & "' exists in list, no add"; end if;
+                        if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD: '" & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))) & "' exists in list, no add"; end if;
                         return;
                     end if;
                     -- capture add position
@@ -2760,7 +2770,7 @@ package body eSpiMasterBfm is
             vwIdx(vwPosAdd)     := appendElem(0);                                                           --! index
             vwData(vwPosAdd)    := vwData(vwPosAdd) or to_stdlogicvector(to_bitvector(appendElem(1), '0')); --! data, contents don't cares
             -- append info
-            if ( this.verbose > C_MSG_INFO ) then
+            if ( this.verbose >= C_MSG_INFO ) then
                 Report  "eSpiMasterBfm:VW_ADD: Virtual Wires "                      & character(LF) &
                         "     Index : " & hexStr(vwIdx(vwIdx'left to vwLen-1))      & character(LF) &
                         "     Data  : " & hexStr(vwData(vwData'left to vwLen-1));
@@ -2798,16 +2808,16 @@ package body eSpiMasterBfm is
             variable waitDone   : boolean;                                          --! waiting for wires finished
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ"; end if;
             -- same length
             if ( vwIdx'length /= vwData'length ) then
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: vwIdx/vwData have different length"; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: vwIdx/vwData have different length"; end if;
                 good := false;
                 return;
             end if;
             -- empty list
             if ( 0 = vwIdx'length ) then
-                if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: empty list provided"; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: empty list provided"; end if;
                 good := false;
                 return;
             end if;
@@ -2825,7 +2835,7 @@ package body eSpiMasterBfm is
                 -- response good?
                 if ( ACCEPT /= rsp ) then
                     good := false;
-                    if ( this.verbose > C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: unexpected response '" & rsp2str(rsp) & "'" severity error; end if;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:WAIT_VW_IS_EQ: unexpected response '" & rsp2str(rsp) & "'" severity error; end if;
                     exit;
                 end if;
                 -- Wires?
@@ -2847,7 +2857,7 @@ package body eSpiMasterBfm is
                         end if;
                     end loop;
                     -- print all received wires to console
-                    if ( this.verbose > C_MSG_INFO ) then Report character(LF) & "  Virtual Wires:" & character(LF) & vw2str(vwIdxHs, vwDatHs, vwHsLen); end if;
+                    if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & "  Virtual Wires:" & character(LF) & vw2str(vwIdxHs, vwDatHs, vwHsLen); end if;
                     -- check for completed list
                     for i in 0 to vwDatNdl'length - 1 loop
                         if ( cVwRcv = vwDatNdl(i) ) then
@@ -2856,7 +2866,7 @@ package body eSpiMasterBfm is
                                 waitDone := true;   --! all wires received, wait can end.
                             end if;
                             -- message
-                            if ( this.verbose > C_MSG_INFO ) then Report "  Virtual Wire " & integer'image(i) & " complete received"; end if;
+                            if ( this.verbose >= C_MSG_INFO ) then Report "  Virtual Wire " & integer'image(i) & " complete received"; end if;
                         end if;
                     end loop;
                 end if;
@@ -2867,7 +2877,7 @@ package body eSpiMasterBfm is
                 end if;
             end loop;
             -- print status register
-            if ( this.verbose > C_MSG_INFO ) then Report sts2str(sts); end if;  --! print last received status register from Slave
+            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! print last received status register from Slave
         end procedure WAIT_VW_IS_EQ;
         --***************************
 
@@ -2932,7 +2942,7 @@ package body eSpiMasterBfm is
             variable tmpStr : string(1 to 10);
         begin
             -- user message
-            if ( this.verbose > C_MSG_INFO ) then Report "eSpiMasterBfm:PRT_CFG_REGS"; end if;
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:PRT_CFG_REGS"; end if;
             -- template for console print, blanks are filled
             cfgStr  :=  (others => character(NUL)); --! init
             cfgStr  :=  character(LF) &
@@ -2955,7 +2965,7 @@ package body eSpiMasterBfm is
                 if ( ACCEPT = rsp ) then
                     tmpStr := "0x" & to_hstring(cfg);
                 else
-                    if ( this.verbose > C_MSG_WARN ) then Report "eSpiMasterBfm:PRT_CFG_REGS Failed read from ADR 0x" & to_hstring(adrs(i)); end if;
+                    if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:PRT_CFG_REGS Failed read from ADR 0x" & to_hstring(adrs(i)); end if;
                     tmpStr(1 to 4)  := "FAIL";
                     good            := false;
                 end if;
