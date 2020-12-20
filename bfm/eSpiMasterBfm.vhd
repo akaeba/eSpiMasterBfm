@@ -35,25 +35,22 @@ library std;
 package eSpiMasterBfm is
 
     ----------------------------------------------
-    -- BFM Message Levels
-    ----------------------------------------------
-        constant C_MSG_NO       : integer := 0;
-        constant C_MSG_ERROR    : integer := 1;
-        constant C_MSG_WARN     : integer := 2;
-        constant C_MSG_INFO     : integer := 3;
-    ----------------------------------------------
-
-
-    -----------------------------
     -- Typs
+    ----------------------------------------------
+
+        --***************************
         -- Arrays
         type tMemX08 is array (natural range <>) of std_logic_vector (7 downto 0);  --! Byte orientated memory array
         type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --! unconstrained array
+        --***************************
 
+        --***************************
         -- System Event Virtual Wires
         --   resolved index to name, required by print
         type tSysEventName is array(2 to 7, 0 to 3) of string(1 to 22);
+        --***************************
 
+        --***************************
         -- SPI transceiver mode
         type tSpiXcvMode is
             (
@@ -61,8 +58,10 @@ package eSpiMasterBfm is
                 DUAL,   --! two bidirectional data lines
                 QUAD    --! four bidirectional data lines used
             );
+        --***************************
 
-        -- SPI Direction
+        --***************************
+        -- ESPI Slave Response
         type tESpiRsp is
             (
                 ACCEPT,             --! Command was successfully received
@@ -73,7 +72,22 @@ package eSpiMasterBfm is
                 NO_RESPONSE,        --! The response encoding of all 1’s is defined as no response
                 NO_DECODE           --! not in eSPI Spec, no decoding possible
             );
+        --***************************
 
+        --***************************
+        -- ESPI Slave Configuration BFM Shadow Register
+        --  @see Table 20: Slave Registers
+        type tSlaveCfgReg is record
+            DEVID           : std_logic_vector(31 downto 0);    --! Device Identification
+            GENERAL         : std_logic_vector(31 downto 0);    --! General Capabilities and Configurations
+            PERIPHERAL_CHN  : std_logic_vector(31 downto 0);    --! Channel 0 Capabilities and Configurations
+            VIRT_WIRE_CHN   : std_logic_vector(31 downto 0);    --! Channel 1 Capabilities and Configurations
+            OOB_MSG_CHN     : std_logic_vector(31 downto 0);    --! Channel 2 Capabilities and Configurations
+            FLASH_CHN       : std_logic_vector(31 downto 0);    --! Channel 3 Capabilities and Configurations
+        end record tSlaveCfgReg;
+        --***************************
+
+        --***************************
         -- Configures the BFM
         type tESpiBfm is record
             TSpiClk     : time;         --! period of spi clk
@@ -85,8 +99,22 @@ package eSpiMasterBfm is
             tioutAlert  : natural;      --! number of clock cycles before BFM gives with time out up
             tioutRd     : natural;      --! number of Get Status Cycles before data read gives up
             alertMode   : boolean;      --! True: ALERT# pin for alert signaling used, False: DIO[1] signals alert
+            slaveRegs   : tSlaveCfgReg; --! Mirrored Slave Configuration Registers
         end record tESpiBfm;
-    -----------------------------
+        --***************************
+
+        --***************************
+        -- BFM message level
+        type tMsgLevel is
+            (
+                NOMSG,      --! no messages are printed to console
+                ERROR,      --! errors are logged
+                WARNING,    --! errors + warnings are logged
+                INFO        --! errors + warnings + info are logged
+            );
+        --***************************
+
+    ----------------------------------------------
 
 
     -----------------------------
@@ -106,6 +134,13 @@ package eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             );
 
+        -- setLogLevel: sets bfm log level
+        procedure setLogLevel
+            (
+                variable this   : inout tESpiBfm;   --! common handle
+                constant log    : in tMsgLevel      --! BFM log level
+            );
+
         -- RESET: apply reset sequence
         -- @see Figure 63: In-band RESET Command
         procedure RESET
@@ -121,22 +156,33 @@ package eSpiMasterBfm is
             -- w/ status
             procedure GET_CONFIGURATION
                 (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;
-                    signal SCK          : out std_logic;
-                    signal DIO          : inout std_logic_vector(3 downto 0);
+                    variable this       : inout tESpiBfm;                       --! common BFM handle
+                    signal CSn          : out std_logic;                        --! slave select
+                    signal SCK          : out std_logic;                        --! shift clock
+                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                     constant adr        : in std_logic_vector(15 downto 0);     --! config address
                     variable config     : out std_logic_vector(31 downto 0);    --! config data
                     variable status     : out std_logic_vector(15 downto 0);    --! status
                     variable response   : out tESpiRsp                          --! slave response
                 );
-            -- w/o status, response, regs, instead prints direct to log
+            -- w/o status, response; instead general good
             procedure GET_CONFIGURATION
                 (
-                    variable this   : inout tESpiBfm;
-                    signal CSn      : out std_logic;
-                    signal SCK      : out std_logic;
-                    signal DIO      : inout std_logic_vector(3 downto 0);
+                    variable this   : inout tESpiBfm;                       --! common BFM handle
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                    constant adr    : in std_logic_vector(15 downto 0);     --! slave registers address
+                    variable config : out std_logic_vector(31 downto 0);    --! read value
+                    variable good   : inout boolean                         --! successful?
+                );
+            -- w/o status, response, regs, updates BFMs shadows registers of slaves capabilities regs
+            procedure GET_CONFIGURATION
+                (
+                    variable this   : inout tESpiBfm;                       --! common BFM handle
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
                     constant adr    : in std_logic_vector(15 downto 0);     --! config address
                     variable good   : inout boolean                         --! procedure state
                 );
@@ -464,6 +510,20 @@ package body eSpiMasterBfm is
     ----------------------------------------------
 
         --***************************
+        -- BFM
+        constant C_BFM_AUTHORS  : string := "Andreas Kaeberlein";
+        constant C_BFM_VERSION  : string := "v0.1.0";
+        --***************************
+
+        --***************************
+        -- Message Levels
+        constant C_MSG_NO       : integer := 0;
+        constant C_MSG_ERROR    : integer := 1;
+        constant C_MSG_WARN     : integer := 2;
+        constant C_MSG_INFO     : integer := 3;
+        --***************************
+
+        --***************************
         -- Time-out
         constant C_TIOUT_CYC_ALERT  : integer := 100;   --! number of clock cycles before BFM gives with time out up
         constant C_TIOUT_CYC_RD     : integer := 20;    --! number of status retries for read completion before BFM gives uo
@@ -525,13 +585,31 @@ package body eSpiMasterBfm is
         --***************************
 
         --***************************
-        -- Config Register eSpi Slave, Table 20: Slave Registers
-        constant C_DEV_IDENT    : std_logic_vector(15 downto 0) := x"0004";     --! Device Identification
-        constant C_GEN_CAP_CFG  : std_logic_vector(15 downto 0) := x"0008";     --! General Capabilities and Configurations
-        constant C_CH0_CAP_CFG  : std_logic_vector(15 downto 0) := x"0010";     --! Channel 0 Capabilities and Configurations
-        constant C_CH1_CAP_CFG  : std_logic_vector(15 downto 0) := x"0020";     --! Channel 1 Capabilities and Configurations
-        constant C_CH2_CAP_CFG  : std_logic_vector(15 downto 0) := x"0030";     --! Channel 2 Capabilities and Configurations
-        constant C_CH3_CAP_CFG  : std_logic_vector(15 downto 0) := x"0040";     --! Channel 3 Capabilities and Configurations
+        -- Config Register eSpi Slave
+        --  @see Table 20: Slave Registers
+        constant C_SLVREG_DEVID_ADR   : std_logic_vector(15 downto 0) := x"0004";   --! Device Identification
+        constant C_SLVREG_GENCAP_ADR  : std_logic_vector(15 downto 0) := x"0008";   --! General Capabilities and Configurations
+        constant C_SLVREG_CH0CAP_ADR  : std_logic_vector(15 downto 0) := x"0010";   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
+        constant C_SLVREG_CH1CAP_ADR  : std_logic_vector(15 downto 0) := x"0020";   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
+        constant C_SLVREG_CH2CAP_ADR  : std_logic_vector(15 downto 0) := x"0030";   --! Channel 2 Capabilities and Configurations (OOB Channel)
+        constant C_SLVREG_CH3CAP_ADR  : std_logic_vector(15 downto 0) := x"0040";   --! Channel 3 Capabilities and Configurations (Flash Channel)
+        --***************************
+
+        --***************************
+        -- Capabilities and Configuration Registers
+        --  @see 7.2.1.3 Offset 08h: General Capabilities and Configurations
+        --  constants are initialized with Specs defaults
+        constant C_GENERAL_REG_CRC      : std_logic_vector(31 downto 31) := "0";        --! CRC Checking Enable: 0b: CRC checking is disabled. 1b: CRC checking is enabled.
+        constant C_GENERAL_REG_RSP_MOD  : std_logic_vector(30 downto 30) := "0";        --! Response Modifier Enable: This bit is set to '1' to enable the use of Response Modifier
+        constant C_GENERAL_ALERT_MODE   : std_logic_vector(28 downto 28) := "0";        --! Alert Mode: 0b: I/O[1] pin is used to signal the Alert event. 1b: Alert# pin is used to signal the Alert event.
+        constant C_GENERAL_IO_MODE_SEL  : std_logic_vector(27 downto 26) := "00";       --! I/O Mode Select: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
+        constant C_GENERAL_IO_MODE_SUP  : std_logic_vector(25 downto 24) := "--";       --! I/O Mode Support: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
+        constant C_GENERAL_OD_ALERT_PIN : std_logic_vector(23 downto 23) := "0";        --! Open Drain Alert# Select: 0b: Alert# pin is a driven output. 1b: Alert# pin is an open-drain output.
+        constant C_GENERAL_OP_FREQ_SEL  : std_logic_vector(22 downto 20) := "000";      --! Operating Frequency: 000: 20 MHz. 001: 25 MHz. 010: 33 MHz. 011: 50 MHz. 100: 66 MHz. others: Reserved.
+        constant C_GENERAL_OD_ALERT_SUP : std_logic_vector(19 downto 19) := "-";        --! Open Drain Alert# Supported: 0b: Open-drain Alert# pin is not supported. 1b: Open-drain Alert# pin is supported.
+        constant C_GENERAL_OP_FREQ_SUP  : std_logic_vector(18 downto 16) := "---";      --! Maximum Frequency Supported: 000: 20 MHz. 001: 25 MHz. 010: 33 MHz. 011: 50 MHz. 100: 66 MHz. others: Reserved.
+
+
         --***************************
 
         --***************************
@@ -1112,17 +1190,16 @@ package body eSpiMasterBfm is
 
 
     ----------------------------------------------
-    -- init
+    -- Common
     ----------------------------------------------
+
         --***************************
-        -- init
+        -- init, bfm only
         procedure init
             (
-                variable this   : inout tESpiBfm;                       --! common handle
-                signal CSn      : out std_logic;                        --! slave select
-                signal SCK      : out std_logic;                        --! shift clock
-                signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            ) is
+                variable this   : inout tESpiBfm    --! common handle
+            )
+        is
         begin
             -- common handle
             this.TSpiClk    := C_TCLK;              --! default clock is 20MHz
@@ -1134,12 +1211,115 @@ package body eSpiMasterBfm is
             this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.alertMode  := false;               --! in default is DIO[1] for alert signaling used
-            -- signals
-            CSn <= '1';
-            SCK <= '0';
-            DIO <= (others => 'Z');
         end procedure init;
         --***************************
+
+
+        --***************************
+        -- init, todo: delete
+        procedure init
+            (
+                variable this   : inout tESpiBfm;                       --! common handle
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
+            )
+        is
+        begin
+            init( this );
+            CSn     <= '1';             --! deselect device
+            SCK     <= '0';             --! rising edge active clock
+            DIO     <= (others => 'Z'); --! lines are in TB pulled
+        end procedure init;
+        --***************************
+
+
+        --***************************
+        -- init
+        procedure init
+            (
+                variable this   : inout tESpiBfm;                       --! common handle
+                signal RESETn   : out std_logic;                        --! reset signal
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                variable good   : inout boolean;                        --! successful
+                constant log    : in tMsgLevel                          --! BFM log level
+            )
+        is
+            variable pgood  : boolean := true;  --! internal procedure good
+        begin
+            -- init bfm storage element
+                -- init ( this )
+            init( this );
+            -- message level
+            setLogLevel( this, log );
+            -- user message
+            if ( this.verbose >= C_MSG_INFO ) then
+                Report  "eSpiMasterBfm:init"                & character(LF) &
+                        "       Authors: "  & C_BFM_AUTHORS & character(LF) &
+                        "       Version: "  & C_BFM_VERSION;
+            end if;
+            -- reset startup sequence
+            RESETn  <= '0';             --! send core to reset
+            CSn     <= '1';             --! deselect device
+            SCK     <= '0';             --! rising edge active clock
+            DIO     <= (others => 'Z'); --! lines are in TB pulled
+            wait for 2*C_TCLK;          --! apply reset
+            RESETn  <= '1';             --! disable reset
+            wait for C_TINIT;           --! slave initialization time
+            -- Discover Slaves capabilities
+            --  @see Exit from G3, 4.)
+            GET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_GENCAP_ADR, pgood );   --! General Capabilities and Configurations
+            if ( pgood ) then
+
+
+
+
+
+            else
+                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:init: Failed get Capabilities Register 0x" & to_hstring(C_SLVREG_GENCAP_ADR) severity error; end if;
+                good := false;
+                return;
+            end if;
+
+
+
+
+
+
+
+
+
+        end procedure init;
+        --***************************
+
+
+        --***************************
+        -- setLogLevel
+        --  sets bfm log level
+        procedure setLogLevel
+            (
+                variable this   : inout tESpiBfm;   --! common handle
+                constant log    : in tMsgLevel      --! BFM log level
+            )
+        is
+        begin
+            case log is
+                -- no messages are printed to console
+                when NOMSG      => this.verbose := C_MSG_NO;
+                -- errors are logged
+                when ERROR      => this.verbose := C_MSG_ERROR;
+                -- errors + warnings are logged
+                when WARNING    => this.verbose := C_MSG_WARN;
+                -- errors + warnings + info are logged
+                when INFO       => this.verbose := C_MSG_INFO;
+                -- default
+                when others     => this.verbose := C_MSG_NO;
+            end case;
+        end procedure setLogLevel;
+        --***************************
+
     ----------------------------------------------
 
 
@@ -1154,11 +1334,12 @@ package body eSpiMasterBfm is
         --   @see: Figure 54: Single I/O Mode
         procedure spiTx
             (
-                variable this   : inout tESpiBfm;
+                variable this   : inout tESpiBfm;                       --! common handle
                 variable msg    : inout tMemX08;
                 signal SCK      : out std_logic;                        --! shift clock
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            ) is
+            )
+        is
         begin
             -- iterate over message bytes
             for i in msg'low to msg'high loop
@@ -1202,7 +1383,8 @@ package body eSpiMasterBfm is
                 variable this   : inout tESpiBfm;
                 signal SCK      : out std_logic;                        --! shift clock
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            ) is
+            )
+        is
         begin
             -- one clock cycle drive high
             SCK     <= '0';                     --! falling edge
@@ -1244,7 +1426,8 @@ package body eSpiMasterBfm is
                 variable msg    : inout tMemX08;
                 signal SCK      : out std_logic;                        --! shift clock
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            ) is
+            )
+        is
             variable slv1   : std_logic_vector(0 downto 0);
         begin
             -- iterate over message bytes
@@ -1299,7 +1482,8 @@ package body eSpiMasterBfm is
                 constant rxByte     : in integer;                           --! response length in bytes
                 constant intRxByte  : in integer;                           --! interrupts procedure after byte count
                 variable response   : out tESpiRsp                          --! Slaves response to performed request
-            ) is
+            )
+        is
             variable crcMsg     : tMemX08(0 to msg'length); --! message with calculated CRC
             variable rsp        : tESpiRsp;                 --! decoded slave response
             variable rxStart    : integer;                  --! start index in message
@@ -1424,7 +1608,8 @@ package body eSpiMasterBfm is
                 constant numTxByte  : in integer;                           --! request length of message in bytes
                 constant numRxByte  : in integer;                           --! response length in bytes
                 variable response   : out tESpiRsp                          --! Slaves response to performed request
-            ) is
+            )
+        is
         begin
             -- map to interruptible transceiver procedure
                 -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response )
@@ -1447,7 +1632,8 @@ package body eSpiMasterBfm is
                 signal CSn          : out std_logic;
                 signal SCK          : out std_logic;                        --! shift clock
                 signal DIO          : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            ) is
+            )
+        is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RESET"; end if;
@@ -1482,7 +1668,8 @@ package body eSpiMasterBfm is
                 variable config     : out std_logic_vector(31 downto 0);
                 variable status     : out std_logic_vector(15 downto 0);
                 variable response   : out tESpiRsp
-            ) is
+            )
+        is
             variable msg    : tMemX08(0 to 6);                                      --! eSpi message buffer
             variable cfg    : std_logic_vector(config'range) := (others => '0');    --! internal buffer
             variable sts    : std_logic_vector(status'range) := (others => '0');    --! internal buffer
@@ -1513,17 +1700,19 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- GET_CONFIGURATION, prints direct to log
+        -- GET_CONFIGURATION
         --   @see Figure 22: GET_CONFIGURATION Command
         procedure GET_CONFIGURATION
             (
-                variable this   : inout tESpiBfm;
-                signal CSn      : out std_logic;
-                signal SCK      : out std_logic;
-                signal DIO      : inout std_logic_vector(3 downto 0);
-                constant adr    : in std_logic_vector(15 downto 0);
-                variable good   : inout boolean
-            ) is
+                variable this   : inout tESpiBfm;                       --! common BFM handle
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                constant adr    : in std_logic_vector(15 downto 0);     --! slave registers address
+                variable config : out std_logic_vector(31 downto 0);    --! read value
+                variable good   : inout boolean                         --! successful?
+            )
+        is
             variable sts : std_logic_vector(15 downto 0);   --! wrapper variable for status
             variable cfg : std_logic_vector(31 downto 0);   --! wrapper for config
             variable rsp : tESpiRsp;
@@ -1534,10 +1723,46 @@ package body eSpiMasterBfm is
             if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
             -- Function is good?
             if ( ACCEPT /= rsp ) then
-                good := false;
+                good    := false;
+                config  := (others => 'X');
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
             else
-                Report "GET_CONFIGURATION: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(cfg) & ";";  -- print to log
+                config  := cfg;
+            end if;
+        end procedure GET_CONFIGURATION;
+        --***************************
+
+
+        --***************************
+        -- GET_CONFIGURATION, updates BFMs shadows registers of slaves capabilities regs
+        --   @see Figure 22: GET_CONFIGURATION Command
+        procedure GET_CONFIGURATION
+            (
+                variable this   : inout tESpiBfm;                       --! common BFM handle
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                constant adr    : in std_logic_vector(15 downto 0);     --! slave registers address
+                variable good   : inout boolean                         --! successful?
+            )
+        is
+            variable pgood  : boolean := true;                  --! internal good
+            variable cfg    : std_logic_vector(31 downto 0);    --! wrapper for config
+        begin
+                -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+            GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, pgood );
+            if ( pgood ) then
+                case adr is
+                    when C_SLVREG_DEVID_ADR     => this.slaveRegs.DEVID             := cfg; --! Device Identification
+                    when C_SLVREG_GENCAP_ADR    => this.slaveRegs.GENERAL           := cfg; --! General Capabilities and Configurations
+                    when C_SLVREG_CH0CAP_ADR    => this.slaveRegs.PERIPHERAL_CHN    := cfg; --! Channel 0 Capabilities and Configurations (Peripheral Channel)
+                    when C_SLVREG_CH1CAP_ADR    => this.slaveRegs.VIRT_WIRE_CHN     := cfg; --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
+                    when C_SLVREG_CH2CAP_ADR    => this.slaveRegs.OOB_MSG_CHN       := cfg; --! Channel 2 Capabilities and Configurations (OOB Channel)
+                    when C_SLVREG_CH3CAP_ADR    => this.slaveRegs.FLASH_CHN         := cfg; --! Channel 3 Capabilities and Configurations (Flash Channel)
+                    when others                 => Report "GET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(cfg) & ";";  -- print to log
+                end case;
+            else
+                good := false;
             end if;
         end procedure GET_CONFIGURATION;
         --***************************
@@ -1556,7 +1781,8 @@ package body eSpiMasterBfm is
                 constant config     : in std_logic_vector(31 downto 0);
                 variable status     : out std_logic_vector(15 downto 0);
                 variable response   : out tESpiRsp
-            ) is
+            )
+        is
             variable msg    : tMemX08(0 to 6);                                      --! eSpi message buffer
             variable cfg    : std_logic_vector(config'range) := (others => '0');    --! internal buffer
             variable sts    : std_logic_vector(status'range) := (others => '0');    --! internal buffer
@@ -1602,7 +1828,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);
                 constant config : in std_logic_vector(31 downto 0);
                 variable good   : inout boolean
-            ) is
+            )
+        is
             variable sts : std_logic_vector(15 downto 0);   --! wrapper variable for status
             variable rsp : tESpiRsp;
         begin
@@ -1630,7 +1857,8 @@ package body eSpiMasterBfm is
                 signal DIO          : inout std_logic_vector(3 downto 0);
                 variable status     : out std_logic_vector(15 downto 0);
                 variable response   : out tESpiRsp
-            ) is
+            )
+        is
             variable msg    : tMemX08(0 to 2);  --! eSpi message buffer
             variable rsp    : tESpiRsp;         --! Slaves response to performed request
         begin
@@ -1662,7 +1890,8 @@ package body eSpiMasterBfm is
                 signal SCK      : out std_logic;
                 signal DIO      : inout std_logic_vector(3 downto 0);
                 variable good   : inout boolean
-            ) is
+            )
+        is
             variable fg     : boolean := true;                  --! state of function good
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --!
@@ -1704,7 +1933,8 @@ package body eSpiMasterBfm is
                 variable status     : inout std_logic_vector(15 downto 0);  --! slave status
                 variable response   : out   tESpiRsp                        --! command response
 
-            ) is
+            )
+        is
             variable tiout      : natural;                          --! counter for tiout
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
             variable sts        : std_logic_vector(15 downto 0);    --! internal status
@@ -1793,7 +2023,8 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;                        --! shift clock
                 signal DIO          : inout std_logic_vector(3 downto 0);   --! bidirectional data
                 signal ALERTn       : in std_logic                          --! slaves alert pin
-            ) is
+            )
+        is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
@@ -1844,7 +2075,8 @@ package body eSpiMasterBfm is
                 constant data       : in tMemX08;
                 variable status     : out std_logic_vector(15 downto 0);
                 variable response   : out tESpiRsp
-            ) is
+            )
+        is
             variable msg        : tMemX08(0 to data'length + 9);    --! 4Byte Address, Length 1Byte, Length/Tag 1Byte, Cycle Type 1Byte, CMD 1Byte, CRC 1Byte
             variable dLenSlv    : std_logic_vector(11 downto 0);    --! needed for 'PUT_MEMWR32_SHORT'
             variable msgLen     : natural := 0;                     --! message length can vary
@@ -1908,7 +2140,8 @@ package body eSpiMasterBfm is
                 constant adr        : in std_logic_vector(31 downto 0);     --! memory address
                 constant data       : in std_logic_vector(7 downto 0);      --! single data word
                 variable good       : inout boolean                         --! successful
-            ) is
+            )
+        is
             variable dBuf   : tMemX08(0 to 0);                  --! captures single data word
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
@@ -1942,7 +2175,8 @@ package body eSpiMasterBfm is
                 constant adr        : in std_logic_vector(31 downto 0);     --! memory address
                 constant data       : in tMemX08;                           --! multiple data
                 variable good       : inout boolean                         --! successful
-            ) is
+            )
+        is
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
@@ -1974,7 +2208,8 @@ package body eSpiMasterBfm is
                 variable data       : out tMemX08;
                 variable status     : out std_logic_vector(15 downto 0);
                 variable response   : out tESpiRsp
-            ) is
+            )
+        is
             variable msg        : tMemX08(0 to data'length + 9);    --! 4Byte Address, Length 1Byte, Length/Tag 1Byte, Cycle Type 1Byte, CMD 1Byte, CRC 1Byte
             variable dataLenSlv : std_logic_vector(11 downto 0);    --! needed for 'PUT_MEMWR32_SHORT'
             variable msgLen     : integer := 0;                     --! message length can vary
@@ -2029,7 +2264,8 @@ package body eSpiMasterBfm is
                 constant adr        : in std_logic_vector(31 downto 0);     --! memory address
                 variable data       : out std_logic_vector(7 downto 0);     --! single data word
                 variable good       : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf   : tMemX08(0 to 0);
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
@@ -2071,7 +2307,8 @@ package body eSpiMasterBfm is
                 constant data       : in tMemX08;                           --! write data, 1/2/4 Bytes supported
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
                 variable response   : out tESpiRsp                          --! command response
-            ) is
+            )
+        is
             variable msg        : tMemX08(0 to data'length + 3);    --! CMD 1Byte, 2Byte Address
             variable msgLen     : natural := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
@@ -2120,7 +2357,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 constant data   : in std_logic_vector(7 downto 0);      --! data byte
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf   : tMemX08(0 to 0);
             variable fg     : boolean := true;                  --! state of function good
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
@@ -2157,7 +2395,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 constant data   : in std_logic_vector(15 downto 0);     --! data word
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf       : tMemX08(0 to 1);
             variable fg         : boolean := true;                  --! state of function good
             variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
@@ -2197,7 +2436,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 constant data   : in std_logic_vector(31 downto 0);     --! dual data word
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf       : tMemX08(0 to 3);
             variable fg         : boolean := true;                  --! state of function good
             variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
@@ -2240,7 +2480,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 constant data   : in std_logic_vector(7 downto 0);      --! data byte
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
         begin
                 -- IOWR_BYTE( this, CSn, SCK, DIO, adr, data, good )
             IOWR_BYTE( this, CSn, SCK, DIO, adr, data, good );          --! default IOWR is byte operation
@@ -2263,7 +2504,8 @@ package body eSpiMasterBfm is
                 variable data       : out tMemX08;                          --! read data, 1/2/4 Bytes supported
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
                 variable response   : out tESpiRsp                          --! command response
-            ) is
+            )
+        is
             variable msg        : tMemX08(0 to data'length + 6);    --! +1Byte Response, +3Byte Header, +2Byte Status
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
             variable rspGetSts  : tESpiRsp;                         --! Slaves response to performed request
@@ -2319,7 +2561,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data   : out std_logic_vector(7 downto 0);     --! data byte
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf   : tMemX08(0 to 0);
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp    : tESpiRsp;                         --! decoded slave response
@@ -2358,7 +2601,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data   : out std_logic_vector(15 downto 0);    --! data word
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf       : tMemX08(0 to 1);
             variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp        : tESpiRsp;                         --! decoded slave response
@@ -2399,7 +2643,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data   : out std_logic_vector(31 downto 0);    --! data dual word
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
             variable dBuf       : tMemX08(0 to 3);
             variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
             variable rsp        : tESpiRsp;                         --! decoded slave response
@@ -2441,7 +2686,8 @@ package body eSpiMasterBfm is
                 constant adr    : in std_logic_vector(15 downto 0);     --! IO space address, 16Bits
                 variable data   : out std_logic_vector(7 downto 0);     --! data byte
                 variable good   : inout boolean                         --! successful?
-            ) is
+            )
+        is
         begin
                 -- IORD_BYTE( this, CSn, SCK, DIO, adr, data, good )
             IORD_BYTE( this, CSn, SCK, DIO, adr, data, good );          --! default IORD is byte operation
@@ -2471,7 +2717,8 @@ package body eSpiMasterBfm is
                 constant vwireData  : in tMemX08;                           --! virtual wire data
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
                 variable response   : out tESpiRsp                          --! slave response to command
-            ) is
+            )
+        is
             variable msg    : tMemX08(0 to 2*vwireIdx'length + 2);  --! CMD: 1Byte, Wire Count: 1Byte
             variable msgLen : natural := 0;                         --! message length can vary
             variable rsp    : tESpiRsp;                             --! Slaves response to performed request
@@ -2527,7 +2774,8 @@ package body eSpiMasterBfm is
                 constant vwireIdx   : in std_logic_vector(7 downto 0);      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
                 constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
                 variable good       : inout boolean                         --! successful
-            ) is
+            )
+        is
             variable idx    : tMemX08(0 to 0);                  --! vwireIdx
             variable data   : tMemX08(0 to 0);                  --! vwireData
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stuck
@@ -2563,7 +2811,8 @@ package body eSpiMasterBfm is
                 constant name   : in string;                            --! Virtual wire name
                 constant value  : in bit;                               --! virtual wire value
                 variable good   : inout boolean                         --! successful
-            ) is
+            )
+        is
             variable vwireIdx   : tMemX08(0 to 1);  --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
             variable vwireData  : tMemX08(0 to 1);  --! virtual wire data
             variable vwireLen   : integer;
@@ -2605,7 +2854,8 @@ package body eSpiMasterBfm is
                 variable vwireLen   : out integer range 0 to 64;            --! number of wire pairs
                 variable status     : out std_logic_vector(15 downto 0);    --! slave status
                 variable response   : out tESpiRsp                          --! slave response to command
-            ) is
+            )
+        is
             variable msg        : tMemX08(0 to 2*64 + 1 + 2);       --! max. 64 Wires in same packet, +1 response, +2 status
             variable msgLen     : natural := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
@@ -2671,7 +2921,8 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;                        --! shift clock
                 signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                 variable good       : inout boolean                         --! successful
-            ) is
+            )
+        is
             variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition
             variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
             variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
@@ -2933,8 +3184,9 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;                        --! shift clock
                 signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                 variable good       : inout boolean                         --! successful
-            ) is
-            constant adrs   : slv16(0 to 5) := (C_DEV_IDENT, C_GEN_CAP_CFG, C_CH0_CAP_CFG, C_CH1_CAP_CFG, C_CH2_CAP_CFG, C_CH3_CAP_CFG);    --! buffer slave regs
+            )
+        is
+            constant adrs   : slv16(0 to 5) := (C_SLVREG_DEVID_ADR, C_SLVREG_GENCAP_ADR, C_SLVREG_CH0CAP_ADR, C_SLVREG_CH1CAP_ADR, C_SLVREG_CH2CAP_ADR, C_SLVREG_CH3CAP_ADR);    --! buffer slave regs
             variable sts    : std_logic_vector(15 downto 0);    --! dummy variable
             variable rsp    : tESpiRsp;                         --! request response status
             variable cfgStr : string(1 to 313);                 --! string for config print to console
