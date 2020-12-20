@@ -71,7 +71,7 @@ architecture sim of eSpiMasterBfm_tb is
         signal SCK      : std_logic;
         signal DIO      : std_logic_vector(3 downto 0);
         signal ALERTn   : std_logic;
-        signal XRESET   : std_logic;
+        signal RESETn   : std_logic;
         -- ESPI Static Slave
         signal slvGood  : boolean;              --! all request to slave good?
         signal REQMSG   : string(1 to 150);     --! request message
@@ -105,14 +105,16 @@ begin
         -- Init
         -------------------------
             Report "Init...";
-            init(eSpiMasterBfm, CSn, SCK, DIO); --! init eSpi Master
-            eSpiMasterBfm.verbose := 3;         --! enable errors + warning messages
-            XRESET  <= '0';
+            init(eSpiMasterBfm, CSn, SCK, DIO);     --! init eSpi Master
+                -- setLogLevel( this, log )
+            setLogLevel( eSpiMasterBfm, INFO );     --! errors + warning + info messages
+            --
+            RESETn  <= '0';
             LDMSG   <= '0';
             REQMSG  <= (others => character(NUL));
             CMPMSG  <= (others => character(NUL));
             wait for 1 us;
-            XRESET  <= '1';
+            RESETn  <= '1';
             wait for 1 us;
         -------------------------
 
@@ -568,11 +570,11 @@ begin
                         MISO   => DIO(1),   --! Single mode, data out to master
                         XCS    => CSn,      --! slave select
                         XALERT => ALERTn,   --! Alert
-                        XRESET => XRESET,   --! reset
+                        XRESET => RESETn,   --! reset
                         REQMSG => REQMSG,   --! request message
                         CMPMSG => CMPMSG,   --! complete message, if request was ok
                         LDMSG  => LDMSG,    --! load message on rising edge
-                        GOOD   => slvGood   --! all request messages were good, set with XRESET
+                        GOOD   => slvGood   --! all request messages were good, set with RESETn
                     );
     ----------------------------------------------
 
