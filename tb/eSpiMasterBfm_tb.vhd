@@ -138,7 +138,7 @@ begin
             slv8 := crc8(eSpiMsg(0 to 8));  --! calc crc
             assert ( slv8 = x"F4" ) report "  Error: CRC calculation failed, expected 0xF4" severity warning;
             if not ( slv8 = x"F4" ) then good := false; end if;
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- set 1
             eSpiMsg(0) := x"47";
             eSpiMsg(1) := x"12";
@@ -147,7 +147,7 @@ begin
             slv8 := crc8(eSpiMsg(0 to 3));  --! calc crc
             assert ( slv8 = x"4E" ) report "  Error: CRC calculation failed, expected 0x4E" severity warning;
             if not ( slv8 = x"4E" ) then good := false; end if;
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- set 2
             eSpiMsg(0) := x"21";
             eSpiMsg(1) := x"00";
@@ -155,7 +155,7 @@ begin
             slv8 := crc8(eSpiMsg(0 to 2));  --! calc crc
             assert ( slv8 = x"34" ) report "  Error: CRC calculation failed, expected 0x46" severity warning;
             if not ( slv8 = x"34" ) then good := false; end if;
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             wait for 1 us;
         end if;
         -------------------------
@@ -172,9 +172,9 @@ begin
             REQMSG(1 to 9)  <= "21000434"               & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, status, response );   --! read from Slave
             -- check
@@ -204,9 +204,9 @@ begin
             REQMSG(1 to 17) <= "2200080000008088"   & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 15) <= "0F0F0F080F039B"     & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", good );  --! General Capabilities and Configuration 0x08, enable CRC
             -- divide wait
@@ -226,9 +226,9 @@ begin
             REQMSG(1 to 5)  <= "25FB"           & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 15) <= "0F0F0F080F039B" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );      --! get status from slave
             -- divide wait
@@ -250,12 +250,12 @@ begin
             REQMSG(1 to 15) <= "4C0000008047F9"         & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
                 -- Request BFM
             MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good ); --! write single byte to address 0x80
-            wait for 4*eSpiMasterBfm.TSpiClk;                                   --! divide wait
+            wait for 4*decodeClk( eSpiMasterBfm );                                   --! divide wait
             -- Memory write non-short command
             Report "         multiple Byte write";
                 -- load message
@@ -264,9 +264,9 @@ begin
             REQMSG(1 to 25) <= "00010003000000800123454A"   & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 23) <= "0F0F0F08010000000F0309"     & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
                 -- Request BFM
             memX08(0)   := x"01";   --! prepare data to write
             memX08(1)   := x"23";
@@ -289,9 +289,9 @@ begin
             REQMSG(1 to 13) <= "480000008058"           & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             MEMRD32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", slv8, good );  --! read single byte from address 0x80
             -- check
@@ -312,9 +312,9 @@ begin
             CMPMSG          <= (others => character(NUL));
             REQMSG(1 to 5)  <= "FFFF"   & character(NUL);       --! sent Request        (BFM to Slave)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
                 -- RESET ( this, CSn, SCK, DIO );
             RESET ( eSpiMasterBfm, CSn, SCK, DIO );
@@ -334,9 +334,9 @@ begin
             REQMSG(1 to 11) <= "44008047A7"     & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 15) <= "0F0F0F084F03C0" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"47", good );    --! write data byte 0x47 to IO space adr 0x80 (Port 80)
             wait for 1 us;
@@ -356,9 +356,9 @@ begin
             REQMSG(1 to 9)  <= "4000800F"               & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             slv8 := (others => 'X');                                    --! make invalid
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good ); --! read data byte from io space adr 0x80
@@ -373,9 +373,9 @@ begin
             REQMSG(1 to 14) <= "4000800F"   & character(LF) & "0107"                & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 26) <= "015F03AD"   & character(LF) & "080F0001154F039F"    & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             slv8 := (others => 'X');                                    --! make invalid
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good ); --! read data byte from io space adr 0x80
@@ -399,9 +399,9 @@ begin
             REQMSG(1 to 11) <= "0400031110" & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 9)  <= "084F03C0"   & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
                 -- VWIREWR( this, CSn, SCK, DIO, name, value, good  )
             VWIREWR( eSpiMasterBfm, CSn, SCK, DIO, "SUS_STAT#", '1', good );
@@ -413,9 +413,9 @@ begin
             REQMSG(1 to 11) <= "0400032289" & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 9)  <= "084F03C0"   & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
                 -- VWIREWR( this, CSn, SCK, DIO, name, value, good  )
             VWIREWR( eSpiMasterBfm, CSn, SCK, DIO, "PLTRST#", '1', good );
@@ -437,9 +437,9 @@ begin
             REQMSG(1 to 54) <=  "21000434"         & character(LF) & "21000810"         & character(LF) & "21001058"         & character(LF) & "210020C8"         & character(LF) & "210030B8"         & character(LF) & "210040EF" & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 88) <=  "0878563412000042" & character(LF) & "08111111110000B5" & character(LF) & "0822222222000054" & character(LF) & "083333333300000B" & character(LF) & "0844444444000091" & character(LF) & "FF"       & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             tmpBool         := true;
             -- Request BFM
                 -- PRT_CFG_REGS( this, CSn, SCK, DIO, good )
@@ -462,9 +462,9 @@ begin
             REQMSG(1 to 10) <= "25FB"       & character(LF) & "051B"                    & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 32) <= "084F03C0"   & character(LF) & "0802059904C006500F03E9"  & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
                 -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
             VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, good );
@@ -475,9 +475,9 @@ begin
             REQMSG(1 to 10) <= "25FB"       & character(LF) & "051B"            & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 24) <= "084F03C0"   & character(LF) & "080000840F0325"  & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
                 -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
             VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, good );
@@ -531,9 +531,9 @@ begin
             REQMSG(1 to 10) <= "25FB"       & character(LF) & "051B"            & character(NUL);   --! sent Request        (BFM to Slave)
             CMPMSG(1 to 24) <= "084F03C0"   & character(LF) & "080000840F0325"  & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
-            wait for eSpiMasterBfm.TSpiClk/2;
+            wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
                 -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, wireName, wireVal, good )
             WAIT_VW_IS_EQ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, "IRQ4", '1', good );

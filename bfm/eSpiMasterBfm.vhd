@@ -80,7 +80,6 @@ package eSpiMasterBfm is
         --***************************
         -- Configures the BFM
         type tESpiBfm is record
-            TSpiClk     : time;         --! period of spi clk
             sigSkew     : time;         --! defines Signal Skew to prevent timing errors in back-anno
             verbose     : natural;      --! message level; 0: no message, 1: errors, 2: error + warnings
             tiout       : time;         --! time out when master give up an interaction
@@ -108,6 +107,7 @@ package eSpiMasterBfm is
     -----------------------------
     -- Functions (public)
         function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8: calculate crc from a message
+        function decodeClk ( this : in tESpiBfm ) return time;      --! decodeClk: decodes slave register into a proper time for clock generation
     -----------------------------
 
 
@@ -924,6 +924,27 @@ package body eSpiMasterBfm is
 
 
         --***************************
+        -- decodeClk
+        --   decodes slave register into a proper time for clock generation
+        function decodeClk ( this : in tESpiBfm ) return time is
+            variable tclk : time;
+        begin
+            -- get time
+            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
+                when C_GENERAL_OP_FREQ_20MHz => tclk := 1 sec / 20_000_000;
+                when C_GENERAL_OP_FREQ_25MHz => tclk := 1 sec / 25_000_000;
+                when C_GENERAL_OP_FREQ_33MHz => tclk := 1 sec / 33_000_000;
+                when C_GENERAL_OP_FREQ_50MHz => tclk := 1 sec / 50_000_000;
+                when C_GENERAL_OP_FREQ_66MHz => tclk := 1 sec / 66_000_000;
+                when others                  => tclk := 1 sec / 20_000_000; --! init frequency is 20MHz
+            end case;
+            -- release time
+            return tclk;
+        end function decodeClk;
+        --***************************
+
+
+        --***************************
         -- rsp2str
         --   print decoded response register to string in a human-readable way
         function rsp2str ( rsp : tESpiRsp ) return string is
@@ -1230,7 +1251,6 @@ package body eSpiMasterBfm is
         is
         begin
             -- common handle
-            this.TSpiClk    := C_TCLK;              --! default clock is 20MHz
             this.sigSkew    := 0 ns;                --! no skew between clock edge and data defined
             this.verbose    := C_MSG_NO;            --! all messages disabled
             this.tiout      := 100 us;              --! 100us master time out for wait
@@ -1368,6 +1388,7 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
+            constant tSpiClk : time := decodeClk(this); --! get current SPI period
         begin
             -- iterate over message bytes
             for i in msg'low to msg'high loop
@@ -1376,28 +1397,28 @@ package body eSpiMasterBfm is
                     -- dispatch mode
                     if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- one bit per cycle transfered
-                        SCK     <= '0';                 --! falling edge
-                        DIO(0)  <= msg(i)(j);           --! assign data
-                        wait for this.TSpiClk/2;        --! half clock cycle
-                        SCK     <= '1';                 --! rising edge
-                        wait for this.TSpiClk/2;        --! half clock cycle
+                        SCK     <= '0';             --! falling edge
+                        DIO(0)  <= msg(i)(j);       --! assign data
+                        wait for tSpiClk/2;         --! half clock cycle
+                        SCK     <= '1';             --! rising edge
+                        wait for tSpiClk/2;         --! half clock cycle
                     elsif ( C_GENERAL_IO_MODE_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
-                            SCK             <= '0';     --! falling edge
+                            SCK             <= '0'; --! falling edge
                             DIO(1 downto 0) <= msg(i)(j downto j-1);
-                            wait for this.TSpiClk/2;    --! half clock cycle
-                            SCK             <= '1';     --! rising edge
-                            wait for this.TSpiClk/2;    --! half clock cycle
+                            wait for tSpiClk/2;     --! half clock cycle
+                            SCK             <= '1'; --! rising edge
+                            wait for tSpiClk/2;     --! half clock cycle
                         end if;
                     elsif ( C_GENERAL_IO_MODE_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- four bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 4 ) then
-                            SCK             <= '0';     --! falling edge
+                            SCK             <= '0'; --! falling edge
                             DIO(3 downto 0) <= msg(i)(j downto j-3);
-                            wait for this.TSpiClk/2;    --! half clock cycle
-                            SCK             <= '1';     --! rising edge
-                            wait for this.TSpiClk/2;    --! half clock cycle
+                            wait for tSpiClk/2;     --! half clock cycle
+                            SCK             <= '1'; --! rising edge
+                            wait for tSpiClk/2;     --! half clock cycle
                         end if;
                     else
                         -- unsupported transfer mode
@@ -1420,6 +1441,7 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
+            constant tSpiClk : time := decodeClk(this); --! get current SPI period
         begin
             -- one clock cycle drive high
             SCK     <= '0';                     --! falling edge
@@ -1437,9 +1459,9 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTar: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
                 return;
             end if;
-            wait for this.TSpiClk/2;    --! half clock cycle
-            SCK     <= '1';             --! rising edge
-            wait for this.TSpiClk/2;    --! half clock cycle
+            wait for tSpiClk/2; --! half clock cycle
+            SCK     <= '1';     --! rising edge
+            wait for tSpiClk/2; --! half clock cycle
             -- one clock cycle tristate
             SCK     <= '0';                     --! falling edge
             if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
@@ -1456,9 +1478,9 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
                 return;
             end if;
-            wait for this.TSpiClk/2;    --! half clock cycle
-            SCK     <= '1';             --! rising edge
-            wait for this.TSpiClk/2;    --! half clock cycle
+            wait for tSpiClk/2; --! half clock cycle
+            SCK     <= '1';     --! rising edge
+            wait for tSpiClk/2; --! half clock cycle
         end procedure spiTar;
         --***************************
 
@@ -1477,7 +1499,8 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
-            variable slv1   : std_logic_vector(0 downto 0);
+            constant tSpiClk    : time := decodeClk(this);      --! get current SPI period
+            variable slv1       : std_logic_vector(0 downto 0); --! help
         begin
             -- iterate over message bytes
             for i in msg'low to msg'high loop
@@ -1487,28 +1510,28 @@ package body eSpiMasterBfm is
                     if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- one bit per clock cycle transferred
                         SCK                 <= '0';                                                 --! falling edge
-                        wait for this.TSpiClk/2;                                                    --! half clock cycle
+                        wait for tSpiClk/2;                                                         --! half clock cycle
                         SCK                 <= '1';                                                 --! rising edge
                         slv1(0 downto 0)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));  --! help
                         msg(i)(j)           := slv1(0);                                             --! capture data from line
-                        wait for this.TSpiClk/2;                                                    --! half clock cycle
+                        wait for tSpiClk/2;                                                         --! half clock cycle
                     elsif ( C_GENERAL_IO_MODE_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK                     <= '0';                                                 --! falling edge
-                            wait for this.TSpiClk/2;                                                        --! half clock cycle
+                            wait for tSpiClk/2;                                                             --! half clock cycle
                             SCK                     <= '1';                                                 --! rising edge
                             msg(i)(j downto j-1)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 0))));  --! capture data from line
-                            wait for this.TSpiClk/2;                                                        --! half clock cycle
+                            wait for tSpiClk/2;                                                             --! half clock cycle
                         end if;
                     elsif ( C_GENERAL_IO_MODE_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- four bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 4 ) then
                             SCK                     <= '0';                                                 --! falling edge
-                            wait for this.TSpiClk/2;                                                        --! half clock cycle
+                            wait for tSpiClk/2;                                                             --! half clock cycle
                             SCK                     <= '1';                                                 --! rising edge
                             msg(i)(j downto j-3)    := std_logic_vector(TO_01(unsigned(DIO(3 downto 0))));  --! capture data from line
-                            wait for this.TSpiClk/2;                                                        --! half clock cycle
+                            wait for tSpiClk/2;                                                             --! half clock cycle
                         end if;
                     else
                         -- unsupported transfer mode
@@ -1540,6 +1563,7 @@ package body eSpiMasterBfm is
                 variable response   : out tESpiRsp                          --! Slaves response to performed request
             )
         is
+            constant tSpiClk    : time := decodeClk(this);  --! get current SPI period
             variable crcMsg     : tMemX08(0 to msg'length); --! message with calculated CRC
             variable rsp        : tESpiRsp;                 --! decoded slave response
             variable rxStart    : integer;                  --! start index in message
@@ -1635,9 +1659,9 @@ package body eSpiMasterBfm is
             if ( termCon ) then
                 -- Terminate connection to slave
                 SCK <= '0';
-                wait for this.TSpiClk/2;    --! half clock cycle
+                wait for tSpiClk/2; --! half clock cycle
                 CSn <= '1';
-                wait for this.TSpiClk;      --! limits CSn bandwidth to SCK
+                wait for tSpiClk;   --! limits CSn bandwidth to SCK
             end if;
             -- print receive message to console
             if ( prtRx ) then
@@ -1690,23 +1714,24 @@ package body eSpiMasterBfm is
                 signal DIO          : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
+            constant tSpiClk : time := decodeClk(this); --! get current SPI period
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RESET"; end if;
             -- select slave
             CSn <= '0';
             DIO <= (others => '1');
-            wait for this.TSpiClk/2;
+            wait for tSpiClk/2;
             -- do reset sequence
             for i in 0 to 15 loop
                 SCK <= '1';
-                wait for this.TSpiClk/2;
+                wait for tSpiClk/2;
                 SCK <= '0';
-                wait for this.TSpiClk/2;
+                wait for tSpiClk/2;
             end loop;
             CSn <= '1';
             DIO <= (others => 'Z');
-            wait for this.TSpiClk;  --! limits CSn bandwidth to SCK
+            wait for tSpiClk;   --! limits CSn bandwidth to SCK
         end procedure RESET;
         --***************************
 
@@ -2081,6 +2106,7 @@ package body eSpiMasterBfm is
                 signal ALERTn       : in std_logic                          --! slaves alert pin
             )
         is
+            constant tSpiClk : time := decodeClk(this); --! get current SPI period
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
@@ -2088,7 +2114,7 @@ package body eSpiMasterBfm is
             while ( true ) loop
                 if ( this.alertMode ) then
                     if ( '0' = to_bit(std_ulogic(ALERTn), '1') ) then
-                        wait for this.TSpiClk/2;        --! limit bandwidth
+                        wait for tSpiClk/2;             --! limit bandwidth
                         CSn <= '0';                     --! ACK alert
                         wait until rising_edge(ALERTn); --! wait for slave; true: from low value ('0' or 'L') to high value ('1' or 'H').
                         if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: ALERTn signals alert"; end if;
@@ -2096,16 +2122,16 @@ package body eSpiMasterBfm is
                     end if;
                 else
                     if ( '0' = to_bit(std_ulogic(DIO(1)), '1') ) then
-                        wait for this.TSpiClk/2;
+                        wait for tSpiClk/2;
                         CSn <= '0';
                         wait until rising_edge(DIO(1));
                         if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT: DIO[1] signals alert"; end if;
                         exit;
                     end if;
                 end if;
-                wait for this.TSpiClk/2;
+                wait for tSpiClk/2;
             end loop;
-            wait for this.TSpiClk;  --! limit bandwidth
+            wait for tSpiClk;   --! limit bandwidth
         end procedure WAIT_ALERT;
         --***************************
 
