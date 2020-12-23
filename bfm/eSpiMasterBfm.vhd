@@ -51,16 +51,6 @@ package eSpiMasterBfm is
         --***************************
 
         --***************************
-        -- SPI transceiver mode
-        type tSpiXcvMode is
-            (
-                SINGLE, --! standard SPI mode, MISO, MOSI
-                DUAL,   --! two bidirectional data lines
-                QUAD    --! four bidirectional data lines used
-            );
-        --***************************
-
-        --***************************
         -- ESPI Slave Response
         type tESpiRsp is
             (
@@ -92,7 +82,6 @@ package eSpiMasterBfm is
         type tESpiBfm is record
             TSpiClk     : time;         --! period of spi clk
             crcSlvEna   : boolean;      --! CRC evaluation on Slave is enabled
-            spiMode     : tSpiXcvMode;  --! SPI transceiver mode
             sigSkew     : time;         --! defines Signal Skew to prevent timing errors in back-anno
             verbose     : natural;      --! message level; 0: no message, 1: errors, 2: error + warnings
             tiout       : time;         --! time out when master give up an interaction
@@ -599,17 +588,29 @@ package body eSpiMasterBfm is
         -- Capabilities and Configuration Registers
         --  @see 7.2.1.3 Offset 08h: General Capabilities and Configurations
         --  constants are initialized with Specs defaults
-        constant C_GENERAL_REG_CRC      : std_logic_vector(31 downto 31) := "0";        --! CRC Checking Enable: 0b: CRC checking is disabled. 1b: CRC checking is enabled.
-        constant C_GENERAL_REG_RSP_MOD  : std_logic_vector(30 downto 30) := "0";        --! Response Modifier Enable: This bit is set to '1' to enable the use of Response Modifier
-        constant C_GENERAL_ALERT_MODE   : std_logic_vector(28 downto 28) := "0";        --! Alert Mode: 0b: I/O[1] pin is used to signal the Alert event. 1b: Alert# pin is used to signal the Alert event.
-        constant C_GENERAL_IO_MODE_SEL  : std_logic_vector(27 downto 26) := "00";       --! I/O Mode Select: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
-        constant C_GENERAL_IO_MODE_SUP  : std_logic_vector(25 downto 24) := "--";       --! I/O Mode Support: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
-        constant C_GENERAL_OD_ALERT_PIN : std_logic_vector(23 downto 23) := "0";        --! Open Drain Alert# Select: 0b: Alert# pin is a driven output. 1b: Alert# pin is an open-drain output.
-        constant C_GENERAL_OP_FREQ_SEL  : std_logic_vector(22 downto 20) := "000";      --! Operating Frequency: 000: 20 MHz. 001: 25 MHz. 010: 33 MHz. 011: 50 MHz. 100: 66 MHz. others: Reserved.
-        constant C_GENERAL_OD_ALERT_SUP : std_logic_vector(19 downto 19) := "-";        --! Open Drain Alert# Supported: 0b: Open-drain Alert# pin is not supported. 1b: Open-drain Alert# pin is supported.
-        constant C_GENERAL_OP_FREQ_SUP  : std_logic_vector(18 downto 16) := "---";      --! Maximum Frequency Supported: 000: 20 MHz. 001: 25 MHz. 010: 33 MHz. 011: 50 MHz. 100: 66 MHz. others: Reserved.
-
-
+        constant C_GENERAL_REG_CRC          : std_logic_vector(31 downto 31) := "0";        --! CRC Checking Enable: 0b: CRC checking is disabled. 1b: CRC checking is enabled.
+        constant C_GENERAL_REG_RSP_MOD      : std_logic_vector(30 downto 30) := "0";        --! Response Modifier Enable: This bit is set to '1' to enable the use of Response Modifier
+        constant C_GENERAL_ALERT_MODE       : std_logic_vector(28 downto 28) := "0";        --! Alert Mode: 0b: I/O[1] pin is used to signal the Alert event. 1b: Alert# pin is used to signal the Alert event.
+        constant C_GENERAL_IO_MODE_SEL      : std_logic_vector(27 downto 26) := "00";       --! I/O Mode Select: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
+        constant C_GENERAL_IO_MODE_SUP      : std_logic_vector(25 downto 24) := "--";       --! I/O Mode Support: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
+        constant C_GENERAL_IO_MODE_SINGLE   : std_logic_vector(01 downto 00) := "00";       --! 00: Single I/O.
+        constant C_GENERAL_IO_MODE_DUAL     : std_logic_vector(01 downto 00) := "01";       --! 01: Dual I/O.
+        constant C_GENERAL_IO_MODE_QUAD     : std_logic_vector(01 downto 00) := "10";       --! 10: Quad I/O.
+        constant C_GENERAL_OD_ALERT_PIN     : std_logic_vector(23 downto 23) := "0";        --! Open Drain Alert# Select: 0b: Alert# pin is a driven output. 1b: Alert# pin is an open-drain output.
+        constant C_GENERAL_OD_ALERT_SUP     : std_logic_vector(19 downto 19) := "-";        --! Open Drain Alert# Supported: 0b: Open-drain Alert# pin is not supported. 1b: Open-drain Alert# pin is supported.
+        constant C_GENERAL_OP_FREQ_SEL      : std_logic_vector(22 downto 20) := "000";      --! Operating Frequency: 000: 20 MHz. 001: 25 MHz. 010: 33 MHz. 011: 50 MHz. 100: 66 MHz. others: Reserved.
+        constant C_GENERAL_OP_FREQ_SUP      : std_logic_vector(18 downto 16) := "---";      --! Maximum Frequency Supported: 000: 20 MHz. 001: 25 MHz. 010: 33 MHz. 011: 50 MHz. 100: 66 MHz. others: Reserved.
+        constant C_GENERAL_OP_FREQ_20MHz    : std_logic_vector(02 downto 00) := "000";      --! 000: 20 MHz.
+        constant C_GENERAL_OP_FREQ_25MHz    : std_logic_vector(02 downto 00) := "001";      --! 001: 25 MHz.
+        constant C_GENERAL_OP_FREQ_33MHz    : std_logic_vector(02 downto 00) := "010";      --! 010: 33 MHz.
+        constant C_GENERAL_OP_FREQ_50MHz    : std_logic_vector(02 downto 00) := "011";      --! 011: 50 MHz.
+        constant C_GENERAL_OP_FREQ_66MHz    : std_logic_vector(02 downto 00) := "100";      --! 100: 66 MHz.
+        constant C_GENERAL_OP_MAX_WAIT      : std_logic_vector(15 downto 12) := "0000";     --! Maximum WAIT STATE Allowed: This is a 1-based field in the granularity of byte time. When “0”, it indicates a value of 16 byte time.
+        constant C_GENERAL_OP_CHN_SUP       : std_logic_vector(07 downto 00) := "--------"; --! Channel Supported: Each of the bits when set indicates that the corresponding channel is supported by the slave.
+        constant C_GENERAL_OP_CHN_SUP_PERI  : std_logic_vector(00 downto 00) := "1";        --! Peripheral Channel
+        constant C_GENERAL_OP_CHN_SUP_VW    : std_logic_vector(01 downto 01) := "1";        --! Virtual Wire Channel
+        constant C_GENERAL_OP_CHN_SUP_OOB   : std_logic_vector(02 downto 02) := "1";        --! OOB Message Channel
+        constant C_GENERAL_OP_CHN_SUP_FLASH : std_logic_vector(03 downto 03) := "1";        --! Flash Access Channel
         --***************************
 
         --***************************
@@ -1194,6 +1195,32 @@ package body eSpiMasterBfm is
     ----------------------------------------------
 
         --***************************
+        -- init_cap_reg_08
+        --  Offset 08h: General Capabilities and Configurations
+        --  This register is also reset by the In-band RESET command.
+        procedure init_cap_reg_08
+            (
+                variable this   : inout tESpiBfm    --! common handle
+            )
+        is
+        begin
+            this.slaveRegs.GENERAL                                  := (others => '0');         --! default
+            this.slaveRegs.GENERAL(C_GENERAL_REG_CRC'range)         := C_GENERAL_REG_CRC;       --! CRC Checking
+            this.slaveRegs.GENERAL(C_GENERAL_REG_RSP_MOD'range)     := C_GENERAL_REG_RSP_MOD;   --! Response Modifier
+            this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range)      := C_GENERAL_ALERT_MODE;    --! Alert Mode
+            this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)     := C_GENERAL_IO_MODE_SEL;   --! I/O Mode Select
+            this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SUP'range)     := C_GENERAL_IO_MODE_SUP;   --! I/O Mode Support
+            this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_PIN'range)    := C_GENERAL_OD_ALERT_PIN;  --! Open Drain Alert#
+            this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range)     := C_GENERAL_OP_FREQ_SEL;   --! Operating Frequency
+            this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_SUP'range)    := C_GENERAL_OD_ALERT_SUP;  --! Open Drain Alert# Supported
+            this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SUP'range)     := C_GENERAL_OP_FREQ_SUP;   --! Maximum Frequency Supported
+            this.slaveRegs.GENERAL(C_GENERAL_OP_MAX_WAIT'range)     := C_GENERAL_OP_MAX_WAIT;   --! Maximum WAIT STATE Allowed
+            this.slaveRegs.GENERAL(C_GENERAL_OP_CHN_SUP'range)      := C_GENERAL_OP_CHN_SUP;    --! Channel Supported
+        end procedure init_cap_reg_08;
+        --***************************
+
+
+        --***************************
         -- init, bfm only
         procedure init
             (
@@ -1204,13 +1231,14 @@ package body eSpiMasterBfm is
             -- common handle
             this.TSpiClk    := C_TCLK;              --! default clock is 20MHz
             this.crcSlvEna  := false;               --! out of reset is CRC disabled
-            this.spiMode    := SINGLE;              --! Default mode, out of reset
             this.sigSkew    := 0 ns;                --! no skew between clock edge and data defined
             this.verbose    := C_MSG_NO;            --! all messages disabled
             this.tiout      := 100 us;              --! 100us master time out for wait
             this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.alertMode  := false;               --! in default is DIO[1] for alert signaling used
+            -- Slave Registers
+            init_cap_reg_08( this );    --! Slaves General Capabilities and Configurations
         end procedure init;
         --***************************
 
@@ -1346,13 +1374,15 @@ package body eSpiMasterBfm is
                 -- iterate over bits in a single message byte
                 for j in msg(i)'high downto msg(i)'low loop
                     -- dispatch mode
-                    if ( SINGLE = this.spiMode ) then   --! one bit per cycle transfered
+                    if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    -- one bit per cycle transfered
                         SCK     <= '0';                 --! falling edge
                         DIO(0)  <= msg(i)(j);           --! assign data
                         wait for this.TSpiClk/2;        --! half clock cycle
                         SCK     <= '1';                 --! rising edge
                         wait for this.TSpiClk/2;        --! half clock cycle
-                    elsif ( DUAL = this.spiMode ) then  --! two bits per clock cycle are transfered
+                    elsif ( C_GENERAL_IO_MODE_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    -- two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK             <= '0';     --! falling edge
                             DIO(1 downto 0) <= msg(i)(j downto j-1);
@@ -1360,7 +1390,8 @@ package body eSpiMasterBfm is
                             SCK             <= '1';     --! rising edge
                             wait for this.TSpiClk/2;    --! half clock cycle
                         end if;
-                    elsif ( QUAD = this.spiMode ) then  --! four bits per clock cycle are transfered
+                    elsif ( C_GENERAL_IO_MODE_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    -- four bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 4 ) then
                             SCK             <= '0';     --! falling edge
                             DIO(3 downto 0) <= msg(i)(j downto j-3);
@@ -1368,6 +1399,10 @@ package body eSpiMasterBfm is
                             SCK             <= '1';     --! rising edge
                             wait for this.TSpiClk/2;    --! half clock cycle
                         end if;
+                    else
+                        -- unsupported transfer mode
+                        if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                        return;
                     end if;
                 end loop;
             end loop;
@@ -1388,24 +1423,38 @@ package body eSpiMasterBfm is
         begin
             -- one clock cycle drive high
             SCK     <= '0';                     --! falling edge
-            if ( DUAL = this.spiMode ) then     --! two bits per clock cycle are transfered
-                DIO <= (others => '1');
-            elsif ( QUAD = this.spiMode ) then  --! four bits per clock cycle are transfered
-                DIO(1 downto 0) <= (others => '1');
-            else                                --! one bits per clock cycle are transfered
+            if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            -- one bits per clock cycle are transfered
                 DIO(0)  <= '1';
+            elsif ( C_GENERAL_IO_MODE_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            -- two bits per clock cycle are transfered
+                DIO(1 downto 0) <= (others => '1');
+            elsif ( C_GENERAL_IO_MODE_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            -- four bits per clock cycle are transfered
+                DIO <= (others => '1');
+            else
+                -- unsupported transfer mode
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTar: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                return;
             end if;
             wait for this.TSpiClk/2;    --! half clock cycle
             SCK     <= '1';             --! rising edge
             wait for this.TSpiClk/2;    --! half clock cycle
             -- one clock cycle tristate
             SCK     <= '0';                     --! falling edge
-            if ( DUAL = this.spiMode ) then     --! two bits per clock cycle are transfered
-                DIO <= (others => 'Z');
-            elsif ( QUAD = this.spiMode ) then  --! four bits per clock cycle are transfered
-                DIO(1 downto 0) <= (others => 'Z');
-            else                                --! one bits per clock cycle are transfered
+            if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            -- one bits per clock cycle are transfered
                 DIO(0)  <= 'Z';
+            elsif ( C_GENERAL_IO_MODE_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            -- two bits per clock cycle are transfered
+                DIO(1 downto 0) <= (others => 'Z');
+            elsif ( C_GENERAL_IO_MODE_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            -- four bits per clock cycle are transfered
+                DIO <= (others => 'Z');
+            else
+                -- unsupported transfer mode
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                return;
             end if;
             wait for this.TSpiClk/2;    --! half clock cycle
             SCK     <= '1';             --! rising edge
@@ -1435,14 +1484,16 @@ package body eSpiMasterBfm is
                 -- iterate over bits in a single message byte
                 for j in msg(i)'high downto msg(i)'low loop
                     -- dispatch mode
-                    if ( SINGLE = this.spiMode ) then       --! one bit per clock cycle transferred
+                    if ( C_GENERAL_IO_MODE_SINGLE = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    -- one bit per clock cycle transferred
                         SCK                 <= '0';                                                 --! falling edge
                         wait for this.TSpiClk/2;                                                    --! half clock cycle
                         SCK                 <= '1';                                                 --! rising edge
                         slv1(0 downto 0)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));  --! help
                         msg(i)(j)           := slv1(0);                                             --! capture data from line
                         wait for this.TSpiClk/2;                                                    --! half clock cycle
-                    elsif ( DUAL = this.spiMode ) then     --! two bits per clock cycle are transfered
+                    elsif ( C_GENERAL_IO_MODE_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    -- two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK                     <= '0';                                                 --! falling edge
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
@@ -1450,7 +1501,8 @@ package body eSpiMasterBfm is
                             msg(i)(j downto j-1)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 0))));  --! capture data from line
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
                         end if;
-                    elsif ( QUAD = this.spiMode ) then  --! four bits per clock cycle are transfered
+                    elsif ( C_GENERAL_IO_MODE_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    -- four bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 4 ) then
                             SCK                     <= '0';                                                 --! falling edge
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
@@ -1458,6 +1510,10 @@ package body eSpiMasterBfm is
                             msg(i)(j downto j-3)    := std_logic_vector(TO_01(unsigned(DIO(3 downto 0))));  --! capture data from line
                             wait for this.TSpiClk/2;                                                        --! half clock cycle
                         end if;
+                    else
+                        -- unsupported transfer mode
+                        if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiRx: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                        return;
                     end if;
                 end loop;
             end loop;
