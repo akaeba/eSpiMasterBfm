@@ -81,7 +81,6 @@ package eSpiMasterBfm is
         -- Configures the BFM
         type tESpiBfm is record
             TSpiClk     : time;         --! period of spi clk
-            crcSlvEna   : boolean;      --! CRC evaluation on Slave is enabled
             sigSkew     : time;         --! defines Signal Skew to prevent timing errors in back-anno
             verbose     : natural;      --! message level; 0: no message, 1: errors, 2: error + warnings
             tiout       : time;         --! time out when master give up an interaction
@@ -750,6 +749,7 @@ package body eSpiMasterBfm is
                             when x"E"   => result(i+1) := 'E';
                             when x"F"   => result(i+1) := 'F';
                             when "ZZZZ" => result(i+1) := 'Z';
+                            when "----" => result(i+1) := '-';
                             when others => result(i+1) := 'X';
                         end case;
                       end loop;
@@ -881,7 +881,8 @@ package body eSpiMasterBfm is
         function checkCRC ( this : in tESpiBfm; msg : in tMemX08 ) return boolean is
             variable ret : boolean := true;
         begin
-            if ( this.crcSlvEna ) then
+            -- CRC check enabled?
+            if ( "1" = this.slaveRegs.GENERAL(C_GENERAL_REG_CRC'range) ) then
                 if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
                     ret := false;
                     if ( this.verbose >= C_MSG_ERROR ) then
@@ -1230,7 +1231,6 @@ package body eSpiMasterBfm is
         begin
             -- common handle
             this.TSpiClk    := C_TCLK;              --! default clock is 20MHz
-            this.crcSlvEna  := false;               --! out of reset is CRC disabled
             this.sigSkew    := 0 ns;                --! no skew between clock edge and data defined
             this.verbose    := C_MSG_NO;            --! all messages disabled
             this.tiout      := 100 us;              --! 100us master time out for wait
