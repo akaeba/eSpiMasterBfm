@@ -396,15 +396,15 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);    --! slave status
                     variable response   : out tESpiRsp                          --! slave response to command
                 );
-            -- single vwire instruction, w/o response and status register
+            -- arbitrary vwire instruction, w/o response and status register
             procedure VWIREWR
                 (
                     variable this       : inout tESpiBfm;
                     signal CSn          : out std_logic;                        --! slave select
                     signal SCK          : out std_logic;                        --! shift clock
                     signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant vwireIdx   : in std_logic_vector(7 downto 0);      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                    constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
+                    constant vwireIdx   : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                    constant vwireData  : in tMemX08;                           --! virtual wire data
                     variable good       : inout boolean                         --! successful
                 );
             -- single vwire instruction, wire via name selected, see "System Event Virtual Wires" in spec or 'C_SYSEVENT_NAME' in bfm
@@ -460,6 +460,20 @@ package eSpiMasterBfm is
         -- Virtual Wire: Waits until is equal
         --   waits until a virtual wire has the given value
         --   @see Table 9: Virtual Wire Index Definition
+            -- arbitrary number of wires
+            procedure WAIT_VW_IS_EQ
+                (
+                    variable this   : inout tESpiBfm;
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
+                    signal ALERTn   : in std_logic;                         --! Alert
+                    constant vwIdx  : in tMemX08;                           --! virtual wire indexes to wait for
+                    constant vwData : in tMemX08;                           --! virtual wire data to wait for
+                    variable good   : inout boolean;                        --! successful?
+                    constant order  : in boolean                            --! true: virtual wires has to come in order of provided EQ list; false: any order is allowed
+                );
+            -- single wire
             procedure WAIT_VW_IS_EQ
                 (
                     variable this       : inout tESpiBfm;
@@ -587,8 +601,8 @@ package body eSpiMasterBfm is
         -- Capabilities and Configuration Registers
         --  @see 7.2.1.3 Offset 08h: General Capabilities and Configurations
         --  constants are initialized with Specs defaults
-        constant C_GENERAL_REG_CRC          : std_logic_vector(31 downto 31) := "0";        --! CRC Checking Enable: 0b: CRC checking is disabled. 1b: CRC checking is enabled.
-        constant C_GENERAL_REG_RSP_MOD      : std_logic_vector(30 downto 30) := "0";        --! Response Modifier Enable: This bit is set to '1' to enable the use of Response Modifier
+        constant C_GENERAL_CRC              : std_logic_vector(31 downto 31) := "0";        --! CRC Checking Enable: 0b: CRC checking is disabled. 1b: CRC checking is enabled.
+        constant C_GENERAL_RSP_MOD          : std_logic_vector(30 downto 30) := "0";        --! Response Modifier Enable: This bit is set to '1' to enable the use of Response Modifier
         constant C_GENERAL_ALERT_MODE       : std_logic_vector(28 downto 28) := "0";        --! Alert Mode: 0b: I/O[1] pin is used to signal the Alert event. 1b: Alert# pin is used to signal the Alert event.
         constant C_GENERAL_IO_MODE_SEL      : std_logic_vector(27 downto 26) := "00";       --! I/O Mode Select: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
         constant C_GENERAL_IO_MODE_SUP      : std_logic_vector(25 downto 24) := "--";       --! I/O Mode Support: 00: Single I/O. 01: Dual I/O. 10: Quad I/O. 11: Reserved.
@@ -604,12 +618,28 @@ package body eSpiMasterBfm is
         constant C_GENERAL_OP_FREQ_33MHz    : std_logic_vector(02 downto 00) := "010";      --! 010: 33 MHz.
         constant C_GENERAL_OP_FREQ_50MHz    : std_logic_vector(02 downto 00) := "011";      --! 011: 50 MHz.
         constant C_GENERAL_OP_FREQ_66MHz    : std_logic_vector(02 downto 00) := "100";      --! 100: 66 MHz.
-        constant C_GENERAL_OP_MAX_WAIT      : std_logic_vector(15 downto 12) := "0000";     --! Maximum WAIT STATE Allowed: This is a 1-based field in the granularity of byte time. When “0”, it indicates a value of 16 byte time.
-        constant C_GENERAL_OP_CHN_SUP       : std_logic_vector(07 downto 00) := "--------"; --! Channel Supported: Each of the bits when set indicates that the corresponding channel is supported by the slave.
-        constant C_GENERAL_OP_CHN_SUP_PERI  : std_logic_vector(00 downto 00) := "1";        --! Peripheral Channel
-        constant C_GENERAL_OP_CHN_SUP_VW    : std_logic_vector(01 downto 01) := "1";        --! Virtual Wire Channel
-        constant C_GENERAL_OP_CHN_SUP_OOB   : std_logic_vector(02 downto 02) := "1";        --! OOB Message Channel
-        constant C_GENERAL_OP_CHN_SUP_FLASH : std_logic_vector(03 downto 03) := "1";        --! Flash Access Channel
+        constant C_GENERAL_MAX_WAIT         : std_logic_vector(15 downto 12) := "0000";     --! Maximum WAIT STATE Allowed: This is a 1-based field in the granularity of byte time. When “0”, it indicates a value of 16 byte time.
+        constant C_GENERAL_CHN_SUP          : std_logic_vector(07 downto 00) := "--------"; --! Channel Supported: Each of the bits when set indicates that the corresponding channel is supported by the slave.
+        constant C_GENERAL_CHN_SUP_PERI     : std_logic_vector(00 downto 00) := "1";        --! Peripheral Channel
+        constant C_GENERAL_CHN_SUP_VW       : std_logic_vector(01 downto 01) := "1";        --! Virtual Wire Channel
+        constant C_GENERAL_CHN_SUP_OOB      : std_logic_vector(02 downto 02) := "1";        --! OOB Message Channel
+        constant C_GENERAL_CHN_SUP_FLASH    : std_logic_vector(03 downto 03) := "1";        --! Flash Access Channel
+        --***************************
+
+        --***************************
+        -- Channel 1 Capabilities and Configurations
+        --  @see Offset 20h: Channel 1 Capabilities and Configurations
+        --  constants are initialized with Specs defaults
+        constant C_VW_READY     : std_logic_vector(01 downto 01) := "1";    --! Virtual Wire Channel Ready: 0b: Channel is not ready. 1b: Channel is ready.
+        constant C_VW_ENABLE    : std_logic_vector(00 downto 00) := "1";    --! Virtual Wire Channel Enable: his bit is set to ‘1’ by eSPI master to enable the Virtual Wire channel.
+        --***************************
+
+        --***************************
+        -- Channel 1 Capabilities and Configurations
+        --  @see Offset 40h: Channel 3 Capabilities and Configurations
+        --  constants are initialized with Specs defaults
+        constant C_FLASH_READY  : std_logic_vector(01 downto 01) := "1";    --! Flash Access Channel Ready: 0b: Channel is not ready. 1b: Channel is ready.
+        constant C_FLASH_ENABLE : std_logic_vector(00 downto 00) := "1";    --! Flash Access Channel Enable: This bit is set to '1' by eSPI master to enable the Flash Access channel.
         --***************************
 
         --***************************
@@ -669,7 +699,6 @@ package body eSpiMasterBfm is
         --  @see Table 22: AC Timing Specification
         constant C_TINIT        : time      := 1 us;                    --! eSPI Reset# Deassertion to First Transaction (GET_CONFIGURATION)
         constant C_TINIT_FREQ   : integer   := 20_000_000;              --! Initial Bus Frequency upon eSPI Reset# Deassertion
-        constant C_TCLK         : time      := 1 sec / C_TINIT_FREQ;    --! ESPI init clock frequency
         --***************************
 
     ----------------------------------------------
@@ -882,7 +911,7 @@ package body eSpiMasterBfm is
             variable ret : boolean := true;
         begin
             -- CRC check enabled?
-            if ( "1" = this.slaveRegs.GENERAL(C_GENERAL_REG_CRC'range) ) then
+            if ( "1" = this.slaveRegs.GENERAL(C_GENERAL_CRC'range) ) then
                 if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
                     ret := false;
                     if ( this.verbose >= C_MSG_ERROR ) then
@@ -929,7 +958,7 @@ package body eSpiMasterBfm is
         function decodeClk ( this : in tESpiBfm ) return time is
             variable tclk : time;
         begin
-            -- get time
+            -- get register setting
             case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
                 when C_GENERAL_OP_FREQ_20MHz => tclk := 1 sec / 20_000_000;
                 when C_GENERAL_OP_FREQ_25MHz => tclk := 1 sec / 25_000_000;
@@ -941,6 +970,23 @@ package body eSpiMasterBfm is
             -- release time
             return tclk;
         end function decodeClk;
+        --
+        --   decodes slave register clock setting into string
+        function decodeClk ( this : in tESpiBfm ) return string is
+            variable ret : string(1 to 5);
+        begin
+            -- get register setting
+            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
+                when C_GENERAL_OP_FREQ_20MHz => ret := "20MHz";
+                when C_GENERAL_OP_FREQ_25MHz => ret := "25MHz";
+                when C_GENERAL_OP_FREQ_33MHz => ret := "33MHz";
+                when C_GENERAL_OP_FREQ_50MHz => ret := "50MHz";
+                when C_GENERAL_OP_FREQ_66MHz => ret := "66MHz";
+                when others                  => ret := "20MHz";
+            end case;
+            -- release string
+            return ret;
+        end function decodeClk;
         --***************************
 
 
@@ -949,19 +995,37 @@ package body eSpiMasterBfm is
         --   print decoded response register to string in a human-readable way
         function rsp2str ( rsp : tESpiRsp ) return string is
             variable ret : string(1 to 16) := (others => character(NUL));   --! make empty
+            variable len : integer;                                         --! shorts string to allow concat w/o print abort
         begin
             -- convert
             case rsp is
-                when ACCEPT             => ret(1 to 6)  := "ACCEPT";
-                when DEFER              => ret(1 to 5)  := "DEFER";
-                when NON_FATAL_ERROR    => ret(1 to 15) := "NON_FATAL_ERROR";
-                when FATAL_ERROR        => ret(1 to 11) := "FATAL_ERROR";
-                when WAIT_STATE         => ret(1 to 10) := "WAIT_STATE";
-                when NO_RESPONSE        => ret(1 to 11) := "NO_RESPONSE";
-                when NO_DECODE          => ret(1 to 9)  := "NO_DECODE";
+                when ACCEPT =>
+                    len             := 6;
+                    ret(1 to len)   := "ACCEPT";
+                when DEFER =>
+                    len             := 5;
+                    ret(1 to len)   := "DEFER";
+                when NON_FATAL_ERROR =>
+                    len             := 15;
+                    ret(1 to len)   := "NON_FATAL_ERROR";
+                when FATAL_ERROR =>
+                    len             := 11;
+                    ret(1 to len)   := "FATAL_ERROR";
+                when WAIT_STATE =>
+                    len             := 10;
+                    ret(1 to len)   := "WAIT_STATE";
+                when NO_RESPONSE =>
+                    len             := 11;
+                    ret(1 to len)   := "NO_RESPONSE";
+                when NO_DECODE =>
+                    len             := 9;
+                    ret(1 to len)   := "NO_DECODE";
+                when others =>
+                    len             := 9;
+                    ret(1 to len)   := "NO_DECODE";
             end case;
             -- release
-            return ret;
+            return ret(1 to len);
         end function rsp2str;
         --***************************
 
@@ -1227,8 +1291,8 @@ package body eSpiMasterBfm is
         is
         begin
             this.slaveRegs.GENERAL                                  := (others => '0');         --! default
-            this.slaveRegs.GENERAL(C_GENERAL_REG_CRC'range)         := C_GENERAL_REG_CRC;       --! CRC Checking
-            this.slaveRegs.GENERAL(C_GENERAL_REG_RSP_MOD'range)     := C_GENERAL_REG_RSP_MOD;   --! Response Modifier
+            this.slaveRegs.GENERAL(C_GENERAL_CRC'range)             := C_GENERAL_CRC;           --! CRC Checking
+            this.slaveRegs.GENERAL(C_GENERAL_RSP_MOD'range)         := C_GENERAL_RSP_MOD;       --! Response Modifier
             this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range)      := C_GENERAL_ALERT_MODE;    --! Alert Mode
             this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)     := C_GENERAL_IO_MODE_SEL;   --! I/O Mode Select
             this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SUP'range)     := C_GENERAL_IO_MODE_SUP;   --! I/O Mode Support
@@ -1236,8 +1300,8 @@ package body eSpiMasterBfm is
             this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range)     := C_GENERAL_OP_FREQ_SEL;   --! Operating Frequency
             this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_SUP'range)    := C_GENERAL_OD_ALERT_SUP;  --! Open Drain Alert# Supported
             this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SUP'range)     := C_GENERAL_OP_FREQ_SUP;   --! Maximum Frequency Supported
-            this.slaveRegs.GENERAL(C_GENERAL_OP_MAX_WAIT'range)     := C_GENERAL_OP_MAX_WAIT;   --! Maximum WAIT STATE Allowed
-            this.slaveRegs.GENERAL(C_GENERAL_OP_CHN_SUP'range)      := C_GENERAL_OP_CHN_SUP;    --! Channel Supported
+            this.slaveRegs.GENERAL(C_GENERAL_MAX_WAIT'range)        := C_GENERAL_MAX_WAIT;      --! Maximum WAIT STATE Allowed
+            this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP'range)         := C_GENERAL_CHN_SUP;    --! Channel Supported
         end procedure init_cap_reg_08;
         --***************************
 
@@ -1291,11 +1355,21 @@ package body eSpiMasterBfm is
                 signal CSn      : out std_logic;                        --! slave select
                 signal SCK      : out std_logic;                        --! shift clock
                 signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                signal ALERTn   : in std_logic;                         --! slaves alert pin
                 variable good   : inout boolean;                        --! successful
-                constant log    : in tMsgLevel                          --! BFM log level
+                constant log    : in tMsgLevel;                         --! BFM log level
+                constant crc    : in boolean;                           --! true: CRC is enabled
+                constant maxClk : in boolean;                           --! true: enable maximum supported SPI clock, false: reset setting
+                constant maxDIO : in boolean                            --! true: max supported data lines are used, false: reset setting
             )
         is
-            variable pgood  : boolean := true;  --! internal procedure good
+            variable pgood      : boolean;                          --! internal procedure good
+            variable slv32      : std_logic_vector(31 downto 0);    --! temporary 32bit variable
+            variable vwireIdx   : tMemX08(0 to 63);                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwireData  : tMemX08(0 to 63);                 --! virtual wire data
+            variable vwireLen   : integer range 0 to 64;            --! number of wire pairs
+            variable str        : string(1 to 1024) := (others => character(NUL));  --! message string, max len
+            variable strLen     : natural := 0;                                     --! current string len
         begin
             -- init bfm storage element
                 -- init ( this )
@@ -1309,32 +1383,175 @@ package body eSpiMasterBfm is
                         "       Version: "  & C_BFM_VERSION;
             end if;
             -- reset startup sequence
-            RESETn  <= '0';             --! send core to reset
-            CSn     <= '1';             --! deselect device
-            SCK     <= '0';             --! rising edge active clock
-            DIO     <= (others => 'Z'); --! lines are in TB pulled
-            wait for 2*C_TCLK;          --! apply reset
-            RESETn  <= '1';             --! disable reset
-            wait for C_TINIT;           --! slave initialization time
-            -- Discover Slaves capabilities
+            RESETn  <= '0';                 --! send core to reset
+            CSn     <= '1';                 --! deselect device
+            SCK     <= '0';                 --! rising edge active clock
+            DIO     <= (others => 'Z');     --! lines are in TB pulled
+            wait for 2*decodeClk( this );   --! apply reset
+            RESETn  <= '1';                 --! disable reset
+            wait for C_TINIT;               --! slave initialization time
+            -- *****
+            -- General capabilities
             --  @see Exit from G3, 4.)
+            pgood := true;
             GET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_GENCAP_ADR, pgood );   --! General Capabilities and Configurations
-            if ( pgood ) then
-
-
-
-
-
-            else
-                if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:init: Failed get Capabilities Register 0x" & to_hstring(C_SLVREG_GENCAP_ADR) severity error; end if;
+            if not ( pgood ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_SLVREG_GENCAP_ADR) severity error; end if;
                 good := false;
                 return;
+            end if;
+            -- enable according "Exit G3" sequence
+            slv32 := this.slaveRegs.GENERAL;    --! get general reg from shadow register
+            -- CRC enabled?
+            if ( crc ) then
+                slv32(C_GENERAL_CRC'range) := "1";  --! CRC checking is enabled
+            end if;
+            -- Maximum Supported Clock?
+            if ( maxClk ) then
+                slv32(C_GENERAL_OP_FREQ_SEL'range) := slv32(C_GENERAL_OP_FREQ_SUP'range);   --! maximum supported frequency is used
+            end if;
+            -- Use maximum number of DIO lines
+            if ( maxDIO ) then
+                slv32(C_GENERAL_IO_MODE_SEL'range) := slv32(C_GENERAL_IO_MODE_SUP'range);   --! maximum number of IO lines used
+            end if;
+            -- Set General Cap Register
+            --  @see Exit from G3, 5.)
+                -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+            SET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_GENCAP_ADR, slv32, pgood );    --! update general cap reg
+            if not ( pgood ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Setting Register 0x" & to_hstring(C_SLVREG_GENCAP_ADR) & " = 0x" & to_hstring(slv32) & " failed" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- *****
+            -- Virtual Wire channel is enabled, if supported
+            --  @see Exit from G3, 6.)
+            if ( C_GENERAL_CHN_SUP_VW = this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range) ) then
+                -- get virtual wire channel config
+                GET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_CH1CAP_ADR, pgood );   --! Virtual Wire Capabilities and Configurations
+                if not ( pgood ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_SLVREG_CH1CAP_ADR) severity error; end if;
+                    good := false;
+                    return;
+                end if;
+                -- enable virtual wire channel
+                slv32                       := this.slaveRegs.VIRT_WIRE_CHN;    --! acquire virtual wire config
+                slv32(C_VW_ENABLE'range)    := C_VW_ENABLE;                     --! enable channel
+                    -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+                SET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_CH1CAP_ADR, slv32, pgood );    --! update virtual wire cap reg
+                if not ( pgood ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Setting Register 0x" & to_hstring(C_SLVREG_CH1CAP_ADR) & " = 0x" & to_hstring(slv32) & " failed" severity error; end if;
+                    good := false;
+                    return;
+                end if;
+            end if;
+            -- *****
+            -- Once the Flash controller is ready, the Flash Access Channel is enabled if supported.
+            --  @see Exit from G3, 7.)
+            if ( C_GENERAL_CHN_SUP_FLASH = this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range) ) then
+                -- get virtual wire channel config
+                GET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_CH3CAP_ADR, pgood );   --! Flash Channel Capabilities and Configurations
+                if not ( pgood ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_SLVREG_CH3CAP_ADR) severity error; end if;
+                    good := false;
+                    return;
+                end if;
+                -- enable virtual wire channel
+                slv32                       := this.slaveRegs.FLASH_CHN;    --! acquire virtual wire config
+                slv32(C_FLASH_ENABLE'range) := C_FLASH_ENABLE;              --! enable channel
+                    -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+                SET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_CH3CAP_ADR, slv32, pgood );    --! update flash channel cap reg
+                if not ( pgood ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Setting Register 0x" & to_hstring(C_SLVREG_CH3CAP_ADR) & " = 0x" & to_hstring(slv32) & " failed" severity error; end if;
+                    good := false;
+                    return;
+                end if;
+            end if;
+            -- *****
+            -- Chipset waits for the SLAVE_BOOT_LOAD_DONE Virtual Wire message from eSPI slave before continuing
+            --  @see Exit from G3, 8.)
+            vwireLen    := 0;
+            vwireIdx    := (others => (others => '0'));
+            vwireData   := (others => (others => '-'));     --! data in wait list has don't cares
+                -- VW_ADD( this, name, value, vwIdx, vwData, vwLen, good )
+            VW_ADD( this, "SLAVE_BOOT_LOAD_STATUS", '1', vwireIdx, vwireData, vwireLen, pgood );
+            VW_ADD( this, "SLAVE_BOOT_LOAD_DONE",   '1', vwireIdx, vwireData, vwireLen, pgood );
+                -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIdx, vwData, good, order )
+            WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood, true );
+            if not ( pgood ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed wait for SLAVE_BOOT_LOAD_STATUS/SLAVE_BOOT_LOAD_DONE" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- *****
+            -- Chipset sends in-band Virtual Wire messages to leave sleep states
+            --  @see Exit from G3, 9.)
+            vwireLen    := 0;
+            vwireIdx    := (others => (others => '0'));
+            vwireData   := (others => (others => '0'));
+            VW_ADD( this, "SLP_S5#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            VW_ADD( this, "SLP_S4#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            VW_ADD( this, "SLP_S3#", '1', vwireIdx, vwireData, vwireLen, pgood );
+                -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, good );
+            VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
+            if not ( pgood ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to deassert sleep states" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- *****
+            -- SUS_STAT# de-assertion
+            --  @see Exit from G3, 10.)
+            vwireLen    := 0;
+            vwireIdx    := (others => (others => '0'));
+            vwireData   := (others => (others => '0'));
+            VW_ADD( this, "SUS_STAT#", '0', vwireIdx, vwireData, vwireLen, pgood );
+                -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, good );
+            VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
+            if not ( pgood ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to deassert suspend status" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- *****
+            -- PLTRST# deassertion
+            --  @see Exit from G3, 11.)
+            vwireLen    := 0;
+            vwireIdx    := (others => (others => '0'));
+            vwireData   := (others => (others => '0'));
+            VW_ADD( this, "PLTRST#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
+            if not ( pgood ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to deassert PLTRST" severity error; end if;
+                good := false;
+                return;
+            end if;
+            -- *****
+            -- Peripheral Channel
+            if ( C_GENERAL_CHN_SUP_PERI = this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_PERI'range) ) then
+                GET_CONFIGURATION( this, CSn, SCK, DIO, C_SLVREG_CH0CAP_ADR, pgood );   --! Peripheral Capabilities and Configurations
             end if;
 
 
 
+        end procedure init;
+        --***************************
 
 
+        --***************************
+        -- init, some defaults are set
+        procedure init
+            (
+                variable this   : inout tESpiBfm;                       --! common handle
+                signal RESETn   : out std_logic;                        --! reset signal
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                signal ALERTn   : in std_logic;                         --! slaves alert pin
+                variable good   : inout boolean                         --! successful
+            )
+        is
+        begin
 
 
 
@@ -1706,6 +1923,7 @@ package body eSpiMasterBfm is
 
         --***************************
         -- RESET: sends reset sequence to slave
+        --  @see 9.3.2 In-band RESET Command
         procedure RESET
             (
                 variable this       : inout tESpiBfm;
@@ -1714,7 +1932,7 @@ package body eSpiMasterBfm is
                 signal DIO          : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
-            constant tSpiClk : time := decodeClk(this); --! get current SPI period
+            constant tSpiClk : time := 1 sec / 20_000_000;  --! It is sent with the 20MHz speed or lower.
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RESET"; end if;
@@ -1922,6 +2140,17 @@ package body eSpiMasterBfm is
             if ( ACCEPT /= rsp ) then
                 good := false;
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
+            else
+                -- update BFM shadow register of slave
+                -- case adr is
+                    -- when C_SLVREG_DEVID_ADR     => this.slaveRegs.DEVID             := config;   --! Device Identification
+                    -- when C_SLVREG_GENCAP_ADR    => this.slaveRegs.GENERAL           := config;   --! General Capabilities and Configurations
+                    -- when C_SLVREG_CH0CAP_ADR    => this.slaveRegs.PERIPHERAL_CHN    := config;   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
+                    -- when C_SLVREG_CH1CAP_ADR    => this.slaveRegs.VIRT_WIRE_CHN     := config;   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
+                    -- when C_SLVREG_CH2CAP_ADR    => this.slaveRegs.OOB_MSG_CHN       := config;   --! Channel 2 Capabilities and Configurations (OOB Channel)
+                    -- when C_SLVREG_CH3CAP_ADR    => this.slaveRegs.FLASH_CHN         := config;   --! Channel 3 Capabilities and Configurations (Flash Channel)
+                    -- when others                 => Report "SET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(config) & ";";  -- print to log
+                -- end case;
             end if;
         end procedure SET_CONFIGURATION;
         --***************************
@@ -2844,7 +3073,7 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- Virtual Wire Channel Write, w/o status/response register, prints it values to console, except only one data word
+        -- Virtual Wire Channel Write, w/o status/response register
         -- PUT_VWIRE
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
         procedure VWIREWR
@@ -2853,8 +3082,8 @@ package body eSpiMasterBfm is
                 signal CSn          : out std_logic;                        --! slave select
                 signal SCK          : out std_logic;                        --! shift clock
                 signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                constant vwireIdx   : in std_logic_vector(7 downto 0);      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                constant vwireData  : in std_logic_vector(7 downto 0);      --! virtual wire data
+                constant vwireIdx   : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                constant vwireData  : in tMemX08;                           --! virtual wire data
                 variable good       : inout boolean                         --! successful
             )
         is
@@ -2863,12 +3092,9 @@ package body eSpiMasterBfm is
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stuck
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
-            -- fill in data
-            idx(0)  := vwireIdx;
-            data(0) := vwireData;
             -- call more general function
                 -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, status, response );
-            VWIREWR( this, CSn, SCK, DIO, idx, data, sts, rsp );
+            VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, sts, rsp );
             -- Slave response good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -2908,7 +3134,7 @@ package body eSpiMasterBfm is
             VW_ADD( this, name, value, vwireIdx, vwireData, vwireLen, vwAdd );   --! build virtual wire
             -- write to endpoint
             if ( vwAdd ) then
-                VWIREWR( this, CSn, SCK, DIO, vwireIdx(0), vwireData(0), vwAdd );
+                VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to 0), vwireData(0 to 0), vwAdd );
             end if;
             -- successful?
             if ( vwAdd ) then
@@ -3123,8 +3349,8 @@ package body eSpiMasterBfm is
                 signal SCK      : out std_logic;                        --! shift clock
                 signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
                 signal ALERTn   : in std_logic;                         --! Alert
-                variable vwIdx  : in tMemX08;                           --! virtual wire indexes to wait for
-                variable vwData : in tMemX08;                           --! virtual wire data to wait for
+                constant vwIdx  : in tMemX08;                           --! virtual wire indexes to wait for
+                constant vwData : in tMemX08;                           --! virtual wire data to wait for
                 variable good   : inout boolean;                        --! successful?
                 constant order  : in boolean                            --! true: virtual wires has to come in order of provided EQ list; false: any order is allowed
             )
@@ -3234,7 +3460,7 @@ package body eSpiMasterBfm is
             variable vwIndex    : tMemX08(0 to 0);  --! virtual wire index
             variable vwData     : tMemX08(0 to 0);  --! virtual wire data
             variable vwLen      : integer;          --! length of virtual wire
-            variable inGood     : boolean := true;  --! internal good
+            variable fooGood    : boolean := true;  --! internal good
         begin
             -- init
             vwIndex := (others => (others => '0'));
@@ -3242,7 +3468,7 @@ package body eSpiMasterBfm is
             vwLen   := 0;
             -- add wire
                 -- VW_ADD( this, name, value, vwIdx, vwData, vwLen, good );
-            VW_ADD( this, wireName, wireVal, vwIndex, vwData, vwLen, inGood );
+            VW_ADD( this, wireName, wireVal, vwIndex, vwData, vwLen, fooGood );
             -- go in wait
                 -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIdx, vwData, good, order )
             WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIndex(0 to vwLen-1), vwData(0 to vwLen-1), good, false );
