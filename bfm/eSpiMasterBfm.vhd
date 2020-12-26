@@ -1697,15 +1697,10 @@ package body eSpiMasterBfm is
             -- *****
             -- Print Configuration Regs
             if ( this.verbose >= C_MSG_INFO ) then
-                Report "eSpiMasterBfm:init:"
-                            & cfgReg2Str( this ) & character(LF);
-
+                Report "eSpiMasterBfm:init:"        & character(LF) &
+                            cfgReg2Str( this )      & character(LF) &
+                            generalReg2Str( this );
             end if;
-
-
-
-
-
         end procedure init;
         --***************************
 
