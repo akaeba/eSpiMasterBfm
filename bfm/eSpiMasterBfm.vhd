@@ -109,14 +109,6 @@ package eSpiMasterBfm is
     -- Functions (public)
         function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8: calculate crc from a message
         function decodeClk ( this : in tESpiBfm ) return time;      --! decodeClk: decodes slave register into a proper time for clock generation
-
-        function strcat
-            (
-                constant catstr : in string;    --! input string
-                constant appstr : in string     --! string to appned
-            ) return string;
-
-
     -----------------------------
 
 
@@ -914,15 +906,15 @@ package body eSpiMasterBfm is
         function strcat
             (
                 constant catstr : in string;    --! input string
-                constant appstr : in string     --! string to appned
+                constant appstr : in string     --! string to append
             )
         return string is
+            constant cat : string(1 to catstr'length) := catstr;                        --! make one aligned
+            constant app : string(1 to appstr'length) := appstr;                        --! make one aligned
             variable tmp : string(1 to catstr'length) := (others => character(NUL));    --! make empty
-            variable cat : string(1 to catstr'length) := catstr;                        --! make one aligned
-            variable app : string(1 to appstr'length) := appstr;                        --! make one aligned
             variable idx : integer;                                                     --! append stop index
         begin
-            idx := integer(realmin(real(strlen(cat)+strlen(app))+1.0, real(tmp'length)));   --! concats app string, it buffer size isn't enough
+            idx := integer(realmin(real(strlen(cat)+strlen(app))+1.0, real(tmp'length)));   --! concats app string, if buffer size isn't enough
             tmp(1 to 1+strlen(cat))     := cat(1 to 1+strlen(cat));                         --! copy catstr
             tmp(1+strlen(cat) to idx)   := app(1 to idx-strlen(cat));                       --! concat string
             return tmp;
@@ -1040,23 +1032,6 @@ package body eSpiMasterBfm is
             end case;
             -- release time
             return tclk;
-        end function decodeClk;
-        --
-        --   decodes slave register clock setting into string
-        function decodeClk ( this : in tESpiBfm ) return string is
-            variable ret : string(1 to 5);
-        begin
-            -- get register setting
-            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
-                when C_GENERAL_OP_FREQ_20MHz => ret := "20MHz";
-                when C_GENERAL_OP_FREQ_25MHz => ret := "25MHz";
-                when C_GENERAL_OP_FREQ_33MHz => ret := "33MHz";
-                when C_GENERAL_OP_FREQ_50MHz => ret := "50MHz";
-                when C_GENERAL_OP_FREQ_66MHz => ret := "66MHz";
-                when others                  => ret := "20MHz";
-            end case;
-            -- release string
-            return ret;
         end function decodeClk;
         --***************************
 
@@ -1261,14 +1236,74 @@ package body eSpiMasterBfm is
         -- generalReg2Str
         --   prints & interprets general configuration & capabilities register into string
         function generalReg2Str ( this : in tESpiBfm ) return string is
-            variable str : string(1 to 307) := (others => character(NUL));
-            variable len : integer;
+            variable str : string(1 to 1023) := (others => character(NUL));
         begin
-            str := character(LF) &
-                "     General Capabilities and Configurations (0x08)"                                                               & character(LF) &
-                "       CRC Checking Enable : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CRC'range))))  & character(LF);
-
-
+            -- Header
+            str := strcat(str, "     General Capabilities and Configurations (0x08)" & character(LF));
+            -- CRC Checking Enable, Bit31
+            str := strcat(str, "       CRC Checking Enable  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CRC'range)))) & character(LF));
+            -- Alert Mode, Bit28
+            case this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range) is
+                when "1"    => str := strcat(str, "       Alert Mode            : Alert"    & character(LF));
+                when "0"    => str := strcat(str, "       Alert Mode            : I/O[1]"   & character(LF));
+                when others => str := strcat(str, "       Alert Mode            : UNKNOWN"  & character(LF));
+            end case;
+            -- I/O Mode Select, Bit27:26
+            case this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) is
+                when C_GENERAL_IO_MODE_SINGLE   => str := strcat(str, "       I/O Mode Select       : Single I/O"   & character(LF));
+                when C_GENERAL_IO_MODE_DUAL     => str := strcat(str, "       I/O Mode Select       : Dual I/O"     & character(LF));
+                when C_GENERAL_IO_MODE_QUAD     => str := strcat(str, "       I/O Mode Select       : Quad I/O"     & character(LF));
+                when others                     => str := strcat(str, "       I/O Mode Select       : UNKNOWN"      & character(LF));
+            end case;
+            -- I/O Mode Support, Bit25:24
+            case this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SUP'range) is
+                when C_GENERAL_IO_MODE_SINGLE   => str := strcat(str, "       I/O Mode Support     : Single I/O"    & character(LF));
+                when C_GENERAL_IO_MODE_DUAL     => str := strcat(str, "       I/O Mode Support     : Dual I/O"      & character(LF));
+                when C_GENERAL_IO_MODE_QUAD     => str := strcat(str, "       I/O Mode Support     : Quad I/O"      & character(LF));
+                when others                     => str := strcat(str, "       I/O Mode Support     : UNKNOWN"       & character(LF));
+            end case;
+            -- Open Drain Alert# Select, Bit23
+            case this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_PIN'range) is
+                when "1"    => str := strcat(str, "       Alert Output Pin     : open-drain"    & character(LF));
+                when "0"    => str := strcat(str, "       Alert Output Pin     : driven"        & character(LF));
+                when others => str := strcat(str, "       Alert Output Pin     : UNKNOWN"       & character(LF));
+            end case;
+            -- Operating Frequency, Bit22:20
+            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
+                when C_GENERAL_OP_FREQ_20MHz    => str := strcat(str, "       Operating Frequency  : 20MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_25MHz    => str := strcat(str, "       Operating Frequency  : 25MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_33MHz    => str := strcat(str, "       Operating Frequency  : 33MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_50MHz    => str := strcat(str, "       Operating Frequency  : 50MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_66MHz    => str := strcat(str, "       Operating Frequency  : 66MHz"     & character(LF));
+                when others                     => str := strcat(str, "       Operating Frequency  : UNKNOWN"   & character(LF));
+            end case;
+            -- Open Drain Alert# Supported, Bit19
+            case this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_SUP'range) is
+                when "1"    => str := strcat(str, "       Open Drain Alert#    : supported"     & character(LF));
+                when "0"    => str := strcat(str, "       Open Drain Alert#    : not supported" & character(LF));
+                when others => str := strcat(str, "       Open Drain Alert#    : UNKNOWN"       & character(LF));
+            end case;
+            -- Maximum Frequency Supported, Bit18:16
+            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SUP'range) is
+                when C_GENERAL_OP_FREQ_20MHz    => str := strcat(str, "       Maximum Frequency    : 20MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_25MHz    => str := strcat(str, "       Maximum Frequency    : 25MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_33MHz    => str := strcat(str, "       Maximum Frequency    : 33MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_50MHz    => str := strcat(str, "       Maximum Frequency    : 50MHz"     & character(LF));
+                when C_GENERAL_OP_FREQ_66MHz    => str := strcat(str, "       Maximum Frequency    : 66MHz"     & character(LF));
+                when others                     => str := strcat(str, "       Maximum Frequency    : UNKNOWN"   & character(LF));
+            end case;
+            -- Maximum WAIT STATE Allowed, Bit15:12
+            case to_integer(to_01(unsigned(this.slaveRegs.GENERAL(C_GENERAL_MAX_WAIT'range)))) is
+                when 0      => str := strcat(str, "       Maximum WAIT STATE   : 16Byte"                                                                                    & character(LF));
+                when others => str := strcat(str, "       Maximum WAIT STATE   : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_MAX_WAIT'range))))  & "Byte"    & character(LF));
+            end case;
+            -- Channel Supported:
+            str := strcat(str, "       Peripheral Channel   : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_PERI'range))))     & character(LF));
+            str := strcat(str, "       Virtual Wire Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range))))       & character(LF));
+            str := strcat(str, "       OOB Message Channel  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_OOB'range))))      & character(LF));
+            str := strcat(str, "       Flash Access Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range))))    & character(LF));
+            -- config interpretation finished
+            return str(1 to strlen(str)+1);
         end function generalReg2Str;
         --***************************
 
