@@ -21,9 +21,10 @@
 
 
 --------------------------------------------------------------------------
-library IEEE;
-    use IEEE.std_logic_1164.all;
-    use IEEE.numeric_std.all;
+library ieee;
+    use ieee.std_logic_1164.all;
+    use ieee.numeric_std.all;
+    use ieee.math_real.realmin;
 library std;
     use std.textio.all;
 --------------------------------------------------------------------------
@@ -108,6 +109,14 @@ package eSpiMasterBfm is
     -- Functions (public)
         function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8: calculate crc from a message
         function decodeClk ( this : in tESpiBfm ) return time;      --! decodeClk: decodes slave register into a proper time for clock generation
+
+        function strcat
+            (
+                constant catstr : in string;    --! input string
+                constant appstr : in string     --! string to appned
+            ) return string;
+
+
     -----------------------------
 
 
@@ -766,7 +775,7 @@ package body eSpiMasterBfm is
                     end if;
                     ivalue := pad & value;
                     for i in 0 to ne-1 loop
-                        quad := To_X01Z(ivalue(4*i to 4*i+3));
+                        quad := ivalue(4*i to 4*i+3);
                         case quad is
                             when x"0"   => result(i+1) := '0';
                             when x"1"   => result(i+1) := '1';
@@ -786,6 +795,9 @@ package body eSpiMasterBfm is
                             when x"F"   => result(i+1) := 'F';
                             when "ZZZZ" => result(i+1) := 'Z';
                             when "----" => result(i+1) := '-';
+                            when "UUUU" => result(i+1) := 'U';
+                            when "HHHH" => result(i+1) := 'H';
+                            when "LLLL" => result(i+1) := 'L';
                             when others => result(i+1) := 'X';
                         end case;
                       end loop;
@@ -830,15 +842,16 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- trim
+        -- strtrim
         --   removes leading/trailing blanks from string
-        function trim
+        function strtrim
             (
                 constant str : in string    --! input string
-            ) return string is
+            )
+        return string is
             variable strStart   : positive;
             variable strStop    : positive;
-            variable trimStr    : string(1 to str'length);
+            variable tmpStr     : string(1 to str'length);
         begin
             -- init
             strStart    := str'left;
@@ -862,9 +875,58 @@ package body eSpiMasterBfm is
                 return "";
             end if;
             -- assemble result string
-            trimStr(1 to (strStop-strStart)+1) := str(strStart to strStop);
-            return trimStr(1 to (strStop-strStart)+1);
-        end function trim;
+            tmpStr(1 to (strStop-strStart)+1) := str(strStart to strStop);
+            return tmpStr(1 to (strStop-strStart)+1);
+        end function strtrim;
+        --***************************
+
+
+        --***************************
+        -- strlen
+        --   appends string on other string
+        function strlen
+            (
+                constant str : in string    --! input string
+            )
+        return natural is
+            variable idx : integer;
+            variable tmp : string(1 to str'length) := str;  --! alignment
+        begin
+            for i in tmp'range loop
+                idx := i;
+                -- end of string reached
+                if ( character(NUL) = str(i) ) then
+                    exit;
+                end if;
+            end loop;
+            idx := idx - 1;
+            if ( 0 > idx ) then
+                idx := 0;
+            end if;
+            return idx;
+        end function strlen;
+        --***************************
+
+
+        --***************************
+        -- strcat
+        --   appends string on other string
+        function strcat
+            (
+                constant catstr : in string;    --! input string
+                constant appstr : in string     --! string to appned
+            )
+        return string is
+            variable tmp : string(1 to catstr'length) := (others => character(NUL));    --! make empty
+            variable cat : string(1 to catstr'length) := catstr;                        --! make one aligned
+            variable app : string(1 to appstr'length) := appstr;                        --! make one aligned
+            variable idx : integer;                                                     --! append stop index
+        begin
+            idx := integer(realmin(real(strlen(cat)+strlen(app))+1.0, real(tmp'length)));   --! concats app string, it buffer size isn't enough
+            tmp(1 to 1+strlen(cat))     := cat(1 to 1+strlen(cat));                         --! copy catstr
+            tmp(1+strlen(cat) to idx)   := app(1 to idx-strlen(cat));                       --! concat string
+            return tmp;
+        end function strcat;
         --***************************
 
 
@@ -875,9 +937,10 @@ package body eSpiMasterBfm is
             (
                 constant str1 : in string;  --! input string 1
                 constant str2 : in string   --! input string 2
-            ) return boolean is
-            constant cStr1 : string := trim(str1);
-            constant cStr2 : string := trim(str2);
+            )
+        return boolean is
+            constant cStr1 : string := strtrim(str1);
+            constant cStr2 : string := strtrim(str2);
         begin
             -- same length?
             if ( cStr1'length /= cStr2'length ) then
@@ -896,7 +959,8 @@ package body eSpiMasterBfm is
         --***************************
         -- hexStr
         --   converts byte array into hexadecimal string
-        function hexStr ( msg : in tMemX08 ) return string is
+        function hexStr ( msg : in tMemX08 )
+        return string is
             variable str : string(1 to (msg'length+1)*5+1);  --! 8bit per
         begin
             -- init
@@ -1171,6 +1235,41 @@ package body eSpiMasterBfm is
             end loop;
             return str(1 to strLen-1);  --! drop last line feed
         end function vw2str;
+        --***************************
+
+
+        --***************************
+        -- cfgReg2Str
+        --   prints configuration registers into string
+        function cfgReg2Str ( this : in tESpiBfm ) return string is
+            variable str : string(1 to 306) := (others => character(NUL));
+        begin
+            str := character(LF) &
+                "     eSPI Configuration"                                                                   & character(LF) &
+                "       Device Identification      : 0x" & to_hstring(this.slaveRegs.DEVICE_IDENTIFICATION) & character(LF) &
+                "       General                    : 0x" & to_hstring(this.slaveRegs.GENERAL)               & character(LF) &
+                "       Peripheral Channel   (Ch0) : 0x" & to_hstring(this.slaveRegs.PERIPHERAL_CHANNEL)    & character(LF) &
+                "       Virtual Wire Channel (Ch1) : 0x" & to_hstring(this.slaveRegs.VIRTUAL_WIRE_CHANNEL)  & character(LF) &
+                "       OOB Message Channel  (Ch2) : 0x" & to_hstring(this.slaveRegs.OOB_CHANNEL)           & character(LF) &
+                "       Flash Access Channel (Ch3) : 0x" & to_hstring(this.slaveRegs.FLASH_CHANNEL);
+            return str;
+        end function cfgReg2Str;
+        --***************************
+
+
+        --***************************
+        -- generalReg2Str
+        --   prints & interprets general configuration & capabilities register into string
+        function generalReg2Str ( this : in tESpiBfm ) return string is
+            variable str : string(1 to 307) := (others => character(NUL));
+            variable len : integer;
+        begin
+            str := character(LF) &
+                "     General Capabilities and Configurations (0x08)"                                                               & character(LF) &
+                "       CRC Checking Enable : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CRC'range))))  & character(LF);
+
+
+        end function generalReg2Str;
         --***************************
 
 
@@ -1563,7 +1662,8 @@ package body eSpiMasterBfm is
             -- *****
             -- Print Configuration Regs
             if ( this.verbose >= C_MSG_INFO ) then
-
+                Report "eSpiMasterBfm:init:"
+                            & cfgReg2Str( this ) & character(LF);
 
             end if;
 
