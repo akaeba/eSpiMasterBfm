@@ -56,11 +56,10 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest7    : boolean := true;  --! test7:  IOWR
         constant doTest8    : boolean := true;  --! test8:  IORD
         constant doTest9    : boolean := true;  --! test9:  VWIRE Name
-        constant doTest10   : boolean := true;  --! test10: PRT_CFG_REGS, prints configuration regs to console
-        constant doTest11   : boolean := true;  --! test11: VWIRERD
-        constant doTest12   : boolean := true;  --! test12: VW_ADD, adds virtual wires to a list
-        constant doTest13   : boolean := true;  --! test13: WAIT_VW_IS_EQ
-
+        constant doTest10   : boolean := true;  --! test10: VWIRERD
+        constant doTest11   : boolean := true;  --! test11: VW_ADD, adds virtual wires to a list
+        constant doTest12   : boolean := true;  --! test12: WAIT_VW_IS_EQ
+        constant doTest13   : boolean := true;  --! test13: init, applies 'Exit G3 Sequence'
     -----------------------------
 
 
@@ -107,14 +106,17 @@ begin
         -- Init
         -------------------------
             Report "Init...";
-            init(eSpiMasterBfm, CSn, SCK, DIO);     --! init eSpi Master
-                -- setLogLevel( this, log )
-            setLogLevel( eSpiMasterBfm, INFO );     --! errors + warning + info messages
-            --
             RESETn  <= '0';
+            CSn     <= '1';
+            SCK     <= '0';
+            DIO     <= (others => 'Z');
             LDMSG   <= '0';
             REQMSG  <= (others => character(NUL));
             CMPMSG  <= (others => character(NUL));
+            -- init( this )
+            init( eSpiMasterBfm );  --! BFM common data handle only
+                -- setLogLevel( this, log )
+            setLogLevel( eSpiMasterBfm, INFO );     --! errors + warning + info messages
             wait for 1 us;
             RESETn  <= '1';
             wait for 1 us;
@@ -434,37 +436,10 @@ begin
 
 
         -------------------------
-        -- Test10: PRT_CFG_REGS
+        -- Test10: VWIRERD
         -------------------------
         if ( doTest10 or DO_ALL_TEST ) then
-            Report "Test10: PRT_CFG_REGS";
-            -- load message
-            REQMSG          <= (others => character(NUL));
-            CMPMSG          <= (others => character(NUL));
-            -- Slave Cfg Regs
-            --                      ADR=0x04                             ADR=0x08                             ADR=0x10                             ADR=0x20                             ADR=0x30                             ADR=0x40
-            REQMSG(1 to 54) <=  "21000434"         & character(LF) & "21000810"         & character(LF) & "21001058"         & character(LF) & "210020C8"         & character(LF) & "210030B8"         & character(LF) & "210040EF" & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 88) <=  "0878563412000042" & character(LF) & "08111111110000B5" & character(LF) & "0822222222000054" & character(LF) & "083333333300000B" & character(LF) & "0844444444000091" & character(LF) & "FF"       & character(NUL);   --! received response   (Slave to BFM)
-            LDMSG           <= '1';
-            wait for decodeClk( eSpiMasterBfm )/2;
-            LDMSG           <= '0';
-            wait for decodeClk( eSpiMasterBfm )/2;
-            tmpBool         := true;
-            -- Request BFM
-                -- PRT_CFG_REGS( this, CSn, SCK, DIO, good )
-            PRT_CFG_REGS( eSpiMasterBfm, CSn, SCK, DIO, tmpBool );
-            assert ( tmpBool = false ) report "PRT_CFG_REGS:  One access needs to fail" severity warning;
-            if not ( tmpBool = false ) then good := false; end if;
-            wait for 1 us;
-        end if;
-        -------------------------
-
-
-        -------------------------
-        -- Test11: VWIRERD
-        -------------------------
-        if ( doTest11 or DO_ALL_TEST ) then
-            Report "Test11: VWIRERD - Status Wires";
+            Report "Test10: VWIRERD - Status Wires";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -496,10 +471,10 @@ begin
 
 
         -------------------------
-        -- Test12: VW_ADD
+        -- Test11: VW_ADD
         -------------------------
-        if ( doTest12 or DO_ALL_TEST ) then
-            Report "Test12: VW_ADD - Composes List of Virtual Wires";
+        if ( doTest11 or DO_ALL_TEST ) then
+            Report "Test11: VW_ADD - Composes List of Virtual Wires";
             vwireLen := 0;
             VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vwireIdx, vwireData, vwireLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index
             VW_ADD( eSpiMasterBfm, "IRQ12",                     '1', vwireIdx, vwireData, vwireLen, good );
@@ -530,10 +505,10 @@ begin
 
 
         -------------------------
-        -- Test13: WAIT_VW_IS_EQ
+        -- Test12: WAIT_VW_IS_EQ
         -------------------------
-        if ( doTest13 or DO_ALL_TEST ) then
-            Report "Test13: WAIT_VW_IS_EQ - Waits until the Virtual Wires with Value are read";
+        if ( doTest12 or DO_ALL_TEST ) then
+            Report "Test12: WAIT_VW_IS_EQ - Waits until the Virtual Wires with Value are read";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -549,6 +524,18 @@ begin
         end if;
         -------------------------
 
+
+        -------------------------
+        -- Test13: init
+        -------------------------
+        if ( doTest13 or DO_ALL_TEST ) then
+            Report "Test13: test13: init with 'Exit G3 Sequence'";
+
+
+
+
+        end if;
+        -------------------------
 
 
         -------------------------

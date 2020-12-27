@@ -516,16 +516,6 @@ package eSpiMasterBfm is
                     variable good       : inout boolean                         --! successful?
                 );
 
-        -- Print: Slave Configuration Registers to Console Log
-            procedure PRT_CFG_REGS
-                (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;                        --! slave select
-                    signal SCK          : out std_logic;                        --! shift clock
-                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                    variable good       : inout boolean                         --! successful
-                );
-
     -----------------------------
 
 end package eSpiMasterBfm;
@@ -543,6 +533,7 @@ package body eSpiMasterBfm is
 
         --***************************
         -- BFM
+        constant C_BFM_LICENSE  : string := "BSDv3";
         constant C_BFM_AUTHORS  : string := "Andreas Kaeberlein";
         constant C_BFM_VERSION  : string := "v0.1.0";
         --***************************
@@ -1529,12 +1520,11 @@ package body eSpiMasterBfm is
             init( this );
             -- message level
             setLogLevel( this, log );
-            -- user message
-            if ( this.verbose >= C_MSG_INFO ) then
-                Report  "eSpiMasterBfm:init"                & character(LF) &
-                        "       Authors: "  & C_BFM_AUTHORS & character(LF) &
-                        "       Version: "  & C_BFM_VERSION;
-            end if;
+            -- BFM info
+            Report  "eSpiMasterBfm"                         & character(LF) &
+                    "       License : "  & C_BFM_LICENSE    & character(LF) &
+                    "       Authors : "  & C_BFM_AUTHORS    & character(LF) &
+                    "       Version : "  & C_BFM_VERSION;
             -- reset startup sequence
             RESETn  <= '0';                 --! send core to reset
             CSn     <= '1';                 --! deselect device
@@ -3676,69 +3666,6 @@ package body eSpiMasterBfm is
         --***************************
 
     ----------------------------------------------
-
-
-
-    ----------------------------------------------
-    -- Print to Console
-    ----------------------------------------------
-
-        --***************************
-        -- Prints: Slave Configuration Registers to Console Log
-        procedure PRT_CFG_REGS
-            (
-                variable this       : inout tESpiBfm;
-                signal CSn          : out std_logic;                        --! slave select
-                signal SCK          : out std_logic;                        --! shift clock
-                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                variable good       : inout boolean                         --! successful
-            )
-        is
-            constant adrs   : slv16(0 to 5) := (C_DEVICE_IDENTIFICATION, C_GENERAL, C_PERIPHERAL_CHANNEL, C_VIRTUAL_WIRE_CHANNEL, C_OOB_CHANNEL, C_FLASH_CHANNEL);    --! buffer slave regs
-            variable sts    : std_logic_vector(15 downto 0);    --! dummy variable
-            variable rsp    : tESpiRsp;                         --! request response status
-            variable cfgStr : string(1 to 313);                 --! string for config print to console
-            variable cfg    : std_logic_vector(31 downto 0);    --! temp variable for config
-            variable tmpStr : string(1 to 10);
-        begin
-            -- user message
-            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:PRT_CFG_REGS"; end if;
-            -- template for console print, blanks are filled
-            cfgStr  :=  (others => character(NUL)); --! init
-            cfgStr  :=  character(LF) &
-                        "     eSPI Slave Configuration:"                 & character(LF) &
-                        "       DevId                      :           " & character(LF) &
-                        "       General                    :           " & character(LF) &
-                        "       Peripheral Channel   (Ch0) :           " & character(LF) &
-                        "       Virtual Wire Channel (Ch1) :           " & character(LF) &
-                        "       OOB Message Channel  (Ch2) :           " & character(LF) &
-                        "       Flash Access Channel (Ch3) :           ";
-            -- acquire data
-            for i in 0 to (adrs'length - 1) loop
-                -- prepare
-                cfg     := (others => '0');             -- init
-                tmpStr  := (others => character(' '));  -- blank string
-                -- request slave
-                    -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, status, response );
-                GET_CONFIGURATION( this, CSn, SCK, DIO, adrs(i), cfg, sts, rsp );
-                -- check response and prepare data
-                if ( ACCEPT = rsp ) then
-                    tmpStr := "0x" & to_hstring(cfg);
-                else
-                    if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:PRT_CFG_REGS Failed read from ADR 0x" & to_hstring(adrs(i)); end if;
-                    tmpStr(1 to 4)  := "FAIL";
-                    good            := false;
-                end if;
-                -- insert
-                cfgStr(68+i*47+1 to 68+i*47+tmpStr'length) := tmpStr;
-            end loop;
-            -- print config
-            Report cfgStr;
-        end procedure PRT_CFG_REGS;
-        --***************************
-
-    ----------------------------------------------
-
 
 
 end package body eSpiMasterBfm;
