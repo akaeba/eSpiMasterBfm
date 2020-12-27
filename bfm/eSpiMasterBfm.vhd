@@ -1235,17 +1235,38 @@ package body eSpiMasterBfm is
         -- cfgReg2Str
         --   prints configuration registers into string
         function cfgReg2Str ( this : in tESpiBfm ) return string is
-            variable str : string(1 to 306) := (others => character(NUL));
+            variable str : string(1 to 512) := (others => character(NUL));
         begin
-            str := character(LF) &
-                "     eSPI Configuration"                                                                   & character(LF) &
-                "       Device Identification      : 0x" & to_hstring(this.slaveRegs.DEVICE_IDENTIFICATION) & character(LF) &
-                "       General                    : 0x" & to_hstring(this.slaveRegs.GENERAL)               & character(LF) &
-                "       Peripheral Channel   (Ch0) : 0x" & to_hstring(this.slaveRegs.PERIPHERAL_CHANNEL)    & character(LF) &
-                "       Virtual Wire Channel (Ch1) : 0x" & to_hstring(this.slaveRegs.VIRTUAL_WIRE_CHANNEL)  & character(LF) &
-                "       OOB Message Channel  (Ch2) : 0x" & to_hstring(this.slaveRegs.OOB_CHANNEL)           & character(LF) &
-                "       Flash Access Channel (Ch3) : 0x" & to_hstring(this.slaveRegs.FLASH_CHANNEL);
-            return str;
+            -- always print
+            str := strcat(str, "     eSPI Configuration:"                                                                   & character(LF));
+            str := strcat(str, "       Device Identification      : 0x" & to_hstring(this.slaveRegs.DEVICE_IDENTIFICATION)  & character(LF));
+            str := strcat(str, "       General                    : 0x" & to_hstring(this.slaveRegs.GENERAL)                & character(LF));
+            -- Peripheral Channel (Ch0)
+            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_PERI'range) is
+                when "1"    => str := strcat(str, "       Peripheral Channel   (Ch0) : 0x" & to_hstring(this.slaveRegs.PERIPHERAL_CHANNEL)  & character(LF));
+                when "0"    => str := strcat(str, "       Peripheral Channel   (Ch0) : not supported"                                       & character(LF));
+                when others => str := strcat(str, "       Peripheral Channel   (Ch0) : UNKNOWN"                                             & character(LF));
+            end case;
+            -- Virtual Wire Channel (Ch1)
+            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range) is
+                when "1"    => str := strcat(str, "       Virtual Wire Channel (Ch1) : 0x" & to_hstring(this.slaveRegs.VIRTUAL_WIRE_CHANNEL)    & character(LF));
+                when "0"    => str := strcat(str, "       Virtual Wire Channel (Ch1) : not supported"                                           & character(LF));
+                when others => str := strcat(str, "       Virtual Wire Channel (Ch1) : UNKNOWN"                                                 & character(LF));
+            end case;
+            -- OOB Message Channel (Ch2)
+            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_OOB'range) is
+                when "1"    => str := strcat(str, "       OOB Message Channel  (Ch2) : 0x" & to_hstring(this.slaveRegs.OOB_CHANNEL) & character(LF));
+                when "0"    => str := strcat(str, "       OOB Message Channel  (Ch2) : not supported"                               & character(LF));
+                when others => str := strcat(str, "       OOB Message Channel  (Ch2) : UNKNOWN"                                     & character(LF));
+            end case;
+            -- Flash Access Channel (Ch3)
+            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range) is
+                when "1"    => str := strcat(str, "       Flash Access Channel (Ch3) : 0x" & to_hstring(this.slaveRegs.FLASH_CHANNEL)   & character(LF));
+                when "0"    => str := strcat(str, "       Flash Access Channel (Ch3) : not supported"                                   & character(LF));
+                when others => str := strcat(str, "       Flash Access Channel (Ch3) : UNKNOWN"                                         & character(LF));
+            end case;
+            -- interpretation finished
+            return str(1 to strlen(str)+1);
         end function cfgReg2Str;
         --***************************
 
@@ -1257,21 +1278,21 @@ package body eSpiMasterBfm is
             variable str : string(1 to 1023) := (others => character(NUL));
         begin
             -- Header
-            str := strcat(str, "     General Capabilities and Configurations (0x08)" & character(LF));
+            str := strcat(str, "     General Capabilities and Configurations (0x08):" & character(LF));
             -- CRC Checking Enable, Bit31
             str := strcat(str, "       CRC Checking Enable  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CRC'range)))) & character(LF));
             -- Alert Mode, Bit28
             case this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range) is
-                when "1"    => str := strcat(str, "       Alert Mode            : Alert"    & character(LF));
-                when "0"    => str := strcat(str, "       Alert Mode            : I/O[1]"   & character(LF));
-                when others => str := strcat(str, "       Alert Mode            : UNKNOWN"  & character(LF));
+                when "1"    => str := strcat(str, "       Alert Mode           : Alert"    & character(LF));
+                when "0"    => str := strcat(str, "       Alert Mode           : I/O[1]"   & character(LF));
+                when others => str := strcat(str, "       Alert Mode           : UNKNOWN"  & character(LF));
             end case;
             -- I/O Mode Select, Bit27:26
             case this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) is
-                when C_GENERAL_IO_MODE_SINGLE   => str := strcat(str, "       I/O Mode Select       : Single I/O"   & character(LF));
-                when C_GENERAL_IO_MODE_DUAL     => str := strcat(str, "       I/O Mode Select       : Dual I/O"     & character(LF));
-                when C_GENERAL_IO_MODE_QUAD     => str := strcat(str, "       I/O Mode Select       : Quad I/O"     & character(LF));
-                when others                     => str := strcat(str, "       I/O Mode Select       : UNKNOWN"      & character(LF));
+                when C_GENERAL_IO_MODE_SINGLE   => str := strcat(str, "       I/O Mode Select      : Single I/O"   & character(LF));
+                when C_GENERAL_IO_MODE_DUAL     => str := strcat(str, "       I/O Mode Select      : Dual I/O"     & character(LF));
+                when C_GENERAL_IO_MODE_QUAD     => str := strcat(str, "       I/O Mode Select      : Quad I/O"     & character(LF));
+                when others                     => str := strcat(str, "       I/O Mode Select      : UNKNOWN"      & character(LF));
             end case;
             -- I/O Mode Support, Bit25:24
             case this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SUP'range) is
@@ -1320,7 +1341,7 @@ package body eSpiMasterBfm is
             str := strcat(str, "       Virtual Wire Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range))))       & character(LF));
             str := strcat(str, "       OOB Message Channel  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_OOB'range))))      & character(LF));
             str := strcat(str, "       Flash Access Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range))))    & character(LF));
-            -- config interpretation finished
+            -- interpretation finished
             return str(1 to strlen(str)+1);
         end function generalReg2Str;
         --***************************
@@ -1679,8 +1700,8 @@ package body eSpiMasterBfm is
             -- *****
             -- Print Configuration Regs
             if ( this.verbose >= C_MSG_INFO ) then
-                Report "eSpiMasterBfm:init:"        & character(LF) &
-                            cfgReg2Str( this )      & character(LF) &
+                Report "eSpiMasterBfm:init:"        & character(LF) & character(LF) &
+                            cfgReg2Str( this )      & character(LF) & character(LF) &
                             generalReg2Str( this );
             end if;
         end procedure init;
