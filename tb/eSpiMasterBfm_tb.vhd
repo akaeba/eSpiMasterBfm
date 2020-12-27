@@ -87,7 +87,6 @@ begin
     p_stimuli : process
         -- tb help variables
             variable good       : boolean := true;
-            variable tmpBool    : boolean := true;
         -- DUT
             variable eSpiMasterBfm  : tESpiBfm;                                         --! eSPI Master bfm Handle
             variable eSpiMsg        : tMemX08(0 to 9);                                  --! eSPI Message
@@ -99,8 +98,6 @@ begin
             variable vwireIdx       : tMemX08(0 to 63);                                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
             variable vwireData      : tMemX08(0 to 63);                                 --! virtual wire data
             variable vwireLen       : integer range 0 to 64;                            --! number of wire pairs
-
-            variable myStr  : string (1 to 1024) := (others => character(NUL));
 
     begin
 
