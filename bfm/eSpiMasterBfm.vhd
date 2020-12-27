@@ -208,7 +208,7 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);
                     variable response   : out tESpiRsp
                 );
-            -- w/o status, response
+            -- w/o status, response; Writes changed registers into BFM shadow registers (slaveRegs) back
             procedure SET_CONFIGURATION
                 (
                     variable this   : inout tESpiBfm;
@@ -2290,15 +2290,15 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- update BFM shadow register of slave
-                -- case adr is
-                    -- when C_DEVICE_IDENTIFICATION     => this.slaveRegs.DEVICE_IDENTIFICATION             := config;   --! Device Identification
-                    -- when C_GENERAL    => this.slaveRegs.GENERAL           := config;   --! General Capabilities and Configurations
-                    -- when C_PERIPHERAL_CHANNEL    => this.slaveRegs.PERIPHERAL_CHANNEL    := config;   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
-                    -- when C_VIRTUAL_WIRE_CHANNEL    => this.slaveRegs.VIRTUAL_WIRE_CHANNEL     := config;   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
-                    -- when C_OOB_CHANNEL    => this.slaveRegs.OOB_CHANNEL       := config;   --! Channel 2 Capabilities and Configurations (OOB Channel)
-                    -- when C_FLASH_CHANNEL    => this.slaveRegs.FLASH_CHANNEL         := config;   --! Channel 3 Capabilities and Configurations (Flash Channel)
-                    -- when others                 => Report "SET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(config) & ";";  -- print to log
-                -- end case;
+                case adr is
+                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs.DEVICE_IDENTIFICATION := config;   --! Device Identification
+                    when C_GENERAL                  => this.slaveRegs.GENERAL               := config;   --! General Capabilities and Configurations
+                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs.PERIPHERAL_CHANNEL    := config;   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
+                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs.VIRTUAL_WIRE_CHANNEL  := config;   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
+                    when C_OOB_CHANNEL              => this.slaveRegs.OOB_CHANNEL           := config;   --! Channel 2 Capabilities and Configurations (OOB Channel)
+                    when C_FLASH_CHANNEL            => this.slaveRegs.FLASH_CHANNEL         := config;   --! Channel 3 Capabilities and Configurations (Flash Channel)
+                    when others                     => Report "SET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(config) & ";";  -- print to log
+                end case;
             end if;
         end procedure SET_CONFIGURATION;
         --***************************

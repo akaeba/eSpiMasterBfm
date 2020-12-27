@@ -99,6 +99,8 @@ begin
             variable vwireData      : tMemX08(0 to 63);                                 --! virtual wire data
             variable vwireLen       : integer range 0 to 64;                            --! number of wire pairs
 
+            variable myStr  : string (1 to 1024) := (others => character(NUL));
+
     begin
 
         -------------------------
@@ -208,7 +210,14 @@ begin
             LDMSG           <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
-            SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", good );  --! General Capabilities and Configuration 0x08, enable CRC
+                -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config, status, response );
+            SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", status, response );
+                -- status
+            assert ( x"030F" = status ) report "SET_CONFIGURATION:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = status ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = response ) report "SET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = response ) then good := false; end if;
             -- divide wait
             wait for 1 us;
         end if;
