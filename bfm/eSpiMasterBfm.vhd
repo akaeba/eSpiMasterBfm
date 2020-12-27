@@ -1268,7 +1268,7 @@ package body eSpiMasterBfm is
                 when others => str := strcat(str, "       Flash Access Channel (Ch3) : UNKNOWN"                                         & character(LF));
             end case;
             -- interpretation finished
-            return str(1 to strlen(str)+1);
+            return str(1 to strlen(str));
         end function cfgReg2Str;
         --***************************
 
@@ -1344,7 +1344,7 @@ package body eSpiMasterBfm is
             str := strcat(str, "       OOB Message Channel  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_OOB'range))))      & character(LF));
             str := strcat(str, "       Flash Access Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range))))    & character(LF));
             -- interpretation finished
-            return str(1 to strlen(str)+1);
+            return str(1 to strlen(str));
         end function generalReg2Str;
         --***************************
 
@@ -1702,7 +1702,7 @@ package body eSpiMasterBfm is
             -- Print Configuration Regs
             if ( this.verbose >= C_MSG_INFO ) then
                 Report "eSpiMasterBfm:init:"        & character(LF) & character(LF) &
-                            cfgReg2Str( this )      & character(LF) & character(LF) &
+                            cfgReg2Str( this )      & character(LF) &
                             generalReg2Str( this );
             end if;
         end procedure init;
