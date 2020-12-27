@@ -115,13 +115,31 @@ package eSpiMasterBfm is
     -----------------------------
     -- Procedures
         -- init: initializes bus functional model
-        procedure init
-            (
-                variable this   : inout tESpiBfm;                       --! common handle
-                signal CSn      : out std_logic;                        --! slave select
-                signal SCK      : out std_logic;                        --! shift clock
-                signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            );
+            -- bfm common handle only
+            procedure init
+                (
+                    variable this   : inout tESpiBfm    --! common handle
+                );
+            -- todo: del
+            procedure init
+                (
+                    variable this   : inout tESpiBfm;                       --! common handle
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
+                );
+            -- bfm and slave 'Exit G3' sequence
+            procedure init
+                (
+                    variable this   : inout tESpiBfm;                       --! common handle
+                    signal RESETn   : out std_logic;                        --! reset signal
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                    signal ALERTn   : in std_logic;                         --! slaves alert pin
+                    variable good   : inout boolean;                        --! successful
+                    constant log    : in tMsgLevel                          --! BFM log level
+                );
 
         -- setLogLevel: sets bfm log level
         procedure setLogLevel
@@ -1351,42 +1369,6 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- isVW
-        --   checks if virtual wire list has element with name/value
-        function isVW
-            (
-                constant name       : in string;    --! virtual wire name
-                constant value      : in bit;       --! virtual wire value
-                constant vwireIdx   : tMemX08;      --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                constant vwireData  : tMemX08       --! virtual wire data
-            )
-        return boolean is
-            constant notValidElem   : tMemX08(0 to 1) := (others => (others => '-'));   --! not valid element
-            variable virtWire       : tMemX08(0 to 1);                                  --! virtual wire index/value pair
-        begin
-            -- same length?
-            if ( vwireIdx'length /= vwireData'length ) then
-                return false;
-            end if;
-            -- build match vector
-                -- newVW( name, value )
-            virtWire := newVW( name, value );   --! create needle for match
-            -- virtual wire build?
-            if ( notValidElem = virtWire ) then
-                return false;
-            end if;
-            -- search in list
-            for i in vwireIdx'left to vwireIdx'right loop
-                if ( std_match(vwireIdx(i), virtWire(0)) and std_match(vwireData(i), virtWire(1)) ) then
-                    return true;    --! virtual wire in list
-                end if;
-            end loop;
-            return false;   --! no name/value match
-        end function isVW;
-        --***************************
-
-
-        --***************************
         -- dcIfEq
         --   returns slv with don't care ('-') elements in bits which are equal
         function dcIfEq
@@ -1706,7 +1688,7 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- init, some defaults are set
+        -- init, only log is settable
         procedure init
             (
                 variable this   : inout tESpiBfm;                       --! common handle
@@ -1715,14 +1697,13 @@ package body eSpiMasterBfm is
                 signal SCK      : out std_logic;                        --! shift clock
                 signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
                 signal ALERTn   : in std_logic;                         --! slaves alert pin
-                variable good   : inout boolean                         --! successful
+                variable good   : inout boolean;                        --! successful
+                constant log    : in tMsgLevel                          --! BFM log level
             )
         is
         begin
-
-
-
-
+                -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log, crc, maxClk, maxDIO );
+            init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log, false, true, true );
         end procedure init;
         --***************************
 
