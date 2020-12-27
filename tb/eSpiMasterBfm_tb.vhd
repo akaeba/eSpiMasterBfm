@@ -76,6 +76,8 @@ architecture sim of eSpiMasterBfm_tb is
         signal REQMSG   : string(1 to 150);     --! request message
         signal CMPMSG   : string(1 to 150);     --! complete message, if request was ok
         signal LDMSG    : std_logic;            --! load message on rising edge
+        -- Help
+        signal foo      : std_logic;            --! init applies reset
     -----------------------------
 
 begin
@@ -521,6 +523,7 @@ begin
             -- Request BFM
                 -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, wireName, wireVal, good )
             WAIT_VW_IS_EQ( eSpiMasterBfm, CSn, SCK, DIO, ALERTn, "IRQ4", '1', good );
+            wait for 1 us;
         end if;
         -------------------------
 
@@ -529,11 +532,20 @@ begin
         -- Test13: init
         -------------------------
         if ( doTest13 or DO_ALL_TEST ) then
-            Report "Test13: test13: init with 'Exit G3 Sequence'";
-
-
-
-
+            Report "Test13: init with 'Exit G3 Sequence'";
+            -- load message
+            REQMSG              <= (others => character(NUL));
+            CMPMSG              <= (others => character(NUL));
+            REQMSG(1 to 130)    <= "21000810"           & character(LF) & "220008030000003B"    & character(LF) & "210020C8"            & character(LF) & "220020010700007C"    & character(LF) & "25FB"        & character(LF) & "051B"            & character(LF) & "0400027730"  & character(LF) & "0400031017"  & character(LF) & "0400032289"  & character(LF) & "21001058"            & character(LF) & "22001013110000BE"    & character(LF) & "21000434"            & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 146)    <= "08030000000F035B"   & character(LF) & "080F039B"            & character(LF) & "08000700000F0309"    & character(LF) & "080F039B"            & character(LF) & "084F03C0"    & character(LF) & "080005994F0303"  & character(LF) & "084F03C0"    & character(LF) & "084F03C0"    & character(LF) & "084F03C0"    & character(LF) & "08131100004F03CE"    & character(LF) & "084F03C0"            & character(LF) & "08010000004F0352"    & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG               <= '1';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            LDMSG               <= '0';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            -- Request BFM
+                -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log );
+            init( eSpiMasterBfm, foo, CSn, SCK, DIO, ALERTn, good, INFO );
+            wait for 1 us;
         end if;
         -------------------------
 
@@ -577,7 +589,8 @@ begin
 
     ----------------------------------------------
     -- Pull Resistors
-    DIO <= (others => 'H');
+    DIO     <= (others => 'H');
+    ALERTn  <= 'H';
     ----------------------------------------------
 
 end architecture sim;
