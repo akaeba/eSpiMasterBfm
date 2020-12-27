@@ -114,7 +114,7 @@ package eSpiMasterBfm is
 
     -----------------------------
     -- Procedures
-        -- init: initializes bus functional model
+        -- init: initializes espi system
             -- bfm common handle only
             procedure init
                 (
@@ -139,6 +139,17 @@ package eSpiMasterBfm is
                     signal ALERTn   : in std_logic;                         --! slaves alert pin
                     variable good   : inout boolean;                        --! successful
                     constant log    : in tMsgLevel                          --! BFM log level
+                );
+            -- init, bfm and slave 'Exit G3' sequence, errors printed to console
+            procedure init
+                (
+                    variable this   : inout tESpiBfm;                       --! common handle
+                    signal RESETn   : out std_logic;                        --! reset signal
+                    signal CSn      : out std_logic;                        --! slave select
+                    signal SCK      : out std_logic;                        --! shift clock
+                    signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                    signal ALERTn   : in std_logic;                         --! slaves alert pin
+                    variable good   : inout boolean                         --! successful
                 );
 
         -- setLogLevel: sets bfm log level
@@ -1725,6 +1736,26 @@ package body eSpiMasterBfm is
         begin
                 -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log, crc, maxClk, maxDIO );
             init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log, false, true, true );
+        end procedure init;
+        --***************************
+
+
+        --***************************
+        -- init, default: errors printed to console
+        procedure init
+            (
+                variable this   : inout tESpiBfm;                       --! common handle
+                signal RESETn   : out std_logic;                        --! reset signal
+                signal CSn      : out std_logic;                        --! slave select
+                signal SCK      : out std_logic;                        --! shift clock
+                signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
+                signal ALERTn   : in std_logic;                         --! slaves alert pin
+                variable good   : inout boolean                         --! successful
+            )
+        is
+        begin
+                -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log )
+            init( this, RESETn, CSn, SCK, DIO, ALERTn, good, ERROR );   -- only errors are printed to console
         end procedure init;
         --***************************
 
