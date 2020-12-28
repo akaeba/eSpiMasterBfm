@@ -21,7 +21,7 @@ Currently are procedures available for:
 
 ## Example
 
-The full provided function set is demonstrated in _[eSpiStaticSlave_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiStaticSlave_tb.vhd)_.
+The full provided function set is demonstrated in _[eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)_.
 A tiny testbench example shows the snippet below:
 
 ```vhdl
