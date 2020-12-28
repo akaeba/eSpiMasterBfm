@@ -13,10 +13,22 @@ Currently are procedures available for:
 
 ## Releases
 
+| Version | Date       | Source                                                                                            | Change log                                      |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| latest  |            | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> | latest                                          |
+| v0.1.0  |            |                                                                                                   | Configuration; IO read/write; Memory read/write |
 
 
-## Enhanced Serial Peripheral Interface (ESPI)
+## Example
 
+The full provided function set is demonstrated in _[eSpiStaticSlave_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiStaticSlave_tb.vhd)_
+A tiny testbench example is shown below:
+
+```vhdl
+
+
+
+```
 
 
 ## File Listing
@@ -27,10 +39,6 @@ Currently are procedures available for:
 | [eSpiStaticSlave.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiStaticSlave.vhd)      | BFM   | ASCII hex request/completion checking slave, supports eSpiMasterBfm TB |
 | [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)     | TB    | checks functionality of _eSpiMasterBfm_                                |
 | [eSpiStaticSlave_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiStaticSlave_tb.vhd) | TB    | checks functionality of _eSpiStaticSlave_                              |
-
-
-## How-to use
-
 
 
 ## Procedures
