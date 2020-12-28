@@ -29,7 +29,7 @@ library ieee;
   use ieee.std_logic_1164.all;
 library work;
   use work.eSpiMasterBfm.all;
-  
+
 entity espi_tb is
 end entity espi_tb;
 
@@ -43,7 +43,7 @@ architecture sim of espi_tb is
   signal ALERTn : std_logic;
   signal RESETn : std_logic;
   -----------------------------
-  
+
 begin
 
   -----------------------------
@@ -51,41 +51,41 @@ begin
   --   add ESPI Slave here
   -----------------------------
 
-  
+
   -----------------------------
   -- stimuli process
   p_stimuli : process
-	variable eSpiBfm : tESpiBfm;	    				-- eSPI Master bfm Handle
-	variable good    : boolean := true;					-- test state
-	variable slv08   : std_logic_vector(7 downto 0);	-- help variable
+    variable eSpiBfm : tESpiBfm;                        -- eSPI Master bfm Handle
+    variable good    : boolean := true;                 -- test state
+    variable slv08   : std_logic_vector(7 downto 0);    -- help variable
   begin
     -- Initializes Endpoint according 'Exit G3' sequence
     --   init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log );
     init( eSpiBfm, RESETn, CSn, SCK, DIO, ALERTn, good, INFO );
 
-	-- write to io-mapped address
-	--   IOWR( this, CSn, SCK, DIO, adr, data, good )
-	IOWR( eSpiBfm, CSn, SCK, DIO, x"0080", x"47", good );	-- P80
-	
-	-- read from io-mapped address
-	--   IORD( this, CSn, SCK, DIO, adr, data, good )
-	IORD( eSpiBfm, CSn, SCK, DIO, x"0081", slv08, good );	-- P81
-	
-	-- write to memory-mapped address
-	--   MEMWR32( this, CSn, SCK, DIO, adr, data, good );
-	MEMWR32( eSpiBfm, CSn, SCK, DIO, x"00000080", x"47", good );	-- byte write
-	
-	-- read from memory-mapped address
-	--   MEMRD32( this, CSn, SCK, DIO, adr, data, good );
-	MEMRD32( eSpiBfm, CSn, SCK, DIO, x"00000080", slv08, good );	-- byte read
-	
-	-- done
-	Report "That's it :-)";
-	wait;	-- stop continous run
+    -- write to io-mapped address
+    --   IOWR( this, CSn, SCK, DIO, adr, data, good )
+    IOWR( eSpiBfm, CSn, SCK, DIO, x"0080", x"47", good );   -- P80
+
+    -- read from io-mapped address
+    --   IORD( this, CSn, SCK, DIO, adr, data, good )
+    IORD( eSpiBfm, CSn, SCK, DIO, x"0081", slv08, good );   -- P81
+
+    -- write to memory-mapped address
+    --   MEMWR32( this, CSn, SCK, DIO, adr, data, good );
+    MEMWR32( eSpiBfm, CSn, SCK, DIO, x"00000080", x"47", good );    -- byte write
+
+    -- read from memory-mapped address
+    --   MEMRD32( this, CSn, SCK, DIO, adr, data, good );
+    MEMRD32( eSpiBfm, CSn, SCK, DIO, x"00000080", slv08, good );    -- byte read
+
+    -- done
+    Report "That's it :-)";
+    wait;   -- stop continous run
   end process p_stimuli;
   -----------------------------
 
-  
+
   -----------------------------
   -- External Pull Resistors
   SCK    <= 'L';
