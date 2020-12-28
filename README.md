@@ -99,12 +99,14 @@ end architecture sim;
 
 ## File Listing
 
-| File                                                                                                    | Group | Remark                                                                 |
-| ------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------------------------------------------- |
-| [eSpiMasterBfm.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd)          | BFM   | provides VHDL procedures to interact with an eSPI Slave                |
-| [eSpiStaticSlave.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiStaticSlave.vhd)      | BFM   | ASCII hex request/completion checking slave, supports eSpiMasterBfm TB |
-| [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)     | TB    | checks functionality of _eSpiMasterBfm_                                |
-| [eSpiStaticSlave_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiStaticSlave_tb.vhd) | TB    | checks functionality of _eSpiStaticSlave_                              |
+The table below lists the major files in this project:
+
+| File                                                                                                                             | Group | Remark                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------- |
+| [eSpiMasterBfm.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd)                                   | BFM   | BFM itself, provides procedures to interact with an eSPI Slave |
+| [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)                              | TB    | _eSpiMasterBfm_ testbench, example BFM procedure calls         |
+| [eSpiMasterBfm_compile.tcl](https://github.com/akaeba/eSpiMasterBfm/blob/master/tcl/sim/eSpiMasterBfm/eSpiMasterBfm_compile.tcl) | SIM   | compile script for Modelsim                                    |
+| [eSpiMasterBfm_runsim.tcl](https://github.com/akaeba/eSpiMasterBfm/blob/master/tcl/sim/eSpiMasterBfm/eSpiMasterBfm_runsim.tcl)   | SIM   | starts simulation                                              |
 
 
 ## Procedures
@@ -194,6 +196,10 @@ IORD_BYTE(this, CSn, SCK, DIO, adr, data, good);    -- 8bit data
 IORD_WORD(this, CSn, SCK, DIO, adr, data, good);    -- 16bit data
 IORD_DWORD(this, CSn, SCK, DIO, adr, data, good);   -- 32bit data
 ```
+
+
+## Contributors wanted
+
 
 
 ## References
