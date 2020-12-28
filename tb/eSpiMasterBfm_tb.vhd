@@ -21,7 +21,6 @@
 library ieee;
     use ieee.std_logic_1164.all;
     use ieee.numeric_std.all;
-    use ieee.math_real.all;         --! for UNIFORM, TRUNC
 library work;
     use work.eSpiMasterBfm.all;     --! package under test
 --------------------------------------------------------------------------
@@ -263,9 +262,10 @@ begin
             wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
-                -- Request BFM
+            -- Request BFM
+                -- MEMWR32( this, CSn, SCK, DIO, adr, data, good );
             MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good ); --! write single byte to address 0x80
-            wait for 4*decodeClk( eSpiMasterBfm );                                   --! divide wait
+            wait for 4*decodeClk( eSpiMasterBfm );                              --! divide wait
             -- Memory write non-short command
             Report "         multiple Byte write";
                 -- load message
@@ -281,6 +281,7 @@ begin
             memX08(0)   := x"01";   --! prepare data to write
             memX08(1)   := x"23";
             memX08(2)   := x"45";
+                -- MEMWR32( this, CSn, SCK, DIO, adr, data, good );
             MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", memX08, good );    --! write to memory
             -- divide wait
             wait for 1 us;
@@ -303,6 +304,7 @@ begin
             LDMSG           <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
+                -- MEMRD32( this, CSn, SCK, DIO, adr, data, good );
             MEMRD32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", slv8, good );  --! read single byte from address 0x80
             -- check
             assert ( x"01" = slv8 ) report "MEMRD32:  Read value unequal 0x01" severity warning;
@@ -348,6 +350,7 @@ begin
             LDMSG           <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
+                -- IOWR( this, CSn, SCK, DIO, adr, data, good )
             IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"47", good );    --! write data byte 0x47 to IO space adr 0x80 (Port 80)
             wait for 1 us;
         end if;
@@ -371,6 +374,7 @@ begin
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
             slv8 := (others => 'X');                                    --! make invalid
+                -- IORD( this, CSn, SCK, DIO, adr, data, good );
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good ); --! read data byte from io space adr 0x80
             -- check
             assert ( x"01" = slv8 ) report "IORD:  Read value unequal 0x01" severity warning;
@@ -586,6 +590,7 @@ begin
 
     ----------------------------------------------
     -- Pull Resistors
+    SCK     <= 'L';
     DIO     <= (others => 'H');
     ALERTn  <= 'H';
     ----------------------------------------------
