@@ -25,6 +25,7 @@ library ieee;
     use ieee.std_logic_1164.all;
     use ieee.numeric_std.all;
     use ieee.math_real.realmin;
+    use ieee.math_real.realmax;
 library std;
     use std.textio.all;
 --------------------------------------------------------------------------
@@ -554,19 +555,41 @@ package body eSpiMasterBfm is
 
         --***************************
         -- padStr
-        --   creates an string with a fixed length, padded with NUL
-        function padStr ( str : in string; pad : in character; len : in positive ) return string is
+        --   creates an string with a fixed length, padded with pad
+        function padStr
+            (
+                constant str : in string;
+                constant pad : in character;
+                constant len : in positive
+            )
+        return string is
+            constant alignStr : string( 1 to str'length) := str;    --! make one aligned
             variable padedStr : string(1 to len);
         begin
             -- pad with null
             padedStr := (others => pad);
-            -- check length
-            if ( str'length < len ) then
-                padedStr(1 to str'length) := str;
-            else
-                padedStr := str(1 to str'length);
+            -- no padding
+            if ( alignStr'length = len ) then
+                return alignStr;
             end if;
+            -- pad
+            padedStr(1 to alignStr'length) := alignStr;
             return padedStr;
+        end function padStr;
+        --***************************
+
+        --***************************
+        -- padStr
+        --   creates an string with a fixed length, padded with NUL
+        function padStr
+            (
+                constant str : in string;
+                constant len : in positive
+            )
+        return string is
+        begin
+                -- padStr( str, pad, len )
+            return padStr( str, character(NUL), len );
         end function padStr;
         --***************************
 
@@ -1102,20 +1125,20 @@ package body eSpiMasterBfm is
         return string is
             variable ret : string(1 to 1024) := (others => (character(NUL)));   --! make empty
         begin
-            ret := strcat(ret, "     Status           : 0x"    & to_hstring(sts)                                                                                   & character(LF));
-            ret := strcat(ret, "       PC_FREE        : "      & to_hstring(sts(C_STS_PC_FREE'range))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF));
-            ret := strcat(ret, "       NP_FREE        : "      & to_hstring(sts(C_STS_NP_FREE'range))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF));
-            ret := strcat(ret, "       VWIRE_FREE     : "      & to_hstring(sts(C_STS_VWIRE_FREE'range))     & "       Virtual Wire Rx Queue Free"                  & character(LF));
-            ret := strcat(ret, "       OOB_FREE       : "      & to_hstring(sts(C_STS_OOB_FREE'range))       & "       OOB Posted Rx Queue Free"                    & character(LF));
-            ret := strcat(ret, "       PC_AVAIL       : "      & to_hstring(sts(C_STS_PC_AVAIL'range))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF));
-            ret := strcat(ret, "       NP_AVAIL       : "      & to_hstring(sts(C_STS_NP_AVAIL'range))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF));
-            ret := strcat(ret, "       VWIRE_AVAIL    : "      & to_hstring(sts(C_STS_VWIRE_AVAIL'range))    & "       Virtual Wire Tx Queue Avail"                 & character(LF));
-            ret := strcat(ret, "       OOB_AVAIL      : "      & to_hstring(sts(C_STS_OOB_AVAIL'range))      & "       OOB Posted Tx Queue Avail"                   & character(LF));
-            ret := strcat(ret, "       FLASH_C_FREE   : "      & to_hstring(sts(C_STS_FLASH_C_FREE'range))   & "       Flash Completion Rx Queue Free"              & character(LF));
-            ret := strcat(ret, "       FLASH_NP_FREE  : "      & to_hstring(sts(C_STS_FLASH_NP_FREE'range))  & "       Flash Non-Posted Rx Queue Free"              & character(LF));
-            ret := strcat(ret, "       FLASH_C_AVAIL  : "      & to_hstring(sts(C_STS_FLASH_C_AVAIL'range))  & "       Flash Completion Tx Queue Avail"             & character(LF));
-            ret := strcat(ret, "       FLASH_NP_AVAIL : "      & to_hstring(sts(C_STS_FLASH_NP_AVAIL'range)) & "       Flash Non-Posted Tx Queue Avail");
-            return ret(1 to strlen(ret));
+            ret := strcat(ret, "     Status           : 0x" & to_hstring(sts)                                                                                    & character(LF));
+            ret := strcat(ret, "       PC_FREE        : "   & to_hstring(sts(C_STS_PC_FREE'range))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF));
+            ret := strcat(ret, "       NP_FREE        : "   & to_hstring(sts(C_STS_NP_FREE'range))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF));
+            ret := strcat(ret, "       VWIRE_FREE     : "   & to_hstring(sts(C_STS_VWIRE_FREE'range))     & "       Virtual Wire Rx Queue Free"                  & character(LF));
+            ret := strcat(ret, "       OOB_FREE       : "   & to_hstring(sts(C_STS_OOB_FREE'range))       & "       OOB Posted Rx Queue Free"                    & character(LF));
+            ret := strcat(ret, "       PC_AVAIL       : "   & to_hstring(sts(C_STS_PC_AVAIL'range))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF));
+            ret := strcat(ret, "       NP_AVAIL       : "   & to_hstring(sts(C_STS_NP_AVAIL'range))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF));
+            ret := strcat(ret, "       VWIRE_AVAIL    : "   & to_hstring(sts(C_STS_VWIRE_AVAIL'range))    & "       Virtual Wire Tx Queue Avail"                 & character(LF));
+            ret := strcat(ret, "       OOB_AVAIL      : "   & to_hstring(sts(C_STS_OOB_AVAIL'range))      & "       OOB Posted Tx Queue Avail"                   & character(LF));
+            ret := strcat(ret, "       FLASH_C_FREE   : "   & to_hstring(sts(C_STS_FLASH_C_FREE'range))   & "       Flash Completion Rx Queue Free"              & character(LF));
+            ret := strcat(ret, "       FLASH_NP_FREE  : "   & to_hstring(sts(C_STS_FLASH_NP_FREE'range))  & "       Flash Non-Posted Rx Queue Free"              & character(LF));
+            ret := strcat(ret, "       FLASH_C_AVAIL  : "   & to_hstring(sts(C_STS_FLASH_C_AVAIL'range))  & "       Flash Completion Tx Queue Avail"             & character(LF));
+            ret := strcat(ret, "       FLASH_NP_AVAIL : "   & to_hstring(sts(C_STS_FLASH_NP_AVAIL'range)) & "       Flash Non-Posted Tx Queue Avail"             & character(LF));
+            return ret(1 to strlen(ret)-1); --! -1: drops last 'LF'
         end function sts2str;
         --***************************
 
@@ -1126,61 +1149,67 @@ package body eSpiMasterBfm is
         function vw2str
             (
                 constant idx    : in tMemX08;   --! slv array of virtual wire indexes
-                constant data   : in tMemX08;   --! slv array of virtual wire data
-                constant len    : in natural    --! array number of elements
+                constant data   : in tMemX08    --! slv array of virtual wire data
             )
         return string is
-            constant nameLen    : natural           := C_SYSEVENT_NAME(C_SYSEVENT_NAME'low, C_SYSEVENT_NAME'low)'length;    --! get string length for memory allocation
-            constant blankPad   : string(1 to 7)    := "       ";                       --! blanks for entry alignment
-            constant lineLen    : natural           := nameLen + blankPad'length + 5;   --! str + ' : x' + NL
-            variable str        : string(1 to 4*len*lineLen + 32);                      --! 4: if system event wire, in one data are up to 4 wires encoded, +32 in case of len=0
-            variable strLen     : natural;                                              --! used number of characters
-            variable index      : integer;                                              --! idx converted to integer
+            variable ret    : string(1 to 2048) := (others => character(NUL));  --! make empty
+            variable maxLen : integer := 0;                                     --! maximum wire name len, required for blank pad
+            variable index  : integer;                                          --! idx converted to integer
         begin
-            -- init
-            str     := (others => (character(NUL)));
-            strLen  := 0;
-            -- wires available
-            if ( 0 = len ) then
-                strLen              := 31;
-                str(1 to strLen)    := "     No virtual wires available";
-                return str(1 to strLen);
+            -- prepare header
+            ret := strcat(ret, "     Virtual Wires:" & character(LF));
+            -- no virtual wires available
+            if ( 0 = idx'length ) then
+                ret := strcat(ret, "       no new available" & character(LF));
+                return ret(1 to strlen(ret)-1); --! -1: drops last 'LF'
             end if;
-            -- process IRQ as events
-            for i in 0 to len-1 loop
-                -- slv as integer needed
+            -- index/data mismatch
+            if ( 0 = idx'length ) then
+                ret := strcat(ret, "       index/data mismatch" & character(LF));
+                return ret(1 to strlen(ret)-1); --! -1: drops last 'LF'
+            end if;
+            -- determine max string length
+            for i in 0 to idx'length - 1 loop
+                -- convert to integer
                 index := to_integer(unsigned(idx(i)));
-                -- IRQ event
-                --   @see Table 9: Virtual Wire Index Definition
-                if ( (0 <= index) and (index <= 1) ) then
-                    -- assemble IRQ String
-                    str(strLen+1 to strLen+lineLen) := blankPad                                                                                                         &
-                                                       padstr("IRQ" & integer'image(to_integer(unsigned(data(i)(data(0)'left-1 downto data(0)'right)))) , ' ', nameLen) &
-                                                       " : "        & integer'image(to_integer(unsigned(data(i)(data(0)'left downto data(0)'left))))                    &
-                                                       character(LF);
-                    strLen := strLen + lineLen;
+                -- IRQ?
+                if ( (0 <= index) and (index <= 1) ) then   --! index=0/1 -> IRQ
+                    -- +3 -> IRQ
+                    maxLen := integer(realmax(real(maxLen), real(3 + strlen(integer'image(to_integer(unsigned(data(i)(6 downto 0))))))));
                 end if;
-            end loop;
-            -- process virtual wires
-            for i in 0 to len-1 loop
-                -- slv as integer needed
-                index := to_integer(unsigned(idx(i)));
-                -- check index for system event
+                -- System Event Wire
                 if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
-                    -- iterate over bits of system event
-                    for j in C_SYSEVENT_NAME'range(2) loop
-                        -- valid?
-                        --   @see Table 9: Virtual Wire Index Definition
-                        if ( '1' = data(i)(j+4) ) then
-                            str(strLen+1 to strLen+lineLen) := blankPad & C_SYSEVENT_NAME(index,j) & " : "              &
-                                                               integer'image(to_integer(unsigned(data(i)(j downto j)))) &
-                                                               character(LF);
-                            strLen := strLen + lineLen;
+                    -- four wires a packed into one virtual wire nibble
+                    for j in 0 to 3 loop
+                        if ( '1' = data(i)(j+4) ) then  --! valid
+                            maxLen := integer(realmax(real(maxLen), real(strlen(strtrim(C_SYSEVENT_NAME(index, j))))));
                         end if;
                     end loop;
                 end if;
             end loop;
-            return str(1 to strLen-1);  --! drop last line feed
+            maxLen := maxLen + 1;   --! padStr overflow
+            -- build virtual wire string list
+            for i in 0 to idx'length - 1 loop
+                -- convert to integer
+                index := to_integer(unsigned(idx(i)));
+                -- IRQ?
+                if ( (0 <= index) and (index <= 1) ) then   --! index=0/1 -> IRQ
+                    ret := strcat(ret, padStr("       IRQ" & integer'image(to_integer(unsigned(data(i)(6 downto 0)))), ' ', maxLen+7)); --! IRQ number, +7: leading blanks
+                    ret := strcat(ret, " : "               & integer'image(to_integer(unsigned(data(i)(7 downto 7)))) & character(LF)); --! IRQ level
+                end if;
+                -- System Event Wire
+                if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
+                    -- four wires a packed into one virtual wire nibble
+                    for j in 0 to 3 loop
+                        if ( '1' = data(i)(j+4) ) then  --! valid
+                            ret := strcat(ret, padStr("       " & strtrim(C_SYSEVENT_NAME(index, j)), ' ', maxLen+7));              --! system wire name, +7: leading blanks
+                            ret := strcat(ret, " : " & integer'image(to_integer(unsigned(data(i)(j downto j)))) & character(LF));   --! wire level
+                        end if;
+                    end loop;
+                end if;
+            end loop;
+            -- all done
+            return ret(1 to strlen(ret)-1); --! drop last line feed
         end function vw2str;
         --***************************
 
@@ -3365,8 +3394,8 @@ package body eSpiMasterBfm is
             VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, sts, rsp );
             -- only if virtual wires available print to log
             if ( ACCEPT = rsp ) then
-                    -- vw2str( idx, data, len)
-                Report character(LF) & "     Virtual Wires:" & character(LF) & vw2str(vwireIdx, vwireData, vwireLen);
+                    -- vw2str( idx, data )
+                Report character(LF) & vw2str(vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1));
             end if;
             --slave request good?
             if ( ACCEPT /= rsp ) then
@@ -3539,7 +3568,7 @@ package body eSpiMasterBfm is
                         end if;
                     end loop;
                     -- print all received wires to console
-                    if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & "  Virtual Wires:" & character(LF) & vw2str(vwIdxHs, vwDatHs, vwHsLen); end if;
+                    if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & vw2str(vwIdxHs(0 to vwHsLen-1), vwDatHs(0 to vwHsLen-1)); end if;
                     -- check for completed list
                     for i in 0 to vwDatNdl'length - 1 loop
                         if ( cVwRcv = vwDatNdl(i) ) then
