@@ -120,14 +120,6 @@ package eSpiMasterBfm is
                 (
                     variable this   : inout tESpiBfm    --! common handle
                 );
-            -- todo: del
-            procedure init
-                (
-                    variable this   : inout tESpiBfm;                       --! common handle
-                    signal CSn      : out std_logic;                        --! slave select
-                    signal SCK      : out std_logic;                        --! shift clock
-                    signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-                );
             -- bfm and slave 'Exit G3' sequence
             procedure init
                 (
@@ -1061,37 +1053,20 @@ package body eSpiMasterBfm is
         --   print decoded response register to string in a human-readable way
         function rsp2str ( rsp : tESpiRsp ) return string is
             variable ret : string(1 to 16) := (others => character(NUL));   --! make empty
-            variable len : integer;                                         --! shorts string to allow concat w/o print abort
         begin
             -- convert
             case rsp is
-                when ACCEPT =>
-                    len             := 6;
-                    ret(1 to len)   := "ACCEPT";
-                when DEFER =>
-                    len             := 5;
-                    ret(1 to len)   := "DEFER";
-                when NON_FATAL_ERROR =>
-                    len             := 15;
-                    ret(1 to len)   := "NON_FATAL_ERROR";
-                when FATAL_ERROR =>
-                    len             := 11;
-                    ret(1 to len)   := "FATAL_ERROR";
-                when WAIT_STATE =>
-                    len             := 10;
-                    ret(1 to len)   := "WAIT_STATE";
-                when NO_RESPONSE =>
-                    len             := 11;
-                    ret(1 to len)   := "NO_RESPONSE";
-                when NO_DECODE =>
-                    len             := 9;
-                    ret(1 to len)   := "NO_DECODE";
-                when others =>
-                    len             := 9;
-                    ret(1 to len)   := "NO_DECODE";
+                when ACCEPT             => ret(1 to 6)  := "ACCEPT";
+                when DEFER              => ret(1 to 5)  := "DEFER";
+                when NON_FATAL_ERROR    => ret(1 to 15) := "NON_FATAL_ERROR";
+                when FATAL_ERROR        => ret(1 to 11) := "FATAL_ERROR";
+                when WAIT_STATE         => ret(1 to 10) := "WAIT_STATE";
+                when NO_RESPONSE        => ret(1 to 11) := "NO_RESPONSE";
+                when NO_DECODE          => ret(1 to 9)  := "NO_DECODE";
+                when others             => ret(1 to 9)  := "NO_DECODE";
             end case;
             -- release
-            return ret(1 to len);
+            return ret(1 to strlen(ret));
         end function rsp2str;
         --***************************
 
@@ -1100,43 +1075,22 @@ package body eSpiMasterBfm is
         -- ct2str
         --   print decoded cycle type in human readable form to string
         function ct2str ( ct : std_logic_vector(7 downto 0) ) return string is
-            variable ret : string(1 to 50) := (others => character(NUL));   --! make empty
-            variable len : integer;                                         --! shorts string to allow concat w/o print abort
+            variable ret : string(1 to 40) := (others => character(NUL));   --! make empty
         begin
             -- convert
-            if ( std_match(ct, C_CT_MEMRD32) ) then
-                len             := 7;
-                ret(1 to len)   := "MEMRD32";
-            elsif ( std_match(ct, C_CT_MEMRD64) ) then
-                len             := 7;
-                ret(1 to len)   := "MEMRD64";
-            elsif ( std_match(ct, C_CT_MEMWR32) ) then
-                len             := 7;
-                ret(1 to len)   := "MEMWR32";
-            elsif ( std_match(ct, C_CT_MEMWR64) ) then
-                len             := 7;
-                ret(1 to len)   := "MEMWR64";
-            elsif ( std_match(ct, C_CT_MSG) ) then
-                len             := 7;
-                ret(1 to len)   := "Message";
-            elsif ( std_match(ct, C_CT_MSG_W_DAT) ) then
-                len             := 17;
-                ret(1 to len)   := "Message with Data";
-            elsif ( std_match(ct, C_CT_CPL_OK_WO_DAT) ) then
-                len             := 34;
-                ret(1 to len)   := "Successful Completion Without Data";
-            elsif ( std_match(ct, C_CT_CPL_OK_W_DAT) ) then
-                len             := 31;
-                ret(1 to len)   := "Successful Completion With Data";
-            elsif ( std_match(ct, C_CT_CPL_FAIL_W_DAT) ) then
-                len             := 36;
-                ret(1 to len)   := "Unsuccessful Completion Without Data";
-            else
-                ret(1 to 7) := "UNKNOWN";
-                len         := 7;
+            if    ( std_match(ct, C_CT_MEMRD32) )           then ret(1 to 7)    := "MEMRD32";
+            elsif ( std_match(ct, C_CT_MEMRD64) )           then ret(1 to 7)    := "MEMRD64";
+            elsif ( std_match(ct, C_CT_MEMWR32) )           then ret(1 to 7)    := "MEMWR32";
+            elsif ( std_match(ct, C_CT_MEMWR64) )           then ret(1 to 7)    := "MEMWR64";
+            elsif ( std_match(ct, C_CT_MSG) )               then ret(1 to 7)    := "Message";
+            elsif ( std_match(ct, C_CT_MSG_W_DAT) )         then ret(1 to 17)   := "Message with Data";
+            elsif ( std_match(ct, C_CT_CPL_OK_WO_DAT) )     then ret(1 to 34)   := "Successful Completion Without Data";
+            elsif ( std_match(ct, C_CT_CPL_OK_W_DAT) )      then ret(1 to 31)   := "Successful Completion With Data";
+            elsif ( std_match(ct, C_CT_CPL_FAIL_W_DAT) )    then ret(1 to 36)   := "Unsuccessful Completion Without Data";
+            else                                                 ret(1 to 7)    := "UNKNOWN";
             end if;
             -- release
-            return ret(1 to len);
+            return ret(1 to strlen(ret));
         end function ct2str;
         --***************************
 
@@ -1469,25 +1423,6 @@ package body eSpiMasterBfm is
             this.alertMode  := false;               --! in default is DIO[1] for alert signaling used
             -- Slave Registers
             init_cap_reg_08( this );    --! Slaves General Capabilities and Configurations
-        end procedure init;
-        --***************************
-
-
-        --***************************
-        -- init, todo: delete
-        procedure init
-            (
-                variable this   : inout tESpiBfm;                       --! common handle
-                signal CSn      : out std_logic;                        --! slave select
-                signal SCK      : out std_logic;                        --! shift clock
-                signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
-            )
-        is
-        begin
-            init( this );
-            CSn     <= '1';             --! deselect device
-            SCK     <= '0';             --! rising edge active clock
-            DIO     <= (others => 'Z'); --! lines are in TB pulled
         end procedure init;
         --***************************
 
