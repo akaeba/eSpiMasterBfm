@@ -688,18 +688,18 @@ package body eSpiMasterBfm is
 
         --***************************
         -- Status Register, Figure 16: Slave’s Status Register Definition
-        constant C_STS_PC_FREE          : integer := 0;     --! Peripheral Posted/Completion Rx Queue Free
-        constant C_STS_NP_FREE          : integer := 1;     --! Peripheral Non-Posted Rx Queue Free
-        constant C_STS_VWIRE_FREE       : integer := 2;     --! Virtual Wire Rx Queue Free
-        constant C_STS_OOB_FREE         : integer := 3;     --! OOB Posted Rx Queue Free
-        constant C_STS_PC_AVAIL         : integer := 4;     --! Peripheral Posted/Completion Tx Queue Avail
-        constant C_STS_NP_AVAIL         : integer := 5;     --! Peripheral Non-Posted Tx Queue Avail
-        constant C_STS_VWIRE_AVAIL      : integer := 6;     --! Virtual Wire Tx Queue Avail
-        constant C_STS_OOB_AVAIL        : integer := 7;     --! OOB Posted Tx Queue Avail
-        constant C_STS_FLASH_C_FREE     : integer := 8;     --! Flash Completion Rx Queue Free
-        constant C_STS_FLASH_NP_FREE    : integer := 9;     --! Flash Non-Posted Rx Queue Free
-        constant C_STS_FLASH_C_AVAIL    : integer := 12;    --! Flash Completion Tx Queue Avail
-        constant C_STS_FLASH_NP_AVAIL   : integer := 13;    --! Flash Non-Posted Tx Queue Avail
+        constant C_STS_PC_FREE          : std_logic_vector(00 downto 00) := "-";    --! Peripheral Posted/Completion Rx Queue Free
+        constant C_STS_NP_FREE          : std_logic_vector(01 downto 01) := "-";    --! Peripheral Non-Posted Rx Queue Free
+        constant C_STS_VWIRE_FREE       : std_logic_vector(02 downto 02) := "-";    --! Virtual Wire Rx Queue Free
+        constant C_STS_OOB_FREE         : std_logic_vector(03 downto 03) := "-";    --! OOB Posted Rx Queue Free
+        constant C_STS_PC_AVAIL         : std_logic_vector(04 downto 04) := "-";    --! Peripheral Posted/Completion Tx Queue Avail
+        constant C_STS_NP_AVAIL         : std_logic_vector(05 downto 05) := "-";    --! Peripheral Non-Posted Tx Queue Avail
+        constant C_STS_VWIRE_AVAIL      : std_logic_vector(06 downto 06) := "-";    --! Virtual Wire Tx Queue Avail
+        constant C_STS_OOB_AVAIL        : std_logic_vector(07 downto 07) := "-";    --! OOB Posted Tx Queue Avail
+        constant C_STS_FLASH_C_FREE     : std_logic_vector(08 downto 08) := "-";    --! Flash Completion Rx Queue Free
+        constant C_STS_FLASH_NP_FREE    : std_logic_vector(09 downto 09) := "-";    --! Flash Non-Posted Rx Queue Free
+        constant C_STS_FLASH_C_AVAIL    : std_logic_vector(12 downto 12) := "-";    --! Flash Completion Tx Queue Avail
+        constant C_STS_FLASH_NP_AVAIL   : std_logic_vector(13 downto 13) := "-";    --! Flash Non-Posted Tx Queue Avail
         --***************************
 
         --***************************
@@ -718,7 +718,7 @@ package body eSpiMasterBfm is
         --***************************
         -- Timing Parameters
         --  @see Table 22: AC Timing Specification
-        constant C_TINIT        : time      := 1 us;                    --! eSPI Reset# Deassertion to First Transaction (GET_CONFIGURATION)
+        constant C_TINIT    : time := 1 us; --! eSPI Reset# Deassertion to First Transaction (GET_CONFIGURATION)
         --***************************
 
     ----------------------------------------------
@@ -1098,26 +1098,24 @@ package body eSpiMasterBfm is
         --***************************
         -- sts2str
         --   print status register to string in a human-readable way
-        function sts2str ( sts : in std_logic_vector(15 downto 0) ) return string is
-            variable ret : string(1 to 807);
+        function sts2str ( sts : in std_logic_vector(15 downto 0) )
+        return string is
+            variable ret : string(1 to 1024) := (others => (character(NUL)));   --! make empty
         begin
-            -- convert
-            ret :=  character(LF) &
-                    "     Status           : 0x"    & to_hstring(sts)                                                                                                                                   & character(LF) &
-                    "       PC_FREE        : "      & integer'image(to_integer(unsigned(sts(C_STS_PC_FREE        downto C_STS_PC_FREE))))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF) &
-                    "       NP_FREE        : "      & integer'image(to_integer(unsigned(sts(C_STS_NP_FREE        downto C_STS_NP_FREE))))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF) &
-                    "       VWIRE_FREE     : "      & integer'image(to_integer(unsigned(sts(C_STS_VWIRE_FREE     downto C_STS_VWIRE_FREE))))     & "       Virtual Wire Rx Queue Free"                  & character(LF) &
-                    "       OOB_FREE       : "      & integer'image(to_integer(unsigned(sts(C_STS_OOB_FREE       downto C_STS_OOB_FREE))))       & "       OOB Posted Rx Queue Free"                    & character(LF) &
-                    "       PC_AVAIL       : "      & integer'image(to_integer(unsigned(sts(C_STS_PC_AVAIL       downto C_STS_PC_AVAIL))))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF) &
-                    "       NP_AVAIL       : "      & integer'image(to_integer(unsigned(sts(C_STS_NP_AVAIL       downto C_STS_NP_AVAIL))))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF) &
-                    "       VWIRE_AVAIL    : "      & integer'image(to_integer(unsigned(sts(C_STS_VWIRE_AVAIL    downto C_STS_VWIRE_AVAIL))))    & "       Virtual Wire Tx Queue Avail"                 & character(LF) &
-                    "       OOB_AVAIL      : "      & integer'image(to_integer(unsigned(sts(C_STS_OOB_AVAIL      downto C_STS_OOB_AVAIL))))      & "       OOB Posted Tx Queue Avail"                   & character(LF) &
-                    "       FLASH_C_FREE   : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_C_FREE   downto C_STS_FLASH_C_FREE))))   & "       Flash Completion Rx Queue Free"              & character(LF) &
-                    "       FLASH_NP_FREE  : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_FREE  downto C_STS_FLASH_NP_FREE))))  & "       Flash Non-Posted Rx Queue Free"              & character(LF) &
-                    "       FLASH_C_AVAIL  : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_C_AVAIL  downto C_STS_FLASH_C_AVAIL))))  & "       Flash Completion Tx Queue Avail"             & character(LF) &
-                    "       FLASH_NP_AVAIL : "      & integer'image(to_integer(unsigned(sts(C_STS_FLASH_NP_AVAIL downto C_STS_FLASH_NP_AVAIL)))) & "       Flash Non-Posted Tx Queue Avail";
-            -- release
-            return ret;
+            ret := strcat(ret, "     Status           : 0x"    & to_hstring(sts)                                                                                   & character(LF));
+            ret := strcat(ret, "       PC_FREE        : "      & to_hstring(sts(C_STS_PC_FREE'range))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF));
+            ret := strcat(ret, "       NP_FREE        : "      & to_hstring(sts(C_STS_NP_FREE'range))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF));
+            ret := strcat(ret, "       VWIRE_FREE     : "      & to_hstring(sts(C_STS_VWIRE_FREE'range))     & "       Virtual Wire Rx Queue Free"                  & character(LF));
+            ret := strcat(ret, "       OOB_FREE       : "      & to_hstring(sts(C_STS_OOB_FREE'range))       & "       OOB Posted Rx Queue Free"                    & character(LF));
+            ret := strcat(ret, "       PC_AVAIL       : "      & to_hstring(sts(C_STS_PC_AVAIL'range))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF));
+            ret := strcat(ret, "       NP_AVAIL       : "      & to_hstring(sts(C_STS_NP_AVAIL'range))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF));
+            ret := strcat(ret, "       VWIRE_AVAIL    : "      & to_hstring(sts(C_STS_VWIRE_AVAIL'range))    & "       Virtual Wire Tx Queue Avail"                 & character(LF));
+            ret := strcat(ret, "       OOB_AVAIL      : "      & to_hstring(sts(C_STS_OOB_AVAIL'range))      & "       OOB Posted Tx Queue Avail"                   & character(LF));
+            ret := strcat(ret, "       FLASH_C_FREE   : "      & to_hstring(sts(C_STS_FLASH_C_FREE'range))   & "       Flash Completion Rx Queue Free"              & character(LF));
+            ret := strcat(ret, "       FLASH_NP_FREE  : "      & to_hstring(sts(C_STS_FLASH_NP_FREE'range))  & "       Flash Non-Posted Rx Queue Free"              & character(LF));
+            ret := strcat(ret, "       FLASH_C_AVAIL  : "      & to_hstring(sts(C_STS_FLASH_C_AVAIL'range))  & "       Flash Completion Tx Queue Avail"             & character(LF));
+            ret := strcat(ret, "       FLASH_NP_AVAIL : "      & to_hstring(sts(C_STS_FLASH_NP_AVAIL'range)) & "       Flash Non-Posted Tx Queue Avail");
+            return ret(1 to strlen(ret));
         end function sts2str;
         --***************************
 
@@ -2144,7 +2142,7 @@ package body eSpiMasterBfm is
             -- get configuration
             GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts, rsp );
             -- in case of no output print to console
-            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             -- Function is good?
             if ( ACCEPT /= rsp ) then
                 good    := false;
@@ -2260,7 +2258,7 @@ package body eSpiMasterBfm is
             -- get configuration
             SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, sts, rsp );
             -- in case of no output print to console
-            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             -- Slave good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -2335,7 +2333,7 @@ package body eSpiMasterBfm is
                 -- GET_STATUS(this, CSn, SCK, DIO, status, response, good)
             GET_STATUS(this, CSn, SCK, DIO, sts, rsp);
             -- in case of no output print to console
-            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -2384,7 +2382,7 @@ package body eSpiMasterBfm is
             -- check for PC_AVAIL
             sts     := status;      --! handles internal status
             tiout   := 0;
-            while ( ('0' = sts(C_STS_PC_AVAIL)) and tiout < this.tioutRd ) loop --! no PC_AVAIL, wait for it
+            while ( ("0" = sts(C_STS_PC_AVAIL'range)) and tiout < this.tioutRd ) loop   --! no PC_AVAIL, wait for it
                 -- check slave status
                     -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
                 GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
@@ -2398,12 +2396,12 @@ package body eSpiMasterBfm is
                 tiout := tiout + 1;
             end loop;
             -- check for reach tiout
-            if ( (tiout = this.tioutRd) and ('0' = sts(C_STS_PC_AVAIL)) ) then
+            if ( (tiout = this.tioutRd) and ("0" = sts(C_STS_PC_AVAIL'range)) ) then
                 rsp := NO_RESPONSE; --! no data available
                 if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: No data available in allowed response time" severity warning; end if;
             end if;
             -- fetch data from slave
-            if ( (ACCEPT = rsp) and ('1' = sts(C_STS_PC_AVAIL)) ) then  --! no ero and data is available
+            if ( (ACCEPT = rsp) and ("1" = sts(C_STS_PC_AVAIL'range)) ) then    --! no ero and data is available
                 -- user message
                 if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: PC_AVAIL"; end if;
                 -- assemble Posted completion message
@@ -2592,7 +2590,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure MEMWR32;
         --***************************
@@ -2624,7 +2622,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure MEMWR32;
         --***************************
@@ -2714,7 +2712,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMRD32:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
             -- fill in data
             data := dBuf(0);
@@ -2812,7 +2810,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure IOWR_BYTE;
         --***************************
@@ -2853,7 +2851,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure IOWR_WORD;
         --***************************
@@ -2896,7 +2894,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure IOWR_DWORD;
         --***************************
@@ -3016,7 +3014,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
                 -- release data
                 data := dBuf(0);
             end if;
@@ -3058,7 +3056,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
                 -- release data
                 data := dBuf(1) & dBuf(0);
             end if;
@@ -3100,7 +3098,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
                 -- release data
                 data := dBuf(3) & dBuf(2) & dBuf(1) & dBuf(0);
             end if;
@@ -3226,7 +3224,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure VWIREWR;
         --***************************
@@ -3305,7 +3303,7 @@ package body eSpiMasterBfm is
             -- check for virtual message available
                 -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
             GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
-            if ( (ACCEPT = rsp) and '1' = sts(C_STS_VWIRE_AVAIL) ) then
+            if ( (ACCEPT = rsp) and ("1" = sts(C_STS_VWIRE_AVAIL'range)) ) then
                 -- message
                 if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE"; end if;
                 -- acquire count of virtual wires
@@ -3376,7 +3374,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
             end if;
         end procedure VWIRERD;
         --***************************
@@ -3561,7 +3559,7 @@ package body eSpiMasterBfm is
                 end if;
             end loop;
             -- print status register
-            if ( this.verbose >= C_MSG_INFO ) then Report sts2str(sts); end if;  --! print last received status register from Slave
+            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! print last received status register from Slave
         end procedure WAIT_VW_IS_EQ;
         --***************************
 
