@@ -970,11 +970,11 @@ package body eSpiMasterBfm is
             constant cStr2 : string := strtrim(str2);
         begin
             -- same length?
-            if ( cStr1'length /= cStr2'length ) then
+            if ( strlen(cStr1) /= strlen(cStr2) ) then
                 return false;
             end if;
             -- match?
-            if ( upper(cStr1) = upper(cStr2) ) then
+            if ( upper(cStr1(1 to strlen(cStr1))) = upper(cStr2(1 to strlen(cStr2))) ) then
                 return true;
             end if;
             -- no match
