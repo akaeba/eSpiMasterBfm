@@ -125,7 +125,7 @@ The table below lists the major files in this project:
 
 ## Contributors wanted
 
-If you think useful project and helpful too. If you think useful project and also helpful, feel free to fork and contribute
+If you think useful project and also helpful, feel free to fork and contribute.
 The licence does not require this, but the project will love it :-). Contributors welcome.
 
 
