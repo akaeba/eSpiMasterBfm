@@ -3393,8 +3393,10 @@ package body eSpiMasterBfm is
             VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, sts, rsp );
             -- only if virtual wires available print to log
             if ( ACCEPT = rsp ) then
-                    -- vw2str( idx, data )
-                Report character(LF) & vw2str(vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1));
+                if ( this.verbose >= C_MSG_INFO ) then
+                        -- vw2str( idx, data )
+                    Report "eSpiMasterBfm:VWIRERD" & character(LF) & vw2str(vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1));
+                end if;
             end if;
             --slave request good?
             if ( ACCEPT /= rsp ) then
