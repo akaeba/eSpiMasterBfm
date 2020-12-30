@@ -1,4 +1,5 @@
 # eSpiMasterBfm
+
 Enhanced SPI Master Bus Functional Model
 
 
@@ -15,8 +16,8 @@ Currently are procedures available for:
 
 | Version | Date       | Source                                                                                            | Change log                                      |
 | ------- | ---------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| latest  |            | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> | latest                                          |
-| v0.1.0  |            |                                                                                                   | Configuration; IO read/write; Memory read/write |
+| latest  |            | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> |                                                 |
+| v0.1.0  | 2020-12-30 | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.0.zip ">v0.1.0.zip</a> | Configuration; IO read/write; Memory read/write |
 
 
 ## Example
@@ -123,6 +124,9 @@ The table below lists the major files in this project:
 
 
 ## Contributors wanted
+
+If you think useful project and helpful too. If you think useful project and also helpful, feel free to fork and contribute
+The licence does not require this, but the project will love it :-). Contributors welcome.
 
 
 ## eSPI Slaves
