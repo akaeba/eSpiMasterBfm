@@ -111,15 +111,15 @@ The table below lists the major files in this project:
 
 ## [BFM](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd) procedures
 
-| Category            | Procedures                                             | Example                                                        |
-| ------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
-| initialization      | _init_, _RESET_                                        | `init( bfm, RESETn, CSn, SCK, DIO, ALERTn, good );`            |
-| slave configuration | _GET_CONFIGURATION_, _SET_CONFIGURATION_, _GET_STATUS_ | `GET_CONFIGURATION( bfm, CSn, SCK, DIO, adr, cfg, sts, rsp );` |
-| virtual wire        | _VWIREWR_, _VWIRERD_, _WAIT_VW_IS_EQ_                  | `VWIREWR( bfm, CSn, SCK, DIO, "PLTRST#", '1', good );`         |
-| IO write            | _IOWR_BYTE_, _IOWR_WORD_, _IOWR_DWORD_                 | `IOWR( bfm, CSn, SCK, DIO, adr16, dat08, good );`              |
-| IO read             | _IORD_BYTE_, _IORD_WORD_, _IORD_DWORD_                 | `IORD( bfm, CSn, SCK, DIO, adr16, dat08, good );`              |
-| memory write        | _MEMWR32_                                              | `MEMWR32( bfm, CSn, SCK, DIO, adr32, dat08, good );            |
-| memory read         | _MEMRD32_                                              | `MEMRD32( bfm, CSn, SCK, DIO, adr32, dat08, good );            |
+| Category            | Procedures                                             | Example                                                     |
+| ------------------- | ------------------------------------------------------ | ----------------------------------------------------------- |
+| initialization      | _init_, _RESET_                                        | `init(bfm, RESETn, CSn, SCK, DIO, ALERTn, good)`            |
+| slave configuration | _GET_CONFIGURATION_, _SET_CONFIGURATION_, _GET_STATUS_ | `GET_CONFIGURATION(bfm, CSn, SCK, DIO, adr, cfg, sts, rsp)` |
+| virtual wire        | _VWIREWR_, _VWIRERD_, _WAIT_VW_IS_EQ_                  | `VWIREWR(bfm, CSn, SCK, DIO, "PLTRST#", '1', good)`         |
+| IO write            | _IOWR_BYTE_, _IOWR_WORD_, _IOWR_DWORD_                 | `IOWR(bfm, CSn, SCK, DIO, adr16, dat08, good)`              |
+| IO read             | _IORD_BYTE_, _IORD_WORD_, _IORD_DWORD_                 | `IORD(bfm, CSn, SCK, DIO, adr16, dat08, good)`              |
+| memory write        | _MEMWR32_                                              | `MEMWR32(bfm, CSn, SCK, DIO, adr32, dat08, good)`           |
+| memory read         | _MEMRD32_                                              | `MEMRD32(bfm, CSn, SCK, DIO, adr32, dat08, good)`           |
 
 
 ## Contributors wanted
