@@ -12,6 +12,9 @@
 ## @date:       2020-04-24
 ##
 ## @brief:      starts simulation
+##                1) open Modelsim project in simulation directory '/sim'
+##                2) Tools -> TCL -> Execute Macro
+##                3) choose this script '/tcl/sim/*/*.tcl
 ##************************************************************************
 
 
