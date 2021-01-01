@@ -2868,6 +2868,12 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_WORD"; end if;
+            -- check alignment
+            if ( "0" /= adr(0 downto 0) ) then
+                good := false;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR_WORD: not WORD (16bit) aligned address." severity error; end if;
+                return;
+            end if;
             -- prepare
             adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
             dBuf(0)     := data(7 downto 0);                            --! fill in data
@@ -2877,7 +2883,7 @@ package body eSpiMasterBfm is
             -- Slave request good?
             if ( ACCEPT /= rsp ) then
                 good := false;
-                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR_WORD:Slave " & rsp2str(rsp) severity error; end if;
             else
                 -- in case of no output print to console
                 if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
@@ -2909,6 +2915,12 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR_DWORD"; end if;
+            -- check alignment
+            if ( "00" /= adr(1 downto 0) ) then
+                good := false;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR_DWORD: not DWORD (32bit) aligned address." severity error; end if;
+                return;
+            end if;
             -- prepare
             adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
             dBuf(0)     := data(7 downto 0);                            --! fill in data
@@ -3073,6 +3085,12 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
+            -- check alignment
+            if ( "0" /= adr(0 downto 0) ) then
+                good := false;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD_WORD: not WORD (16bit) aligned address." severity error; end if;
+                return;
+            end if;
             -- prepare
             adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
             dBuf        := (others => (others => '0'));                 --! init
@@ -3115,6 +3133,12 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_WORD"; end if;
+            -- check alignment
+            if ( "00" /= adr(1 downto 0) ) then
+                good := false;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD_DWORD: not DWORD (32bit) aligned address." severity error; end if;
+                return;
+            end if;
             -- prepare
             adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
             dBuf        := (others => (others => '0'));                 --! init
