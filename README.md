@@ -14,10 +14,10 @@ Currently are procedures available for:
 
 ## Releases
 
-| Version | Date       | Source                                                                                            | Change log                                      |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| latest  |            | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> |                                                 |
-| v0.1.0  | 2020-12-30 | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.0.zip ">v0.1.0.zip</a> | Configuration; IO read/write; Memory read/write |
+| Version                                                       | Date       | Source                                                                                            | Change log                                      |
+| ------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| latest                                                        |            | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> |                                                 |
+| [v0.1.0](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.0) | 2020-12-30 | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.0.zip ">v0.1.0.zip</a> | Configuration; IO read/write; Memory read/write |
 
 
 ## Example
