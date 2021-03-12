@@ -3593,7 +3593,7 @@ package body eSpiMasterBfm is
                     for i in ndlStart to vwIdxNdl'length - 1 loop
                         -- current received list
                         for j in 0 to vwHsLen - 1 loop      --! marks wires in wait list as received
-                            if ( vwIdxHs(i) = vwIdxNdl(j) ) then    --! same index?
+                            if ( vwIdxHs(j) = vwIdxNdl(i) ) then    --! same index?
                                 vwDatNdl(i) := dcIfEq( vwDatNdl(i), vwDatHs(j) );   --! make matched bits to don't care
                             end if;
                         end loop;
@@ -3619,7 +3619,7 @@ package body eSpiMasterBfm is
                         end if;
                     end loop;
                 end if;
-                -- wait only if not completed
+                -- wait for next virtual wire list only when "needle" list isn't completed
                 if ( false = waitDone ) then
                         -- WAIT_ALERT( this, CSn, SCK, DIO, ALERTn )
                     WAIT_ALERT( this, CSn, SCK, DIO, ALERTn );  --! wait for new wires
