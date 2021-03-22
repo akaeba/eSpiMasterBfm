@@ -2114,7 +2114,12 @@ package body eSpiMasterBfm is
             end loop;
             CSn <= '1';
             DIO <= (others => 'Z');
-            wait for tSpiClk;   --! limits CSn bandwidth to SCK
+            -- Reset master registers according spec
+            --   eSPI Interface Base Specification, 2016, Revision 1.0, 327432-002, p. 128
+            --   008h-00Bh: General Capabilities and Configurations to default reset value
+            init_cap_reg_08( this );
+            -- limits CSn bandwidth to SCK
+            wait for tSpiClk;
         end procedure RESET;
         --***************************
 
