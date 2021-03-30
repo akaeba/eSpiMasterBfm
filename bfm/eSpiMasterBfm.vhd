@@ -47,9 +47,8 @@ package eSpiMasterBfm is
         --***************************
 
         --***************************
-        -- System Event Virtual Wires
-        --   resolved index to name, required by print
-        type tSysEventName is array(2 to 7, 0 to 3) of string(1 to 22);
+        -- Virtual Wires Index/Name resolving
+        type tSysEventName is array(2 to 7, 0 to 3) of string(1 to 22); --! resolves index to name, required by print
         --***************************
 
         --***************************
@@ -82,13 +81,13 @@ package eSpiMasterBfm is
         --***************************
         -- Configures the BFM
         type tESpiBfm is record
-            sigSkew     : time;         --! defines Signal Skew to prevent timing errors in back-anno
-            verbose     : natural;      --! message level; 0: no message, 1: errors, 2: error + warnings
-            tiout       : time;         --! time out when master give up an interaction
-            tioutAlert  : natural;      --! number of clock cycles before BFM gives with time out up
-            tioutRd     : natural;      --! number of Get Status Cycles before data read gives up
-            alertMode   : boolean;      --! True: ALERT# pin for alert signaling used, False: DIO[1] signals alert
-            slaveRegs   : tSlaveCfgReg; --! Mirrored Slave Configuration Registers
+            sigSkew         : time;             --! defines Signal Skew to prevent timing errors in back-anno
+            verbose         : natural;          --! message level; 0: no message, 1: errors, 2: error + warnings
+            tiout           : time;             --! time out when master give up an interaction
+            tioutAlert      : natural;          --! number of clock cycles before BFM gives with time out up
+            tioutRd         : natural;          --! number of Get Status Cycles before data read gives up
+            slaveRegs       : tSlaveCfgReg;     --! Mirrored Slave Configuration Registers
+            virtualWires    : tMemX08(0 to 7);  --! Table 9: Virtual Wire Index Definition; 0-1: Interrupt event, 2-7: System Event
         end record tESpiBfm;
         --***************************
 
@@ -1453,7 +1452,6 @@ package body eSpiMasterBfm is
             this.tiout      := 100 us;              --! 100us master time out for wait
             this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
             this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
-            this.alertMode  := false;               --! in default is DIO[1] for alert signaling used
             -- Slave Registers
             init_cap_reg_08( this );    --! Slaves General Capabilities and Configurations
         end procedure init;
@@ -2511,7 +2509,7 @@ package body eSpiMasterBfm is
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
             -- wait for alert
             while ( true ) loop
-                if ( this.alertMode ) then
+                if ( "1" = this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range) ) then
                     if ( '0' = to_bit(std_ulogic(ALERTn), '1') ) then
                         wait for tSpiClk/2;             --! limit bandwidth
                         CSn <= '0';                     --! ACK alert
