@@ -42,8 +42,8 @@ package eSpiMasterBfm is
 
         --***************************
         -- Arrays
-        type tMemX08 is array (natural range <>) of std_logic_vector (7 downto 0);  --! Byte orientated memory array
-        type slv16 is array (natural range <>) of std_logic_vector (15 downto 0);   --! unconstrained array
+        type tMemX08 is array (natural range <>) of std_logic_vector (7 downto 0);  --! byte array
+        type tMemX32 is array (natural range <>) of std_logic_vector (31 downto 0); --! dword array
         --***************************
 
         --***************************
@@ -1152,40 +1152,40 @@ package body eSpiMasterBfm is
         --   prints virtual wires in a human-readable way
         function vw2str
             (
-                constant idx    : in tMemX08;   --! slv array of virtual wire indexes
-                constant data   : in tMemX08    --! slv array of virtual wire data
+                constant virtualWire : in tMemX08   --! virtual wire index/data pairs
             )
         return string is
-            variable ret    : string(1 to 2048) := (others => character(NUL));  --! make empty
-            variable maxLen : integer := 0;                                     --! maximum wire name len, required for blank pad
-            variable index  : integer;                                          --! idx converted to integer
+            constant vw     : tMemX08(0 to virtualWire'length-1)    := virtualWire;                 --! zero align
+            variable ret    : string(1 to 2048)                     := (others => character(NUL));  --! make empty
+            variable maxLen : integer                               := 0;                           --! maximum wire name len, required for blank pad
+            variable index  : integer;                                                              --! idx converted to integer
         begin
             -- prepare header
             ret := strcat(ret, "     Virtual Wires:" & character(LF));
             -- no virtual wires available
-            if ( 0 = idx'length ) then
+            if ( 0 = vw'length ) then
                 ret := strcat(ret, "       no new available" & character(LF));
                 return ret(1 to strlen(ret)-1); --! -1: drops last 'LF'
             end if;
             -- index/data mismatch
-            if ( 0 = idx'length ) then
+            if ( 0 /= (vw'length mod 2) ) then
                 ret := strcat(ret, "       index/data mismatch" & character(LF));
                 return ret(1 to strlen(ret)-1); --! -1: drops last 'LF'
             end if;
             -- determine max string length
-            for i in 0 to idx'length - 1 loop
+            for i in 0 to vw'length/2 - 1 loop
                 -- convert to integer
-                index := to_integer(unsigned(idx(i)));
+                index := to_integer(unsigned(vw(2*i)));
                 -- IRQ?
                 if ( (0 <= index) and (index <= 1) ) then   --! index=0/1 -> IRQ
                     -- +3 -> IRQ
-                    maxLen := integer(realmax(real(maxLen), real(3 + strlen(integer'image(to_integer(unsigned(data(i)(6 downto 0))))))));
+                    maxLen := integer(realmax(real(maxLen), real(3 + strlen(integer'image(to_integer(unsigned(vw(2*i+1)(6 downto 0))))))));
                 end if;
                 -- System Event Wire
                 if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
                     -- four wires a packed into one virtual wire nibble
                     for j in 0 to 3 loop
-                        if ( '1' = data(i)(j+4) ) then  --! valid
+                        if ( '1' = vw(2*i+1)(j+4) ) then  --! valid
                             maxLen := integer(realmax(real(maxLen), real(strlen(strtrim(C_SYSEVENT_NAME(index, j))))));
                         end if;
                     end loop;
@@ -1193,21 +1193,21 @@ package body eSpiMasterBfm is
             end loop;
             maxLen := maxLen + 1;   --! padStr overflow
             -- build virtual wire string list
-            for i in 0 to idx'length - 1 loop
+            for i in 0 to vw'length/2 - 1 loop
                 -- convert to integer
-                index := to_integer(unsigned(idx(i)));
+                index := to_integer(unsigned(vw(2*i)));
                 -- IRQ?
                 if ( (0 <= index) and (index <= 1) ) then   --! index=0/1 -> IRQ
-                    ret := strcat(ret, padStr("       IRQ" & integer'image(to_integer(unsigned(data(i)(6 downto 0)))), ' ', maxLen+7)); --! IRQ number, +7: leading blanks
-                    ret := strcat(ret, " : "               & integer'image(to_integer(unsigned(data(i)(7 downto 7)))) & character(LF)); --! IRQ level
+                    ret := strcat(ret, padStr("       IRQ" & integer'image(to_integer(unsigned(vw(2*i+1)(6 downto 0)))), ' ', maxLen+7));   --! IRQ number, +7: leading blanks
+                    ret := strcat(ret, " : "               & integer'image(to_integer(unsigned(vw(2*i+1)(7 downto 7)))) & character(LF));   --! IRQ level
                 end if;
                 -- System Event Wire
                 if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
                     -- four wires a packed into one virtual wire nibble
                     for j in 0 to 3 loop
-                        if ( '1' = data(i)(j+4) ) then  --! valid
+                        if ( '1' = vw(2*i+1)(j+4) ) then    --! valid
                             ret := strcat(ret, padStr("       " & strtrim(C_SYSEVENT_NAME(index, j)), ' ', maxLen+7));              --! system wire name, +7: leading blanks
-                            ret := strcat(ret, " : " & integer'image(to_integer(unsigned(data(i)(j downto j)))) & character(LF));   --! wire level
+                            ret := strcat(ret, " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)); --! wire level
                         end if;
                     end loop;
                 end if;
@@ -3206,6 +3206,59 @@ package body eSpiMasterBfm is
     ----------------------------------------------
 
         --***************************
+        -- Updates VW shadow registers
+        --   @see Table 9: Virtual Wire Index Definition
+        procedure VW_UPDATE_BFM
+            (
+                variable this           : inout tESpiBfm;   --! common handle
+                constant virtualWire    : in tMemX08;       --! virtual wire index/data pairs
+                variable good           : inout boolean     --! successful
+            )
+        is
+            constant vw : tMemX08(0 to virtualWire'length-1) := virtualWire;    --! zero align
+        begin
+            -- user message
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VW_UPDATE_BFM"; end if;
+            -- nothing to update?
+            if ( 0 = vw'length ) then
+                return;
+            end if;
+            -- only index/value pairs
+            if ( 0 /= (vw'length mod 2) ) then
+                good := false;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_UPDATE_BFM: corrupted virtual wire data, no index/value pairs" severity error; end if;
+                return;
+            end if;
+            -- process data and update BFM shadow registers
+            -- first: index
+            -- second: data
+            for i in 0 to vw'length/2 - 1 loop
+                if ( (0 <= to_integer(to_01(unsigned(vw(2*i))))) and  (to_integer(to_01(unsigned(vw(2*i)))) <= 1) ) then    -- IRQ?
+                    this.virtualWires(to_integer(to_01(unsigned(vw(2*i))))) := vw(2*i+1);   --! store in BFM
+                elsif ( (2 <= to_integer(to_01(unsigned(vw(2*i))))) and  (to_integer(to_01(unsigned(vw(2*i)))) <= 7) ) then --! System Wire
+                    -- iterate over packed system event virtual wires
+                    for j in 0 to 3 loop
+                        if ( '1' = vw(2*i+1)(j+4) ) then
+                            this.virtualWires(to_integer(to_01(unsigned(vw(2*i)))))(j+4) := '1';
+                            this.virtualWires(to_integer(to_01(unsigned(vw(2*i)))))(j)   := vw(2*i+1)(j);
+                        end if;
+                    end loop;
+                else    --! Unsupported?
+                    good := false;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_UPDATE_BFM: Unsupported virtual wire index " & integer'image(to_integer(to_01(unsigned(vw(2*i))))) severity error; end if;
+                    return;
+                end if;
+            end loop;
+            -- print updated Wires to console
+            if ( this.verbose >= C_MSG_INFO ) then
+                    -- vw2str( virtualWires )
+                Report "eSpiMasterBfm:VW_UPDATE_BFM" & character(LF) & vw2str(vw);
+            end if;
+        end procedure VW_UPDATE_BFM;
+        --***************************
+
+
+        --***************************
         -- Virtual Wire Channel Write
         -- PUT_VWIRE
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
@@ -3224,6 +3277,7 @@ package body eSpiMasterBfm is
             variable msg    : tMemX08(0 to 2*vwireIdx'length + 2);  --! CMD: 1Byte, Wire Count: 1Byte
             variable msgLen : natural := 0;                         --! message length can vary
             variable rsp    : tESpiRsp;                             --! Slaves response to performed request
+            variable pgood  : boolean;                              --! help variable
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: PUT_VWIRE instruction"; end if;
@@ -3248,6 +3302,9 @@ package body eSpiMasterBfm is
                 msg(2+2*i+1)    := vwireData(i);
                 msgLen          := msgLen+2;        --! update message length
             end loop;
+            -- add to BFM, todo: change to after ACCEPT
+                -- VW_UPDATE_BFM( this, vw, good )
+            VW_UPDATE_BFM( this, msg(2 to msgLen-1), pgood );
             -- send and get response
                 -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
             spiXcv(this, msg, CSn, SCK, DIO, msgLen, 3, rsp);   --! CRC added and checked by transceiver procedure
@@ -3360,6 +3417,7 @@ package body eSpiMasterBfm is
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
             variable sts        : std_logic_vector(15 downto 0);    --! slaves status buffer
             variable wireCnt    : natural;                          --! number of virtual wires
+            variable pgood      : boolean;                          --! help variable
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD"; end if;
@@ -3392,6 +3450,10 @@ package body eSpiMasterBfm is
                         vwireIdx(i)     := msg(i*2 + 2);    --! +1 Response, +1 wire count
                         vwireData(i)    := msg(i*2 + 3);    --! +1 Response, +1 wire count, +1 wire index
                     end loop;
+                    -- BFM virtual wires
+                        -- VW_UPDATE_BFM( this, vw, good )
+                    VW_UPDATE_BFM( this, msg(2 to 2*wireCnt+2-1), pgood );
+                    -- slaves status
                     status      := msg((wireCnt-1)*2 + 2 + 3) & msg((wireCnt-1)*2 + 2 + 2); --! +1 Response, +1 wire count, +1/+2 status bytes
                     response    := rsp;
                     vwireLen    := wireCnt;
@@ -3435,7 +3497,7 @@ package body eSpiMasterBfm is
             if ( ACCEPT = rsp ) then
                 if ( this.verbose >= C_MSG_INFO ) then
                         -- vw2str( idx, data )
-                    Report "eSpiMasterBfm:VWIRERD" & character(LF) & vw2str(vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1));
+                    --Report "eSpiMasterBfm:VWIRERD" & character(LF) & vw2str(vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1));
                 end if;
             end if;
             --slave request good?
@@ -3609,7 +3671,7 @@ package body eSpiMasterBfm is
                         end if;
                     end loop;
                     -- print all received wires to console
-                    if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & vw2str(vwIdxHs(0 to vwHsLen-1), vwDatHs(0 to vwHsLen-1)); end if;
+                    --if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & vw2str(vwIdxHs(0 to vwHsLen-1), vwDatHs(0 to vwHsLen-1)); end if;
                     -- check for completed list
                     for i in 0 to vwDatNdl'length - 1 loop
                         if ( cVwRcv = vwDatNdl(i) ) then
