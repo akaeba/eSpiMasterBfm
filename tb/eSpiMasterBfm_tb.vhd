@@ -57,8 +57,8 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest9    : boolean := true;  --! test9:  VWIRE Name
         constant doTest10   : boolean := true;  --! test10: VWIRERD
         constant doTest11   : boolean := true;  --! test11: VW_ADD, adds virtual wires to a list
-        constant doTest12   : boolean := true;  --! test12: WAIT_VW_IS_EQ
-        constant doTest13   : boolean := true;  --! test13: init, applies 'Exit G3 Sequence'
+        constant doTest12   : boolean := false;  --! test12: WAIT_VW_IS_EQ
+        constant doTest13   : boolean := false;  --! test13: init, applies 'Exit G3 Sequence'
     -----------------------------
 
 
@@ -94,9 +94,8 @@ begin
             variable response       : tESpiRsp;                                         --! slave response
             variable slv8           : std_logic_vector(7 downto 0);                     --! help
             variable memX08         : tMemX08(0 to 2);                                  --! help
-            variable vwireIdx       : tMemX08(0 to 63);                                 --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
-            variable vwireData      : tMemX08(0 to 63);                                 --! virtual wire data
-            variable vwireLen       : integer range 0 to 64;                            --! number of wire pairs
+            variable vw             : tMemX08(0 to 127);                                --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwLen          : integer range 0 to 64;                            --! number of wire pairs
 
     begin
 
@@ -442,6 +441,7 @@ begin
         -- Test10: VWIRERD
         -------------------------
         if ( doTest10 or DO_ALL_TEST ) then
+            -- first test
             Report "Test10: VWIRERD - Status Wires";
             -- load message
             REQMSG          <= (others => character(NUL));
@@ -453,9 +453,35 @@ begin
             LDMSG           <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
-                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
-            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, good );
-            Report "Test11: VWIRERD - IRQ4";
+            vwLen   := 0;
+            vw      := (others => (others => '0'));
+                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status, response );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status, response );
+            -- check
+                -- status
+            assert ( x"030F" = status ) report "VWIRERD:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = status ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = response ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = response ) then good := false; end if;
+                -- wire length
+            assert ( 6 = vwLen ) Report "VWIRERD: Wrong list length" severity warning;
+            if not ( 6 = vwLen ) then good := false; end if;
+                -- data
+            assert ( x"05" = vw(0) ) Report "VWIRERD: Byte 0" severity warning;
+            if not ( x"05" = vw(0) ) then good := false; end if;
+            assert ( x"99" = vw(1) ) Report "VWIRERD: Byte 1" severity warning;
+            if not ( x"99" = vw(1) ) then good := false; end if;
+            assert ( x"04" = vw(2) ) Report "VWIRERD: Byte 2" severity warning;
+            if not ( x"04" = vw(2) ) then good := false; end if;
+            assert ( x"C0" = vw(3) ) Report "VWIRERD: Byte 3" severity warning;
+            if not ( x"C0" = vw(3) ) then good := false; end if;
+            assert ( x"06" = vw(4) ) Report "VWIRERD: Byte 4" severity warning;
+            if not ( x"06" = vw(4) ) then good := false; end if;
+            assert ( x"50" = vw(5) ) Report "VWIRERD: Byte 5" severity warning;
+            if not ( x"50" = vw(5) ) then good := false; end if;
+            -- second test
+            Report "Test10: VWIRERD - IRQ4";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -466,8 +492,25 @@ begin
             LDMSG           <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
-                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status, response );
-            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, good );
+            vwLen   := 0;
+            vw      := (others => (others => '0'));
+                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status, response );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status, response );
+            -- check
+                -- status
+            assert ( x"030F" = status ) report "VWIRERD:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = status ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = response ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = response ) then good := false; end if;
+                -- wire length
+            assert ( 2 = vwLen ) Report "VWIRERD: Wrong list length" severity warning;
+            if not ( 2 = vwLen ) then good := false; end if;
+                -- data
+            assert ( x"00" = vw(0) ) Report "VWIRERD: Byte 0" severity warning;
+            if not ( x"00" = vw(0) ) then good := false; end if;
+            assert ( x"84" = vw(1) ) Report "VWIRERD: Byte 1" severity warning;
+            if not ( x"84" = vw(1) ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
@@ -478,30 +521,31 @@ begin
         -------------------------
         if ( doTest11 or DO_ALL_TEST ) then
             Report "Test11: VW_ADD - Composes List of Virtual Wires";
-            vwireLen := 0;
-            VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vwireIdx, vwireData, vwireLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index
-            VW_ADD( eSpiMasterBfm, "IRQ12",                     '1', vwireIdx, vwireData, vwireLen, good );
-            VW_ADD( eSpiMasterBfm, "SUS_STAT#",                 '0', vwireIdx, vwireData, vwireLen, good );
-            VW_ADD( eSpiMasterBfm, "SLAVE_BOOT_LOAD_STATUS",    '1', vwireIdx, vwireData, vwireLen, good );
+            vwLen   := 0;
+            vw      := (others => (others => '0'));
+            VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vw, vwLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index
+            VW_ADD( eSpiMasterBfm, "IRQ12",                     '1', vw, vwLen, good );
+            VW_ADD( eSpiMasterBfm, "SUS_STAT#",                 '0', vw, vwLen, good );
+            VW_ADD( eSpiMasterBfm, "SLAVE_BOOT_LOAD_STATUS",    '1', vw, vwLen, good );
             wait for 100 ns;
             -- wire length
-            assert ( 3 = vwireLen ) Report "VW_ADD: Wrong list length" severity warning;
-            if not ( 3 = vwireLen ) then good := false; end if;
+            assert ( 6 = vwLen ) Report "VW_ADD: Wrong list length" severity warning;
+            if not ( 6 = vwLen ) then good := false; end if;
             -- wire 0 (PLTRST#/SUS_STAT#)
-            assert ( x"03" = vwireIdx(0) )  Report "VW_ADD:Wire0: Wrong Index" severity warning;
-            if not ( x"03" = vwireIdx(0) )  then good := false; end if;
-            assert ( x"32" = vwireData(0) ) Report "VW_ADD:Wire0: Wrong Data" severity warning;
-            if not ( x"32" = vwireData(0) ) then good := false; end if;
+            assert ( x"03" = vw(0) )  Report "VW_ADD:Wire0: Wrong Index" severity warning;
+            if not ( x"03" = vw(0) )  then good := false; end if;
+            assert ( x"32" = vw(1) ) Report "VW_ADD:Wire0: Wrong Data" severity warning;
+            if not ( x"32" = vw(1) ) then good := false; end if;
             -- wire 1 (IRQ12)
-            assert ( x"00" = vwireIdx(1) )  Report "VW_ADD:Wire1: Wrong Index" severity warning;
-            if not ( x"00" = vwireIdx(1) )  then good := false; end if;
-            assert ( x"8C" = vwireData(1) ) Report "VW_ADD:Wire1: Wrong Data" severity warning;
-            if not ( x"8C" = vwireData(1) ) then good := false; end if;
+            assert ( x"00" = vw(2) )  Report "VW_ADD:Wire1: Wrong Index" severity warning;
+            if not ( x"00" = vw(2) )  then good := false; end if;
+            assert ( x"8C" = vw(3) ) Report "VW_ADD:Wire1: Wrong Data" severity warning;
+            if not ( x"8C" = vw(3) ) then good := false; end if;
             -- wire 1 (SLAVE_BOOT_LOAD_STATUS)
-            assert ( x"05" = vwireIdx(2) )  Report "VW_ADD:Wire2: Wrong Index" severity warning;
-            if not ( x"05" = vwireIdx(2) )  then good := false; end if;
-            assert ( x"88" = vwireData(2) ) Report "VW_ADD:Wire2: Wrong Data" severity warning;
-            if not ( x"88" = vwireData(2) ) then good := false; end if;
+            assert ( x"05" = vw(4) )  Report "VW_ADD:Wire2: Wrong Index" severity warning;
+            if not ( x"05" = vw(4) )  then good := false; end if;
+            assert ( x"88" = vw(5) ) Report "VW_ADD:Wire2: Wrong Data" severity warning;
+            if not ( x"88" = vw(5) ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
@@ -556,7 +600,7 @@ begin
         -------------------------
             Report "End TB...";     -- sim finished
             if ( good and slvGood ) then
-                Report "Test SUCCESSFULL";
+                Report "Test SUCCESSFUL";
             else
                 Report "Test FAILED" severity error;
             end if;
