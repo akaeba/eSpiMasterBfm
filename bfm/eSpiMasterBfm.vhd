@@ -409,25 +409,23 @@ package eSpiMasterBfm is
             -- arbitrary number (<64) of vwire data, response and status register
             procedure VWIREWR
                 (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;                        --! slave select
-                    signal SCK          : out std_logic;                        --! shift clock
-                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant vwireIdx   : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                    constant vwireData  : in tMemX08;                           --! virtual wire data
-                    variable status     : out std_logic_vector(15 downto 0);    --! slave status
-                    variable response   : out tESpiRsp                          --! slave response to command
+                    variable this           : inout tESpiBfm;
+                    signal CSn              : out std_logic;                        --! slave select
+                    signal SCK              : out std_logic;                        --! shift clock
+                    signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
+                    constant virtualWire    : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                    variable status         : out std_logic_vector(15 downto 0);    --! slave status
+                    variable response       : out tESpiRsp                          --! slave response to command
                 );
             -- arbitrary vwire instruction, w/o response and status register
             procedure VWIREWR
                 (
-                    variable this       : inout tESpiBfm;
-                    signal CSn          : out std_logic;                        --! slave select
-                    signal SCK          : out std_logic;                        --! shift clock
-                    signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant vwireIdx   : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                    constant vwireData  : in tMemX08;                           --! virtual wire data
-                    variable good       : inout boolean                         --! successful
+                    variable this           : inout tESpiBfm;
+                    signal CSn              : out std_logic;                        --! slave select
+                    signal SCK              : out std_logic;                        --! shift clock
+                    signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
+                    constant virtualWire    : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                    variable good           : inout boolean                         --! successful
                 );
             -- single vwire instruction, wire via name selected, see "System Event Virtual Wires" in spec or 'C_SYSEVENT_NAME' in bfm
             procedure VWIREWR
@@ -473,8 +471,7 @@ package eSpiMasterBfm is
                     variable this   : inout tESpiBfm;   --! common storage element
                     constant name   : in string;        --! Virtual wire name
                     constant value  : in bit;           --! virtual wire value
-                    variable vwIdx  : inout tMemX08;    --! list with virtual wire indexes
-                    variable vwData : inout tMemX08;    --! list with virtual wire data
+                    variable vw     : inout tMemX08;    --! virtual wire index, @see Table 9: Virtual Wire Index Definition
                     variable vwLen  : inout natural;    --! effective list length
                     variable good   : inout boolean     --! successful
                 );
@@ -1590,8 +1587,8 @@ package body eSpiMasterBfm is
             vwireIdx    := (others => (others => '0'));
             vwireData   := (others => (others => '-'));     --! data in wait list has don't cares
                 -- VW_ADD( this, name, value, vwIdx, vwData, vwLen, good )
-            VW_ADD( this, "SLAVE_BOOT_LOAD_STATUS", '1', vwireIdx, vwireData, vwireLen, pgood );
-            VW_ADD( this, "SLAVE_BOOT_LOAD_DONE",   '1', vwireIdx, vwireData, vwireLen, pgood );
+            --VW_ADD( this, "SLAVE_BOOT_LOAD_STATUS", '1', vwireIdx, vwireData, vwireLen, pgood );
+            --VW_ADD( this, "SLAVE_BOOT_LOAD_DONE",   '1', vwireIdx, vwireData, vwireLen, pgood );
                 -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIdx, vwData, good, order )
             WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood, true );
             if not ( pgood ) then
@@ -1605,11 +1602,11 @@ package body eSpiMasterBfm is
             vwireLen    := 0;
             vwireIdx    := (others => (others => '0'));
             vwireData   := (others => (others => '0'));
-            VW_ADD( this, "SLP_S5#", '1', vwireIdx, vwireData, vwireLen, pgood );
-            VW_ADD( this, "SLP_S4#", '1', vwireIdx, vwireData, vwireLen, pgood );
-            VW_ADD( this, "SLP_S3#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            --VW_ADD( this, "SLP_S5#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            --VW_ADD( this, "SLP_S4#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            --VW_ADD( this, "SLP_S3#", '1', vwireIdx, vwireData, vwireLen, pgood );
                 -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, good );
-            VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
+            --VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
             if not ( pgood ) then
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to deassert sleep states" severity error; end if;
                 good := false;
@@ -1621,9 +1618,9 @@ package body eSpiMasterBfm is
             vwireLen    := 0;
             vwireIdx    := (others => (others => '0'));
             vwireData   := (others => (others => '0'));
-            VW_ADD( this, "SUS_STAT#", '0', vwireIdx, vwireData, vwireLen, pgood );
+            --VW_ADD( this, "SUS_STAT#", '0', vwireIdx, vwireData, vwireLen, pgood );
                 -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, good );
-            VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
+            --VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
             if not ( pgood ) then
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to deassert suspend status" severity error; end if;
                 good := false;
@@ -1635,8 +1632,8 @@ package body eSpiMasterBfm is
             vwireLen    := 0;
             vwireIdx    := (others => (others => '0'));
             vwireData   := (others => (others => '0'));
-            VW_ADD( this, "PLTRST#", '1', vwireIdx, vwireData, vwireLen, pgood );
-            VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
+            --VW_ADD( this, "PLTRST#", '1', vwireIdx, vwireData, vwireLen, pgood );
+            --VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to vwireLen-1), vwireData(0 to vwireLen-1), pgood );
             if not ( pgood ) then
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to deassert PLTRST" severity error; end if;
                 good := false;
@@ -3264,51 +3261,60 @@ package body eSpiMasterBfm is
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
         procedure VWIREWR
             (
-                variable this       : inout tESpiBfm;
-                signal CSn          : out std_logic;                        --! slave select
-                signal SCK          : out std_logic;                        --! shift clock
-                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                constant vwireIdx   : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                constant vwireData  : in tMemX08;                           --! virtual wire data
-                variable status     : out std_logic_vector(15 downto 0);    --! slave status
-                variable response   : out tESpiRsp                          --! slave response to command
+                variable this           : inout tESpiBfm;
+                signal CSn              : out std_logic;                        --! slave select
+                signal SCK              : out std_logic;                        --! shift clock
+                signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
+                constant virtualWire    : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                variable status         : out std_logic_vector(15 downto 0);    --! slave status
+                variable response       : out tESpiRsp                          --! slave response to command
             )
         is
-            variable msg    : tMemX08(0 to 2*vwireIdx'length + 2);  --! CMD: 1Byte, Wire Count: 1Byte
-            variable msgLen : natural := 0;                         --! message length can vary
-            variable rsp    : tESpiRsp;                             --! Slaves response to performed request
-            variable pgood  : boolean;                              --! help variable
+            constant vw     : tMemX08(0 to virtualWire'length-1) := virtualWire;    --! zero align
+            variable msg    : tMemX08(0 to vw'length + 2);                          --! CMD: 1Byte, Wire Count: 1Byte
+            variable msgLen : natural := 0;                                         --! message length can vary
+            variable rsp    : tESpiRsp;                                             --! Slaves response to performed request
+            variable pgood  : boolean;                                              --! help variable
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: PUT_VWIRE instruction"; end if;
-            -- some checks
-            if ( vwireIdx'length /= vwireData'length ) then
-                response := FATAL_ERROR;
-                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR: vwireIdx and vwireData needs same length" severity error; end if;
+            -- nothing to update?
+            if ( 0 = vw'length ) then
+                return;
             end if;
-            if ( vwireIdx'length > 63 ) then
+            -- only index/value pairs
+            if ( 0 /= (vw'length mod 2) ) then
+                response := FATAL_ERROR;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_UPDATE_BFM: corrupted virtual wire data, no index/value pairs" severity error; end if;
+                return;
+            end if;
+            -- virtual wires transfer length, TODO: get from Slave config
+            if ( vw'length/2 > 63 ) then
                 response := FATAL_ERROR;
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR: maximal length for vwire commands of 64 exceeded" severity error; end if;
             end if;
             -- init
             msg := (others => (others => '0'));
             -- assemble command
-            msg(0)  := C_PUT_VWIRE;
-            msg(1)  := "00" & std_logic_vector(to_unsigned(vwireIdx'length-1, 6));  --! set length of vwire message, 0-based count
-            msgLen  := msgLen+2;
-            -- add data
-            for i in 0 to vwireIdx'length-1 loop
-                msg(2+2*i)      := vwireIdx(i);     --! add index, 2 cause of command
-                msg(2+2*i+1)    := vwireData(i);
-                msgLen          := msgLen+2;        --! update message length
-            end loop;
-            -- add to BFM, todo: change to after ACCEPT
-                -- VW_UPDATE_BFM( this, vw, good )
-            VW_UPDATE_BFM( this, msg(2 to msgLen-1), pgood );
+            msg(0)                              := C_PUT_VWIRE;
+            msg(1)                              := "00" & std_logic_vector(to_unsigned(vw'length/2-1, 6));  --! set length of vwire message, 0-based count
+            msgLen                              := msgLen+2;
+            msg(msgLen to msgLen+vw'length/2)   := vw;                                                      --! add data
+            msgLen                              := msgLen+vw'length/2+1;
             -- send and get response
                 -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
             spiXcv(this, msg, CSn, SCK, DIO, msgLen, 3, rsp);   --! CRC added and checked by transceiver procedure
-            -- process slaves response
+            -- update BFM
+            pgood := true;
+            if ( ACCEPT = rsp ) then
+                    -- VW_UPDATE_BFM( this, vw, good )
+                VW_UPDATE_BFM( this, vw, pgood );
+                -- Success?
+                if not ( pgood ) then
+                    rsp := FATAL_ERROR;
+                end if;
+            end if;
+            -- get slaves response
             if ( ACCEPT = rsp ) then
                 status  := msg(2) & msg(1); --! status
             else
@@ -3326,23 +3332,20 @@ package body eSpiMasterBfm is
         --   @see Figure 41: Virtual Wire Packet Format, Master Initiated Virtual Wire Transfer
         procedure VWIREWR
             (
-                variable this       : inout tESpiBfm;
-                signal CSn          : out std_logic;                        --! slave select
-                signal SCK          : out std_logic;                        --! shift clock
-                signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
-                constant vwireIdx   : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
-                constant vwireData  : in tMemX08;                           --! virtual wire data
-                variable good       : inout boolean                         --! successful
+                variable this           : inout tESpiBfm;
+                signal CSn              : out std_logic;                        --! slave select
+                signal SCK              : out std_logic;                        --! shift clock
+                signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
+                constant virtualWire    : in tMemX08;                           --! virtual wire index, @see Table 9: Virtual Wire Index Definition
+                variable good           : inout boolean                         --! successful
             )
         is
-            variable idx    : tMemX08(0 to 0);                  --! vwireIdx
-            variable data   : tMemX08(0 to 0);                  --! vwireData
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stuck
             variable rsp    : tESpiRsp;                         --! decoded slave response
         begin
             -- call more general function
-                -- VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, status, response );
-            VWIREWR( this, CSn, SCK, DIO, vwireIdx, vwireData, sts, rsp );
+                -- VWIREWR( this, CSn, SCK, DIO, virtualWire, status, response );
+            VWIREWR( this, CSn, SCK, DIO, virtualWire, sts, rsp );
             -- Slave response good?
             if ( ACCEPT /= rsp ) then
                 good := false;
@@ -3369,23 +3372,22 @@ package body eSpiMasterBfm is
                 variable good   : inout boolean                         --! successful
             )
         is
-            variable vwireIdx   : tMemX08(0 to 1);  --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
-            variable vwireData  : tMemX08(0 to 1);  --! virtual wire data
-            variable vwireLen   : integer;
-            variable vwAdd      : boolean;
+            variable vw     : tMemX08(0 to 1);  --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
+            variable vwLen  : integer;
+            variable pgood  : boolean;
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR"; end if;
             -- build virtual wire
-            vwireLen    := 0;
-            vwAdd       := true;
-            VW_ADD( this, name, value, vwireIdx, vwireData, vwireLen, vwAdd );   --! build virtual wire
+            vwLen   := 0;
+            pgood   := true;
+            VW_ADD( this, name, value, vw, vwLen, pgood );  --! build virtual wire
             -- write to endpoint
-            if ( vwAdd ) then
-                VWIREWR( this, CSn, SCK, DIO, vwireIdx(0 to 0), vwireData(0 to 0), vwAdd );
+            if ( good ) then
+                VWIREWR( this, CSn, SCK, DIO, vw(0 to vwLen-1), pgood );
             end if;
             -- successful?
-            if ( vwAdd ) then
+            if ( pgood ) then
                 if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIREWR: " & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))); end if;
             else
                 if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:VWIREWR: " & name & " Failed" severity warning; end if;
@@ -3527,8 +3529,7 @@ package body eSpiMasterBfm is
                 variable this   : inout tESpiBfm;   --! common storage element
                 constant name   : in string;        --! Virtual wire name
                 constant value  : in bit;           --! virtual wire value
-                variable vwIdx  : inout tMemX08;    --! list with virtual wire indexes
-                variable vwData : inout tMemX08;    --! list with virtual wire data
+                variable vw     : inout tMemX08;    --! virtual wire index, @see Table 9: Virtual Wire Index Definition
                 variable vwLen  : inout natural;    --! effective list length
                 variable good   : inout boolean     --! successful
             )
@@ -3539,14 +3540,8 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD"; end if;
-            -- same memory allocated (length)?
-            if ( vwIdx'length /= vwData'length ) then
-                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_ADD: vwIdx/vwData have different length"; end if;
-                good := false;
-                return;
-            end if;
             -- element can appended?
-            if ( vwLen >= vwIdx'length ) then
+            if ( vwLen > vw'length ) then
                 if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:VW_ADD: not enough memory to append additional virtual wire" severity warning; end if;
                 good := false;
                 return;
@@ -3561,33 +3556,32 @@ package body eSpiMasterBfm is
                 return;
             end if;
             -- add to existing list
-            vwPosAdd := vwIdx'left + vwLen; --! append
-            for i in 0 to vwLen-1 loop
+            vwPosAdd := vw'left + vwLen;    --! append
+            for i in 0 to vwLen/2 - 1 loop
                 -- index exist in list
-                if ( vwIdx(vwIdx'left+i) = appendElem(0) ) then
+                if ( vw(vw'left+2*i) = appendElem(0) ) then
                     -- check if element exist in list, max two transitions for a virtual wire allowed
-                    if ( std_match(vwData(vwData'left+i), appendElem(1)) ) then
+                    if ( std_match(vw(vw'left+2*i+1), appendElem(1)) ) then
                         if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VW_ADD: '" & name & " = " & integer'image(to_integer(unsigned'('0' & to_stdulogic(value)))) & "' exists in list, no add"; end if;
                         return;
                     end if;
                     -- capture add position
-                    vwPosAdd := vwIdx'left + i; --! insert
+                    vwPosAdd := vw'left + 2*i;  --! insert
                 end if;
             end loop;
             -- Append mode?
             if ( vwPosAdd = vwLen ) then
-                vwIdx(vwPosAdd)     := (others => '0'); --! init
-                vwData(vwPosAdd)    := (others => '0'); --! init
-                vwLen               := vwLen + 1;       --! update length
+                vw(vwPosAdd)    := (others => '0'); --! init
+                vw(vwPosAdd+1)  := (others => '0'); --! init
+                vwLen           := vwLen + 2;       --! update length
             end if;
             -- append/insert
-            vwIdx(vwPosAdd)     := appendElem(0);                                                           --! index
-            vwData(vwPosAdd)    := vwData(vwPosAdd) or to_stdlogicvector(to_bitvector(appendElem(1), '0')); --! data, contents don't cares
+            vw(vwPosAdd)    := appendElem(0);                                                           --! index
+            vw(vwPosAdd+1)  := vw(vwPosAdd+1) or to_stdlogicvector(to_bitvector(appendElem(1), '0'));   --! data, contents don't cares
             -- append info
             if ( this.verbose >= C_MSG_INFO ) then
                 Report  "eSpiMasterBfm:VW_ADD: Virtual Wires "                      & character(LF) &
-                        "     Index : " & hexStr(vwIdx(vwIdx'left to vwLen-1))      & character(LF) &
-                        "     Data  : " & hexStr(vwData(vwData'left to vwLen-1));
+                        "     Index/Data pairs : " & hexStr(vw(vw'left to vwLen-1));
             end if;
         end procedure VW_ADD;
         --***************************
@@ -3723,7 +3717,7 @@ package body eSpiMasterBfm is
             vwLen   := 0;
             -- add wire
                 -- VW_ADD( this, name, value, vwIdx, vwData, vwLen, good );
-            VW_ADD( this, wireName, wireVal, vwIndex, vwData, vwLen, fooGood );
+            --VW_ADD( this, wireName, wireVal, vwIndex, vwData, vwLen, fooGood );
             -- go in wait
                 -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIdx, vwData, good, order )
             WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vwIndex(0 to vwLen-1), vwData(0 to vwLen-1), good, false );
