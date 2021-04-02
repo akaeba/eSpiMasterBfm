@@ -916,8 +916,8 @@ package body eSpiMasterBfm is
                 constant str : in string    --! input string
             )
         return natural is
-            variable idx : integer;
-            variable tmp : string(1 to str'length) := str;  --! alignment
+            alias tmp       : string(1 to str'length) is str;  --! alignment
+            variable idx    : integer;
         begin
             for i in tmp'range loop
                 idx := i;
@@ -944,10 +944,10 @@ package body eSpiMasterBfm is
                 constant appstr : in string     --! string to append
             )
         return string is
-            constant cat : string(1 to catstr'length) := catstr;                        --! make one aligned
-            constant app : string(1 to appstr'length) := appstr;                        --! make one aligned
-            variable tmp : string(1 to catstr'length) := (others => character(NUL));    --! make empty
-            variable idx : integer;                                                     --! append stop index
+            alias cat       : string(1 to catstr'length) is catstr;                        --! make one aligned
+            alias app       : string(1 to appstr'length) is appstr;                        --! make one aligned
+            variable tmp    : string(1 to catstr'length) := (others => character(NUL));    --! make empty
+            variable idx    : integer;                                                     --! append stop index
         begin
             idx := integer(realmin(real(strlen(cat)+strlen(app))+1.0, real(tmp'length)));   --! concats app string, if buffer size isn't enough
             tmp(1 to 1+strlen(cat))     := cat(1 to 1+strlen(cat));                         --! copy catstr
@@ -988,7 +988,7 @@ package body eSpiMasterBfm is
         --   converts byte array into hexadecimal string
         function hexStr ( msg : in tMemX08 )
         return string is
-            constant slvs   : tMemX08(0 to msg'length-1) := msg;    --! zero align
+            alias slvs      : tMemX08(0 to msg'length-1) is msg;    --! zero align
             variable str    : string(1 to (msg'length+1)*5+1);      --! 8bit per
         begin
             -- init
@@ -1152,10 +1152,10 @@ package body eSpiMasterBfm is
                 constant virtualWire : in tMemX08   --! virtual wire index/data pairs
             )
         return string is
-            constant vw     : tMemX08(0 to virtualWire'length-1)    := virtualWire;                 --! zero align
-            variable ret    : string(1 to 2048)                     := (others => character(NUL));  --! make empty
-            variable maxLen : integer                               := 0;                           --! maximum wire name len, required for blank pad
-            variable index  : integer;                                                              --! idx converted to integer
+            alias vw        : tMemX08(0 to virtualWire'length-1) is virtualWire;    --! zero align
+            variable ret    : string(1 to 2048) := (others => character(NUL));      --! make empty
+            variable maxLen : integer           := 0;                               --! maximum wire name len, required for blank pad
+            variable index  : integer;                                              --! idx converted to integer
         begin
             -- prepare header
             ret := strcat(ret, "     Virtual Wires:" & character(LF));
@@ -3446,7 +3446,7 @@ package body eSpiMasterBfm is
                         -- spiXcv( this, msg, CSn, SCK, DIO, txByte, rxByte, intRxByte, response );
                     spiXcv( this, msg, CSn, SCK, DIO, -1, 2+2*wireCnt+2, 2, rsp );  --! +2: two bytes in first request, *2: per virtual wire 2byte, +2: Status register has two bytes
                     -- align
-                    VW_UPDATE_BFM( this, msg(2 to 2*wireCnt+2-1), pgood );      --! internal storage
+                    VW_UPDATE_BFM( this, msg(2 to 2*wireCnt+2-1), pgood );  --! internal storage
                     -- success?
                     if ( pgood ) then
                         virtualWire(0 to 2*wireCnt-1)   := msg(2 to 2*wireCnt+2-1); --! data to output
@@ -3511,7 +3511,7 @@ package body eSpiMasterBfm is
 
         --***************************
         -- Virtual Wire: Add Virtual wire
-        --   adds to vwIdx/vwData list a new entry
+        --   adds to virtual wire list a new index/data pair
         procedure VW_ADD
             (
                 variable this   : inout tESpiBfm;   --! common storage element
