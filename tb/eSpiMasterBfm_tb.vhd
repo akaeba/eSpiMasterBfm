@@ -57,8 +57,8 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest9    : boolean := true;  --! test9:  VWIRE Name
         constant doTest10   : boolean := true;  --! test10: VWIRERD
         constant doTest11   : boolean := true;  --! test11: VW_ADD, adds virtual wires to a list
-        constant doTest12   : boolean := false;  --! test12: WAIT_VW_IS_EQ
-        constant doTest13   : boolean := false;  --! test13: init, applies 'Exit G3 Sequence'
+        constant doTest12   : boolean := true;  --! test12: WAIT_VW_IS_EQ
+        constant doTest13   : boolean := true;  --! test13: init, applies 'Exit G3 Sequence'
     -----------------------------
 
 
@@ -523,7 +523,7 @@ begin
             Report "Test11: VW_ADD - Composes List of Virtual Wires";
             vwLen   := 0;
             vw      := (others => (others => '0'));
-            VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vw, vwLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index
+            VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vw, vwLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index, not set virtual wires are don't care ('-')
             VW_ADD( eSpiMasterBfm, "IRQ12",                     '1', vw, vwLen, good );
             VW_ADD( eSpiMasterBfm, "SUS_STAT#",                 '0', vw, vwLen, good );
             VW_ADD( eSpiMasterBfm, "SLAVE_BOOT_LOAD_STATUS",    '1', vw, vwLen, good );
@@ -534,8 +534,8 @@ begin
             -- wire 0 (PLTRST#/SUS_STAT#)
             assert ( x"03" = vw(0) )  Report "VW_ADD:Wire0: Wrong Index" severity warning;
             if not ( x"03" = vw(0) )  then good := false; end if;
-            assert ( x"32" = vw(1) ) Report "VW_ADD:Wire0: Wrong Data" severity warning;
-            if not ( x"32" = vw(1) ) then good := false; end if;
+            assert ( "--11--10" = vw(1) ) Report "VW_ADD:Wire0: Wrong Data" severity warning;
+            if not ( "--11--10" = vw(1) ) then good := false; end if;
             -- wire 1 (IRQ12)
             assert ( x"00" = vw(2) )  Report "VW_ADD:Wire1: Wrong Index" severity warning;
             if not ( x"00" = vw(2) )  then good := false; end if;
@@ -544,8 +544,8 @@ begin
             -- wire 1 (SLAVE_BOOT_LOAD_STATUS)
             assert ( x"05" = vw(4) )  Report "VW_ADD:Wire2: Wrong Index" severity warning;
             if not ( x"05" = vw(4) )  then good := false; end if;
-            assert ( x"88" = vw(5) ) Report "VW_ADD:Wire2: Wrong Data" severity warning;
-            if not ( x"88" = vw(5) ) then good := false; end if;
+            assert ( "1---1---" = vw(5) ) Report "VW_ADD:Wire2: Wrong Data" severity warning;
+            if not ( "1---1---" = vw(5) ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
