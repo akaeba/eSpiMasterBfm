@@ -163,7 +163,7 @@ package eSpiMasterBfm is
                     variable status     : out std_logic_vector(15 downto 0);    --! status
                     variable response   : out tESpiRsp                          --! slave response
                 );
-            -- w/o status, response; instead general good
+            -- w/o status, response; instead general good, updates BFMs shadows registers of slaves capabilities regs
             procedure GET_CONFIGURATION
                 (
                     variable this   : inout tESpiBfm;                       --! common BFM handle
@@ -173,16 +173,6 @@ package eSpiMasterBfm is
                     constant adr    : in std_logic_vector(15 downto 0);     --! slave registers address
                     variable config : out std_logic_vector(31 downto 0);    --! read value
                     variable good   : inout boolean                         --! successful?
-                );
-            -- w/o status, response, regs, updates BFMs shadows registers of slaves capabilities regs
-            procedure GET_CONFIGURATION
-                (
-                    variable this   : inout tESpiBfm;                       --! common BFM handle
-                    signal CSn      : out std_logic;                        --! slave select
-                    signal SCK      : out std_logic;                        --! shift clock
-                    signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant adr    : in std_logic_vector(15 downto 0);     --! config address
-                    variable good   : inout boolean                         --! procedure state
                 );
 
         -- SET_CONFIGURATION:
@@ -1061,14 +1051,14 @@ package body eSpiMasterBfm is
             variable ret : boolean := true;
         begin
             -- CRC check enabled?
-            if ( "1" = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range) ) then
-                if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
-                    ret := false;
-                    if ( this.verbose >= C_MSG_ERROR ) then
-                        Report "eSpiMasterBfm:checkCRC rcv=0x" & to_hstring(msg(msg'length-1)) & "; calc=0x" & to_hstring(crc8(msg(0 to msg'length-2))) & ";" severity error;
-                    end if;
-                end if;
-            end if;
+            -- if ( "1" = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range) ) then
+                -- if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
+                    -- ret := false;
+                    -- if ( this.verbose >= C_MSG_ERROR ) then
+                        -- Report "eSpiMasterBfm:checkCRC rcv=0x" & to_hstring(msg(msg'length-1)) & "; calc=0x" & to_hstring(crc8(msg(0 to msg'length-2))) & ";" severity error;
+                    -- end if;
+                -- end if;
+            -- end if;
             return ret;
         end function checkCRC;
         --***************************
@@ -1522,14 +1512,14 @@ package body eSpiMasterBfm is
             -- General capabilities
             --  @see Exit from G3, 4.)
             pgood := true;
-            GET_CONFIGURATION( this, CSn, SCK, DIO, C_GENERAL, pgood );   --! General Capabilities and Configurations
+                -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+            GET_CONFIGURATION( this, CSn, SCK, DIO, C_GENERAL, slv32, pgood );  --! General Capabilities and Configurations
             if not ( pgood ) then
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_GENERAL) severity error; end if;
                 good := false;
                 return;
             end if;
             -- enable according "Exit G3" sequence
-            slv32 := this.slaveRegs(to_integer(unsigned(C_GENERAL)/4));    --! get general reg from shadow register
             -- CRC enabled?
             if ( crc ) then
                 slv32(C_GENERAL_CRC'range) := "1";  --! CRC checking is enabled
@@ -1563,15 +1553,15 @@ package body eSpiMasterBfm is
             --  @see Exit from G3, 6.)
             if ( C_GENERAL_CHN_SUP_VW = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_VW'range) ) then
                 -- get virtual wire channel config
-                GET_CONFIGURATION( this, CSn, SCK, DIO, C_VIRTUAL_WIRE_CHANNEL, pgood );   --! Virtual Wire Capabilities and Configurations
+                    -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+                GET_CONFIGURATION( this, CSn, SCK, DIO, C_VIRTUAL_WIRE_CHANNEL, slv32, pgood ); --! Virtual Wire Capabilities and Configurations
                 if not ( pgood ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_VIRTUAL_WIRE_CHANNEL) severity error; end if;
                     good := false;
                     return;
                 end if;
                 -- enable virtual wire channel
-                slv32                       := this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4)); --! acquire virtual wire config
-                slv32(C_VW_ENABLE'range)    := C_VW_ENABLE;                         --! enable channel
+                slv32(C_VW_ENABLE'range) := C_VW_ENABLE;    --! enable channel
                     -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
                 SET_CONFIGURATION( this, CSn, SCK, DIO, C_VIRTUAL_WIRE_CHANNEL, slv32, pgood ); --! update virtual wire cap reg
                 if not ( pgood ) then
@@ -1585,15 +1575,15 @@ package body eSpiMasterBfm is
             --  @see Exit from G3, 7.)
             if ( C_GENERAL_CHN_SUP_FLASH = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_FLASH'range) ) then
                 -- get virtual wire channel config
-                GET_CONFIGURATION( this, CSn, SCK, DIO, C_FLASH_CHANNEL, pgood );   --! Flash Channel Capabilities and Configurations
+                    -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+                GET_CONFIGURATION( this, CSn, SCK, DIO, C_FLASH_CHANNEL, slv32, pgood );    --! Flash Channel Capabilities and Configurations
                 if not ( pgood ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_FLASH_CHANNEL) severity error; end if;
                     good := false;
                     return;
                 end if;
                 -- enable virtual wire channel
-                slv32                       := this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4));    --! acquire virtual wire config
-                slv32(C_FLASH_ENABLE'range) := C_FLASH_ENABLE;                  --! enable channel
+                slv32(C_FLASH_ENABLE'range) := C_FLASH_ENABLE;  --! enable channel
                     -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
                 SET_CONFIGURATION( this, CSn, SCK, DIO, C_FLASH_CHANNEL, slv32, pgood );    --! update flash channel cap reg
                 if not ( pgood ) then
@@ -1665,15 +1655,15 @@ package body eSpiMasterBfm is
             -- Peripheral Channel
             --  @see Exit from G3, 12.)
             if ( C_GENERAL_CHN_SUP_PERI = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_PERI'range) ) then
-                GET_CONFIGURATION( this, CSn, SCK, DIO, C_PERIPHERAL_CHANNEL, pgood );  --! Peripheral Capabilities and Configurations
+                    -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+                GET_CONFIGURATION( this, CSn, SCK, DIO, C_PERIPHERAL_CHANNEL, slv32, pgood );   --! Peripheral Capabilities and Configurations
                 if not ( pgood ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_PERIPHERAL_CHANNEL) severity error; end if;
                     good := false;
                     return;
                 end if;
                 -- enable peripheral channel, should enabled as default
-                slv32                       := this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4));   --! acquire virtual wire config
-                slv32(C_PERI_ENABLE'range)  := C_PERI_ENABLE;                       --! enable channel
+                slv32(C_PERI_ENABLE'range) := C_PERI_ENABLE;    --! enable channel
                     -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
                 SET_CONFIGURATION( this, CSn, SCK, DIO, C_PERIPHERAL_CHANNEL, slv32, pgood );    --! update virtual wire cap reg
                 if not ( pgood ) then
@@ -1684,9 +1674,10 @@ package body eSpiMasterBfm is
             end if;
             -- *****
             -- Device Identification
-            GET_CONFIGURATION( this, CSn, SCK, DIO, C_DEVICE_IDENTIFICATION, pgood );   --! Peripheral Capabilities and Configurations
+                -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
+            GET_CONFIGURATION( this, CSn, SCK, DIO, C_DEVICE_IDENTIFICATION, slv32, pgood );   --! Peripheral Capabilities and Configurations
             if not ( pgood ) then
-                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_PERIPHERAL_CHANNEL) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_DEVICE_IDENTIFICATION) severity error; end if;
                 good := false;
                 return;
             end if;
@@ -2163,6 +2154,15 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:GET_CONFIGURATION"; end if;
+            -- default assignments
+            status      := (others => '0');
+            config      := (others => '0');
+            response    := FATAL_ERROR;
+            -- check address for 32bit alignment
+            if ( 0 /= (unsigned(adr) mod 4) ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION: address 0x" & to_hstring(adr) & "not 32Bit aligned" severity error; end if;
+                return;
+            end if;
             -- build command
             msg     := (others => (others => '0')); --! clear
             msg(0)  := C_GET_CONFIGURATION;         --! Command
@@ -2173,11 +2173,9 @@ package body eSpiMasterBfm is
             spiXcv(this, msg, CSn, SCK, DIO, 3, 7, rsp);    --! CRC added and checked by transceiver procedure
             -- process slaves response
             if ( ACCEPT = rsp ) then
-                config := msg(4) & msg(3) & msg(2) & msg(1);    --! extract and assemble config
-                status := msg(6) & msg(5);                      --! status
-            else
-                status  := (others => '0');
-                config  := (others => '0');
+                this.slaveRegs(to_integer(unsigned(adr)/4)) := msg(4) & msg(3) & msg(2) & msg(1);    --! extract and assemble config for store in bfm
+                config                                      := msg(4) & msg(3) & msg(2) & msg(1);    --! extract and assemble config
+                status                                      := msg(6) & msg(5);                      --! status
             end if;
             -- propagate response
             response := rsp;
@@ -2220,41 +2218,6 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- GET_CONFIGURATION, updates BFMs shadows registers of slaves capabilities regs
-        --   @see Figure 22: GET_CONFIGURATION Command
-        procedure GET_CONFIGURATION
-            (
-                variable this   : inout tESpiBfm;                       --! common BFM handle
-                signal CSn      : out std_logic;                        --! slave select
-                signal SCK      : out std_logic;                        --! shift clock
-                signal DIO      : inout std_logic_vector(3 downto 0);   --! data lines
-                constant adr    : in std_logic_vector(15 downto 0);     --! slave registers address
-                variable good   : inout boolean                         --! successful?
-            )
-        is
-            variable pgood  : boolean := true;                  --! internal good
-            variable cfg    : std_logic_vector(31 downto 0);    --! wrapper for config
-        begin
-                -- GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
-            GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, pgood );
-            if ( pgood ) then
-                case adr is
-                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs(to_integer(unsigned(C_DEVICE_IDENTIFICATION)/4))  := cfg; --! Device Identification
-                    when C_GENERAL                  => this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))                := cfg; --! General Capabilities and Configurations
-                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4))     := cfg; --! Channel 0 Capabilities and Configurations (Peripheral Channel)
-                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4))   := cfg; --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
-                    when C_OOB_CHANNEL              => this.slaveRegs(to_integer(unsigned(C_OOB_CHANNEL)/4))            := cfg; --! Channel 2 Capabilities and Configurations (OOB Channel)
-                    when C_FLASH_CHANNEL            => this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4))          := cfg; --! Channel 3 Capabilities and Configurations (Flash Channel)
-                    when others                     => Report "GET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(cfg) & ";";  -- print to log
-                end case;
-            else
-                good := false;
-            end if;
-        end procedure GET_CONFIGURATION;
-        --***************************
-
-
-        --***************************
         -- SET_CONFIGURATION w/ status
         --  @see Figure 23: SET_CONFIGURATION Command
         procedure SET_CONFIGURATION
@@ -2276,6 +2239,14 @@ package body eSpiMasterBfm is
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:SET_CONFIGURATION"; end if;
+            -- default
+            status      := (others => '0');
+            response    := FATAL_ERROR;
+            -- check address for 32bit alignment
+            if ( 0 /= (unsigned(adr) mod 4) ) then
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION: address 0x" & to_hstring(adr) & "not 32Bit aligned" severity error; end if;
+                return;
+            end if;
             -- build command
             msg     := (others => (others => '0')); --! clear
             msg(0)  := C_SET_CONFIGURATION;         --! Command
@@ -2292,9 +2263,8 @@ package body eSpiMasterBfm is
             spiXcv(this, msg, CSn, SCK, DIO, 7, 3, rsp);    --! CRC added and checked by transceiver procedure
             -- process slaves response
             if ( ACCEPT = rsp ) then
-                status := msg(2) & msg(1);  --! status
-            else
-                status  := (others => '0');
+                this.slaveRegs(to_integer(unsigned(adr)/4)) := config;          --! bfm internal
+                status                                      := msg(2) & msg(1); --! status
             end if;
             -- propagate response
             response := rsp;
@@ -2327,17 +2297,6 @@ package body eSpiMasterBfm is
             if ( ACCEPT /= rsp ) then
                 good := false;
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:SET_CONFIGURATION:Slave " & rsp2str(rsp) severity error; end if;
-            else
-                -- update BFM shadow register of slave
-                case adr is
-                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs(to_integer(unsigned(C_DEVICE_IDENTIFICATION)/4))  := config;   --! Device Identification
-                    when C_GENERAL                  => this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))                := config;   --! General Capabilities and Configurations
-                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4))     := config;   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
-                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4))   := config;   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
-                    when C_OOB_CHANNEL              => this.slaveRegs(to_integer(unsigned(C_OOB_CHANNEL)/4))            := config;   --! Channel 2 Capabilities and Configurations (OOB Channel)
-                    when C_FLASH_CHANNEL            => this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4))          := config;   --! Channel 3 Capabilities and Configurations (Flash Channel)
-                    when others                     => Report "SET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(config) & ";";  -- print to log
-                end case;
             end if;
         end procedure SET_CONFIGURATION;
         --***************************
