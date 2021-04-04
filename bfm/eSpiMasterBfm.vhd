@@ -3705,9 +3705,14 @@ package body eSpiMasterBfm is
             -- add wire
                 -- VW_ADD( this, name, value, virtualWire, virtualWireLen, good );
             VW_ADD( this, wireName, wireVal, vw, vwLen, pgood );
-            -- go in wait
-                -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, vwNeedle good )
-            WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vw(0 to vwLen-1), good );
+            -- wires successful created?
+            if ( pgood ) then
+                -- go in wait
+                    -- WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn, vwNeedle good )
+                WAIT_VW_IS_EQ( this, CSn, SCK, DIO, ALERTn , vw(0 to vwLen-1), good );
+            else
+                good := false;
+            end if;
         end procedure WAIT_VW_IS_EQ;
         --***************************
 
