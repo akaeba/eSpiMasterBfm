@@ -65,18 +65,6 @@ package eSpiMasterBfm is
             );
         --***************************
 
-        --***************************
-        -- ESPI Slave Configuration BFM Shadow Register
-        --  @see Table 20: Slave Registers
-        type tSlaveCfgReg is record
-            DEVICE_IDENTIFICATION   : std_logic_vector(31 downto 0);    --! Device Identification
-            GENERAL                 : std_logic_vector(31 downto 0);    --! General Capabilities and Configurations
-            PERIPHERAL_CHANNEL      : std_logic_vector(31 downto 0);    --! Channel 0 Capabilities and Configurations
-            VIRTUAL_WIRE_CHANNEL    : std_logic_vector(31 downto 0);    --! Channel 1 Capabilities and Configurations
-            OOB_CHANNEL             : std_logic_vector(31 downto 0);    --! Channel 2 Capabilities and Configurations
-            FLASH_CHANNEL           : std_logic_vector(31 downto 0);    --! Channel 3 Capabilities and Configurations
-        end record tSlaveCfgReg;
-        --***************************
 
         --***************************
         -- Configures the BFM
@@ -86,7 +74,7 @@ package eSpiMasterBfm is
             tiout           : time;             --! time out when master give up an interaction
             tioutAlert      : natural;          --! number of clock cycles before BFM gives with time out up
             tioutRd         : natural;          --! number of Get Status Cycles before data read gives up
-            slaveRegs       : tSlaveCfgReg;     --! Mirrored Slave Configuration Registers
+            slaveRegs       : tMemX32(0 to 16); --! Mirrored Slave Configuration Registers (0x00 - 0x40)
             virtualWires    : tMemX08(0 to 7);  --! Table 9: Virtual Wire Index Definition; 0-1: Interrupt event, 2-7: System Event
         end record tESpiBfm;
         --***************************
@@ -1073,7 +1061,7 @@ package body eSpiMasterBfm is
             variable ret : boolean := true;
         begin
             -- CRC check enabled?
-            if ( "1" = this.slaveRegs.GENERAL(C_GENERAL_CRC'range) ) then
+            if ( "1" = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range) ) then
                 if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
                     ret := false;
                     if ( this.verbose >= C_MSG_ERROR ) then
@@ -1121,7 +1109,7 @@ package body eSpiMasterBfm is
             variable tclk : time;
         begin
             -- get register setting
-            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OP_FREQ_SEL'range) is
                 when C_GENERAL_OP_FREQ_20MHz => tclk := 1 sec / 20_000_000;
                 when C_GENERAL_OP_FREQ_25MHz => tclk := 1 sec / 25_000_000;
                 when C_GENERAL_OP_FREQ_33MHz => tclk := 1 sec / 33_000_000;
@@ -1285,32 +1273,32 @@ package body eSpiMasterBfm is
             variable str : string(1 to 512) := (others => character(NUL));
         begin
             -- always print
-            str := strcat(str, "     eSPI Configuration:"                                                                   & character(LF));
-            str := strcat(str, "       Device Identification      : 0x" & to_hstring(this.slaveRegs.DEVICE_IDENTIFICATION)  & character(LF));
-            str := strcat(str, "       General                    : 0x" & to_hstring(this.slaveRegs.GENERAL)                & character(LF));
+            str := strcat(str, "     eSPI Configuration:"                                                                                               & character(LF));
+            str := strcat(str, "       Device Identification      : 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_DEVICE_IDENTIFICATION)/4)))   & character(LF));
+            str := strcat(str, "       General                    : 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4)))                 & character(LF));
             -- Peripheral Channel (Ch0)
-            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_PERI'range) is
-                when "1"    => str := strcat(str, "       Peripheral Channel   (Ch0) : 0x" & to_hstring(this.slaveRegs.PERIPHERAL_CHANNEL)  & character(LF));
-                when "0"    => str := strcat(str, "       Peripheral Channel   (Ch0) : not supported"                                       & character(LF));
-                when others => str := strcat(str, "       Peripheral Channel   (Ch0) : UNKNOWN"                                             & character(LF));
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_PERI'range) is
+                when "1"    => str := strcat(str, "       Peripheral Channel   (Ch0) : 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4)))   & character(LF));
+                when "0"    => str := strcat(str, "       Peripheral Channel   (Ch0) : not supported"                                                                   & character(LF));
+                when others => str := strcat(str, "       Peripheral Channel   (Ch0) : UNKNOWN"                                                                         & character(LF));
             end case;
             -- Virtual Wire Channel (Ch1)
-            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range) is
-                when "1"    => str := strcat(str, "       Virtual Wire Channel (Ch1) : 0x" & to_hstring(this.slaveRegs.VIRTUAL_WIRE_CHANNEL)    & character(LF));
-                when "0"    => str := strcat(str, "       Virtual Wire Channel (Ch1) : not supported"                                           & character(LF));
-                when others => str := strcat(str, "       Virtual Wire Channel (Ch1) : UNKNOWN"                                                 & character(LF));
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_VW'range) is
+                when "1"    => str := strcat(str, "       Virtual Wire Channel (Ch1) : 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4))) & character(LF));
+                when "0"    => str := strcat(str, "       Virtual Wire Channel (Ch1) : not supported"                                                                   & character(LF));
+                when others => str := strcat(str, "       Virtual Wire Channel (Ch1) : UNKNOWN"                                                                         & character(LF));
             end case;
             -- OOB Message Channel (Ch2)
-            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_OOB'range) is
-                when "1"    => str := strcat(str, "       OOB Message Channel  (Ch2) : 0x" & to_hstring(this.slaveRegs.OOB_CHANNEL) & character(LF));
-                when "0"    => str := strcat(str, "       OOB Message Channel  (Ch2) : not supported"                               & character(LF));
-                when others => str := strcat(str, "       OOB Message Channel  (Ch2) : UNKNOWN"                                     & character(LF));
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_OOB'range) is
+                when "1"    => str := strcat(str, "       OOB Message Channel  (Ch2) : 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_OOB_CHANNEL)/4)))  & character(LF));
+                when "0"    => str := strcat(str, "       OOB Message Channel  (Ch2) : not supported"                                                           & character(LF));
+                when others => str := strcat(str, "       OOB Message Channel  (Ch2) : UNKNOWN"                                                                 & character(LF));
             end case;
             -- Flash Access Channel (Ch3)
-            case this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range) is
-                when "1"    => str := strcat(str, "       Flash Access Channel (Ch3) : 0x" & to_hstring(this.slaveRegs.FLASH_CHANNEL)   & character(LF));
-                when "0"    => str := strcat(str, "       Flash Access Channel (Ch3) : not supported"                                   & character(LF));
-                when others => str := strcat(str, "       Flash Access Channel (Ch3) : UNKNOWN"                                         & character(LF));
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_FLASH'range) is
+                when "1"    => str := strcat(str, "       Flash Access Channel (Ch3) : 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4)))    & character(LF));
+                when "0"    => str := strcat(str, "       Flash Access Channel (Ch3) : not supported"                                                               & character(LF));
+                when others => str := strcat(str, "       Flash Access Channel (Ch3) : UNKNOWN"                                                                     & character(LF));
             end case;
             -- interpretation finished
             return str(1 to strlen(str));
@@ -1327,22 +1315,22 @@ package body eSpiMasterBfm is
             -- Header
             str := strcat(str, "     General Capabilities and Configurations (0x08):" & character(LF));
             -- CRC Checking Enable, Bit31
-            str := strcat(str, "       CRC Checking Enable  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CRC'range)))) & character(LF));
+            str := strcat(str, "       CRC Checking Enable  : " & integer'image(to_integer(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range)))) & character(LF));
             -- Alert Mode, Bit28
-            case this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_ALERT_MODE'range) is
                 when "1"    => str := strcat(str, "       Alert Mode           : Alert"    & character(LF));
                 when "0"    => str := strcat(str, "       Alert Mode           : I/O[1]"   & character(LF));
                 when others => str := strcat(str, "       Alert Mode           : UNKNOWN"  & character(LF));
             end case;
             -- I/O Mode Select, Bit27:26
-            case this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) is
                 when C_GENERAL_IO_MODE_SEL_SGL  => str := strcat(str, "       I/O Mode Select      : Single I/O"   & character(LF));
                 when C_GENERAL_IO_MODE_SEL_DUAL => str := strcat(str, "       I/O Mode Select      : Dual I/O"     & character(LF));
                 when C_GENERAL_IO_MODE_SEL_QUAD => str := strcat(str, "       I/O Mode Select      : Quad I/O"     & character(LF));
                 when others                     => str := strcat(str, "       I/O Mode Select      : UNKNOWN"      & character(LF));
             end case;
             -- I/O Mode Support, Bit25:24
-            case this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SUP'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SUP'range) is
                 when C_GENERAL_IO_MODE_SUP_SGL              => str := strcat(str, "       I/O Mode Support     : Single I/O"                & character(LF));
                 when C_GENERAL_IO_MODE_SUP_SGL_DUAL         => str := strcat(str, "       I/O Mode Support     : Single, Dual I/O"          & character(LF));
                 when C_GENERAL_IO_MODE_SUP_SGL_QUAD         => str := strcat(str, "       I/O Mode Support     : Single, Quad I/O"          & character(LF));
@@ -1350,13 +1338,13 @@ package body eSpiMasterBfm is
                 when others                                 => str := strcat(str, "       I/O Mode Support     : UNKNOWN"       & character(LF));
             end case;
             -- Open Drain Alert# Select, Bit23
-            case this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_PIN'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OD_ALERT_PIN'range) is
                 when "1"    => str := strcat(str, "       Alert Output Pin     : open-drain"    & character(LF));
                 when "0"    => str := strcat(str, "       Alert Output Pin     : driven"        & character(LF));
                 when others => str := strcat(str, "       Alert Output Pin     : UNKNOWN"       & character(LF));
             end case;
             -- Operating Frequency, Bit22:20
-            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OP_FREQ_SEL'range) is
                 when C_GENERAL_OP_FREQ_20MHz    => str := strcat(str, "       Operating Frequency  : 20MHz"     & character(LF));
                 when C_GENERAL_OP_FREQ_25MHz    => str := strcat(str, "       Operating Frequency  : 25MHz"     & character(LF));
                 when C_GENERAL_OP_FREQ_33MHz    => str := strcat(str, "       Operating Frequency  : 33MHz"     & character(LF));
@@ -1365,13 +1353,13 @@ package body eSpiMasterBfm is
                 when others                     => str := strcat(str, "       Operating Frequency  : UNKNOWN"   & character(LF));
             end case;
             -- Open Drain Alert# Supported, Bit19
-            case this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_SUP'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OD_ALERT_SUP'range) is
                 when "1"    => str := strcat(str, "       Open Drain Alert#    : supported"     & character(LF));
                 when "0"    => str := strcat(str, "       Open Drain Alert#    : not supported" & character(LF));
                 when others => str := strcat(str, "       Open Drain Alert#    : UNKNOWN"       & character(LF));
             end case;
             -- Maximum Frequency Supported, Bit18:16
-            case this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SUP'range) is
+            case this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OP_FREQ_SUP'range) is
                 when C_GENERAL_OP_FREQ_20MHz    => str := strcat(str, "       Maximum Frequency    : 20MHz"     & character(LF));
                 when C_GENERAL_OP_FREQ_25MHz    => str := strcat(str, "       Maximum Frequency    : 25MHz"     & character(LF));
                 when C_GENERAL_OP_FREQ_33MHz    => str := strcat(str, "       Maximum Frequency    : 33MHz"     & character(LF));
@@ -1380,15 +1368,15 @@ package body eSpiMasterBfm is
                 when others                     => str := strcat(str, "       Maximum Frequency    : UNKNOWN"   & character(LF));
             end case;
             -- Maximum WAIT STATE Allowed, Bit15:12
-            case to_integer(to_01(unsigned(this.slaveRegs.GENERAL(C_GENERAL_MAX_WAIT'range)))) is
-                when 0      => str := strcat(str, "       Maximum WAIT STATE   : 16Byte"                                                                                    & character(LF));
-                when others => str := strcat(str, "       Maximum WAIT STATE   : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_MAX_WAIT'range))))  & "Byte"    & character(LF));
+            case to_integer(to_01(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_MAX_WAIT'range)))) is
+                when 0      => str := strcat(str, "       Maximum WAIT STATE   : 16Byte"                                                                                                                        & character(LF));
+                when others => str := strcat(str, "       Maximum WAIT STATE   : " & integer'image(to_integer(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_MAX_WAIT'range))))  & "Byte" & character(LF));
             end case;
             -- Channel Supported:
-            str := strcat(str, "       Peripheral Channel   : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_PERI'range))))     & character(LF));
-            str := strcat(str, "       Virtual Wire Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range))))       & character(LF));
-            str := strcat(str, "       OOB Message Channel  : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_OOB'range))))      & character(LF));
-            str := strcat(str, "       Flash Access Channel : " & integer'image(to_integer(unsigned(this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range))))    & character(LF));
+            str := strcat(str, "       Peripheral Channel   : " & integer'image(to_integer(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_PERI'range))))  & character(LF));
+            str := strcat(str, "       Virtual Wire Channel : " & integer'image(to_integer(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_VW'range))))    & character(LF));
+            str := strcat(str, "       OOB Message Channel  : " & integer'image(to_integer(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_OOB'range))))   & character(LF));
+            str := strcat(str, "       Flash Access Channel : " & integer'image(to_integer(unsigned(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_FLASH'range)))) & character(LF));
             -- interpretation finished
             return str(1 to strlen(str));
         end function generalReg2Str;
@@ -1453,18 +1441,18 @@ package body eSpiMasterBfm is
             )
         is
         begin
-            this.slaveRegs.GENERAL                                  := (others => '0');         --! default
-            this.slaveRegs.GENERAL(C_GENERAL_CRC'range)             := C_GENERAL_CRC;           --! CRC Checking
-            this.slaveRegs.GENERAL(C_GENERAL_RSP_MOD'range)         := C_GENERAL_RSP_MOD;       --! Response Modifier
-            this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range)      := C_GENERAL_ALERT_MODE;    --! Alert Mode
-            this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)     := C_GENERAL_IO_MODE_SEL;   --! I/O Mode Select
-            this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SUP'range)     := C_GENERAL_IO_MODE_SUP;   --! I/O Mode Support
-            this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_PIN'range)    := C_GENERAL_OD_ALERT_PIN;  --! Open Drain Alert#
-            this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SEL'range)     := C_GENERAL_OP_FREQ_SEL;   --! Operating Frequency
-            this.slaveRegs.GENERAL(C_GENERAL_OD_ALERT_SUP'range)    := C_GENERAL_OD_ALERT_SUP;  --! Open Drain Alert# Supported
-            this.slaveRegs.GENERAL(C_GENERAL_OP_FREQ_SUP'range)     := C_GENERAL_OP_FREQ_SUP;   --! Maximum Frequency Supported
-            this.slaveRegs.GENERAL(C_GENERAL_MAX_WAIT'range)        := C_GENERAL_MAX_WAIT;      --! Maximum WAIT STATE Allowed
-            this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP'range)         := C_GENERAL_CHN_SUP;    --! Channel Supported
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))                               := (others => '0');         --! default
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range)          := C_GENERAL_CRC;           --! CRC Checking
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_RSP_MOD'range)      := C_GENERAL_RSP_MOD;       --! Response Modifier
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_ALERT_MODE'range)   := C_GENERAL_ALERT_MODE;    --! Alert Mode
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range)  := C_GENERAL_IO_MODE_SEL;   --! I/O Mode Select
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SUP'range)  := C_GENERAL_IO_MODE_SUP;   --! I/O Mode Support
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OD_ALERT_PIN'range) := C_GENERAL_OD_ALERT_PIN;  --! Open Drain Alert#
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OP_FREQ_SEL'range)  := C_GENERAL_OP_FREQ_SEL;   --! Operating Frequency
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OD_ALERT_SUP'range) := C_GENERAL_OD_ALERT_SUP;  --! Open Drain Alert# Supported
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_OP_FREQ_SUP'range)  := C_GENERAL_OP_FREQ_SUP;   --! Maximum Frequency Supported
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_MAX_WAIT'range)     := C_GENERAL_MAX_WAIT;      --! Maximum WAIT STATE Allowed
+            this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP'range)      := C_GENERAL_CHN_SUP;    --! Channel Supported
         end procedure init_cap_reg_08;
         --***************************
 
@@ -1478,11 +1466,12 @@ package body eSpiMasterBfm is
         is
         begin
             -- common handle
-            this.sigSkew    := 0 ns;                --! no skew between clock edge and data defined
-            this.verbose    := C_MSG_NO;            --! all messages disabled
-            this.tiout      := 100 us;              --! 100us master time out for wait
-            this.tioutAlert := C_TIOUT_CYC_ALERT;   --! number of clock cycles before BFM gives up with waiting for ALERTn
-            this.tioutRd    := C_TIOUT_CYC_RD;      --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.sigSkew    := 0 ns;                        --! no skew between clock edge and data defined
+            this.verbose    := C_MSG_NO;                    --! all messages disabled
+            this.tiout      := 100 us;                      --! 100us master time out for wait
+            this.tioutAlert := C_TIOUT_CYC_ALERT;           --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.tioutRd    := C_TIOUT_CYC_RD;              --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.slaveRegs  := (others => (others => '0')); --! defined value, not according spec
             -- Slave Registers
             init_cap_reg_08( this );    --! Slaves General Capabilities and Configurations
         end procedure init;
@@ -1540,7 +1529,7 @@ package body eSpiMasterBfm is
                 return;
             end if;
             -- enable according "Exit G3" sequence
-            slv32 := this.slaveRegs.GENERAL;    --! get general reg from shadow register
+            slv32 := this.slaveRegs(to_integer(unsigned(C_GENERAL)/4));    --! get general reg from shadow register
             -- CRC enabled?
             if ( crc ) then
                 slv32(C_GENERAL_CRC'range) := "1";  --! CRC checking is enabled
@@ -1572,7 +1561,7 @@ package body eSpiMasterBfm is
             -- *****
             -- Virtual Wire channel is enabled, if supported
             --  @see Exit from G3, 6.)
-            if ( C_GENERAL_CHN_SUP_VW = this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_VW'range) ) then
+            if ( C_GENERAL_CHN_SUP_VW = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_VW'range) ) then
                 -- get virtual wire channel config
                 GET_CONFIGURATION( this, CSn, SCK, DIO, C_VIRTUAL_WIRE_CHANNEL, pgood );   --! Virtual Wire Capabilities and Configurations
                 if not ( pgood ) then
@@ -1581,7 +1570,7 @@ package body eSpiMasterBfm is
                     return;
                 end if;
                 -- enable virtual wire channel
-                slv32                       := this.slaveRegs.VIRTUAL_WIRE_CHANNEL; --! acquire virtual wire config
+                slv32                       := this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4)); --! acquire virtual wire config
                 slv32(C_VW_ENABLE'range)    := C_VW_ENABLE;                         --! enable channel
                     -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
                 SET_CONFIGURATION( this, CSn, SCK, DIO, C_VIRTUAL_WIRE_CHANNEL, slv32, pgood ); --! update virtual wire cap reg
@@ -1594,7 +1583,7 @@ package body eSpiMasterBfm is
             -- *****
             -- Once the Flash controller is ready, the Flash Access Channel is enabled if supported.
             --  @see Exit from G3, 7.)
-            if ( C_GENERAL_CHN_SUP_FLASH = this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_FLASH'range) ) then
+            if ( C_GENERAL_CHN_SUP_FLASH = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_FLASH'range) ) then
                 -- get virtual wire channel config
                 GET_CONFIGURATION( this, CSn, SCK, DIO, C_FLASH_CHANNEL, pgood );   --! Flash Channel Capabilities and Configurations
                 if not ( pgood ) then
@@ -1603,7 +1592,7 @@ package body eSpiMasterBfm is
                     return;
                 end if;
                 -- enable virtual wire channel
-                slv32                       := this.slaveRegs.FLASH_CHANNEL;    --! acquire virtual wire config
+                slv32                       := this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4));    --! acquire virtual wire config
                 slv32(C_FLASH_ENABLE'range) := C_FLASH_ENABLE;                  --! enable channel
                     -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
                 SET_CONFIGURATION( this, CSn, SCK, DIO, C_FLASH_CHANNEL, slv32, pgood );    --! update flash channel cap reg
@@ -1675,7 +1664,7 @@ package body eSpiMasterBfm is
             -- *****
             -- Peripheral Channel
             --  @see Exit from G3, 12.)
-            if ( C_GENERAL_CHN_SUP_PERI = this.slaveRegs.GENERAL(C_GENERAL_CHN_SUP_PERI'range) ) then
+            if ( C_GENERAL_CHN_SUP_PERI = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CHN_SUP_PERI'range) ) then
                 GET_CONFIGURATION( this, CSn, SCK, DIO, C_PERIPHERAL_CHANNEL, pgood );  --! Peripheral Capabilities and Configurations
                 if not ( pgood ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:init: Failed to get register 0x" & to_hstring(C_PERIPHERAL_CHANNEL) severity error; end if;
@@ -1683,7 +1672,7 @@ package body eSpiMasterBfm is
                     return;
                 end if;
                 -- enable peripheral channel, should enabled as default
-                slv32                       := this.slaveRegs.PERIPHERAL_CHANNEL;   --! acquire virtual wire config
+                slv32                       := this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4));   --! acquire virtual wire config
                 slv32(C_PERI_ENABLE'range)  := C_PERI_ENABLE;                       --! enable channel
                     -- SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, good )
                 SET_CONFIGURATION( this, CSn, SCK, DIO, C_PERIPHERAL_CHANNEL, slv32, pgood );    --! update virtual wire cap reg
@@ -1805,14 +1794,14 @@ package body eSpiMasterBfm is
                 -- iterate over bits in a single message byte
                 for j in msg(i)'high downto msg(i)'low loop
                     -- dispatch mode
-                    if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- one bit per cycle transfered
                         SCK     <= '0';             --! falling edge
                         DIO(0)  <= msg(i)(j);       --! assign data
                         wait for tSpiClk/2;         --! half clock cycle
                         SCK     <= '1';             --! rising edge
                         wait for tSpiClk/2;         --! half clock cycle
-                    elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK             <= '0'; --! falling edge
@@ -1821,7 +1810,7 @@ package body eSpiMasterBfm is
                             SCK             <= '1'; --! rising edge
                             wait for tSpiClk/2;     --! half clock cycle
                         end if;
-                    elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- four bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 4 ) then
                             SCK             <= '0'; --! falling edge
@@ -1832,7 +1821,7 @@ package body eSpiMasterBfm is
                         end if;
                     else
                         -- unsupported transfer mode
-                        if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                        if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx: unsupported transfer mode 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
                         return;
                     end if;
                 end loop;
@@ -1855,18 +1844,18 @@ package body eSpiMasterBfm is
         begin
             -- one clock cycle drive high
             SCK     <= '0';     --! falling edge
-            if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
             -- one bits per clock cycle are transfered
                 DIO(0)  <= '1';
-            elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
             -- two bits per clock cycle are transfered
                 DIO(1 downto 0) <= (others => '1');
-            elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
             -- four bits per clock cycle are transfered
                 DIO <= (others => '1');
             else
                 -- unsupported transfer mode
-                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTar: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTar: unsupported transfer mode 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
                 return;
             end if;
             wait for tSpiClk/2; --! half clock cycle
@@ -1874,18 +1863,18 @@ package body eSpiMasterBfm is
             wait for tSpiClk/2; --! half clock cycle
             -- one clock cycle tristate
             SCK     <= '0';     --! falling edge
-            if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
             -- one bits per clock cycle are transfered
                 DIO(0)  <= 'Z';
-            elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
             -- two bits per clock cycle are transfered
                 DIO(1 downto 0) <= (others => 'Z');
-            elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+            elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
             -- four bits per clock cycle are transfered
                 DIO <= (others => 'Z');
             else
                 -- unsupported transfer mode
-                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiTx unsupported transfer mode 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
                 return;
             end if;
             wait for tSpiClk/2; --! half clock cycle
@@ -1917,7 +1906,7 @@ package body eSpiMasterBfm is
                 -- iterate over bits in a single message byte
                 for j in msg(i)'high downto msg(i)'low loop
                     -- dispatch mode
-                    if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    if ( C_GENERAL_IO_MODE_SEL_SGL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- one bit per clock cycle transferred
                         SCK                 <= '0';                                                 --! falling edge
                         wait for tSpiClk/2;                                                         --! half clock cycle
@@ -1925,7 +1914,7 @@ package body eSpiMasterBfm is
                         slv1(0 downto 0)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 1))));  --! help
                         msg(i)(j)           := slv1(0);                                             --! capture data from line
                         wait for tSpiClk/2;                                                         --! half clock cycle
-                    elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    elsif ( C_GENERAL_IO_MODE_SEL_DUAL = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- two bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 2 ) then
                             SCK                     <= '0';                                                 --! falling edge
@@ -1934,7 +1923,7 @@ package body eSpiMasterBfm is
                             msg(i)(j downto j-1)    := std_logic_vector(TO_01(unsigned(DIO(1 downto 0))));  --! capture data from line
                             wait for tSpiClk/2;                                                             --! half clock cycle
                         end if;
-                    elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range) ) then
+                    elsif ( C_GENERAL_IO_MODE_SEL_QUAD = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range) ) then
                     -- four bits per clock cycle are transfered
                         if ( 0 = (j+1) mod 4 ) then
                             SCK                     <= '0';                                                 --! falling edge
@@ -1945,7 +1934,7 @@ package body eSpiMasterBfm is
                         end if;
                     else
                         -- unsupported transfer mode
-                        if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiRx: unsupported transfer mode 0x" & to_hstring(this.slaveRegs.GENERAL(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
+                        if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:spiRx: unsupported transfer mode 0x" & to_hstring(this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_IO_MODE_SEL'range)) severity error; end if;
                         return;
                     end if;
                 end loop;
@@ -2250,12 +2239,12 @@ package body eSpiMasterBfm is
             GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, pgood );
             if ( pgood ) then
                 case adr is
-                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs.DEVICE_IDENTIFICATION := cfg; --! Device Identification
-                    when C_GENERAL                  => this.slaveRegs.GENERAL               := cfg; --! General Capabilities and Configurations
-                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs.PERIPHERAL_CHANNEL    := cfg; --! Channel 0 Capabilities and Configurations (Peripheral Channel)
-                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs.VIRTUAL_WIRE_CHANNEL  := cfg; --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
-                    when C_OOB_CHANNEL              => this.slaveRegs.OOB_CHANNEL           := cfg; --! Channel 2 Capabilities and Configurations (OOB Channel)
-                    when C_FLASH_CHANNEL            => this.slaveRegs.FLASH_CHANNEL         := cfg; --! Channel 3 Capabilities and Configurations (Flash Channel)
+                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs(to_integer(unsigned(C_DEVICE_IDENTIFICATION)/4))  := cfg; --! Device Identification
+                    when C_GENERAL                  => this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))                := cfg; --! General Capabilities and Configurations
+                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4))     := cfg; --! Channel 0 Capabilities and Configurations (Peripheral Channel)
+                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4))   := cfg; --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
+                    when C_OOB_CHANNEL              => this.slaveRegs(to_integer(unsigned(C_OOB_CHANNEL)/4))            := cfg; --! Channel 2 Capabilities and Configurations (OOB Channel)
+                    when C_FLASH_CHANNEL            => this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4))          := cfg; --! Channel 3 Capabilities and Configurations (Flash Channel)
                     when others                     => Report "GET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(cfg) & ";";  -- print to log
                 end case;
             else
@@ -2341,12 +2330,12 @@ package body eSpiMasterBfm is
             else
                 -- update BFM shadow register of slave
                 case adr is
-                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs.DEVICE_IDENTIFICATION := config;   --! Device Identification
-                    when C_GENERAL                  => this.slaveRegs.GENERAL               := config;   --! General Capabilities and Configurations
-                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs.PERIPHERAL_CHANNEL    := config;   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
-                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs.VIRTUAL_WIRE_CHANNEL  := config;   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
-                    when C_OOB_CHANNEL              => this.slaveRegs.OOB_CHANNEL           := config;   --! Channel 2 Capabilities and Configurations (OOB Channel)
-                    when C_FLASH_CHANNEL            => this.slaveRegs.FLASH_CHANNEL         := config;   --! Channel 3 Capabilities and Configurations (Flash Channel)
+                    when C_DEVICE_IDENTIFICATION    => this.slaveRegs(to_integer(unsigned(C_DEVICE_IDENTIFICATION)/4))  := config;   --! Device Identification
+                    when C_GENERAL                  => this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))                := config;   --! General Capabilities and Configurations
+                    when C_PERIPHERAL_CHANNEL       => this.slaveRegs(to_integer(unsigned(C_PERIPHERAL_CHANNEL)/4))     := config;   --! Channel 0 Capabilities and Configurations (Peripheral Channel)
+                    when C_VIRTUAL_WIRE_CHANNEL     => this.slaveRegs(to_integer(unsigned(C_VIRTUAL_WIRE_CHANNEL)/4))   := config;   --! Channel 1 Capabilities and Configurations (Virtual Wire Channel)
+                    when C_OOB_CHANNEL              => this.slaveRegs(to_integer(unsigned(C_OOB_CHANNEL)/4))            := config;   --! Channel 2 Capabilities and Configurations (OOB Channel)
+                    when C_FLASH_CHANNEL            => this.slaveRegs(to_integer(unsigned(C_FLASH_CHANNEL)/4))          := config;   --! Channel 3 Capabilities and Configurations (Flash Channel)
                     when others                     => Report "SET_CONFIGURATION:UNKOWN: ADR=0x" & to_hstring(adr) & "; CFG=0x" & to_hstring(config) & ";";  -- print to log
                 end case;
             end if;
@@ -2539,7 +2528,7 @@ package body eSpiMasterBfm is
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
             -- wait for alert
             while ( true ) loop
-                if ( "1" = this.slaveRegs.GENERAL(C_GENERAL_ALERT_MODE'range) ) then
+                if ( "1" = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_ALERT_MODE'range) ) then
                     if ( '0' = to_bit(std_ulogic(ALERTn), '1') ) then
                         wait for tSpiClk/2;             --! limit bandwidth
                         CSn <= '0';                     --! ACK alert
