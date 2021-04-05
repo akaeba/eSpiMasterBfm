@@ -255,8 +255,8 @@ begin
                 -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 15) <= "4C0000008047F9"         & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 15) <= "4C0000008047F9" & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 15) <= "0F0F0F080F039B" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -271,7 +271,7 @@ begin
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
             REQMSG(1 to 25) <= "00010003000000800123454A"   & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 23) <= "0F0F0F08010000000F0309"     & character(NUL);   --! received response   (Slave to BFM)
+            CMPMSG(1 to 15) <= "0F0F0F080F039B"             & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -296,8 +296,8 @@ begin
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 13) <= "480000008058"           & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 13) <= "480000008058"       & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 17) <= "0F0F0F08010F0311"   & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
