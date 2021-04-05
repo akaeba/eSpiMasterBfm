@@ -1048,17 +1048,18 @@ package body eSpiMasterBfm is
         -- checkCRC
         --   calculates CRC from msglen-1 and compares with last byte of msg len
         function checkCRC ( this : in tESpiBfm; msg : in tMemX08 ) return boolean is
-            variable ret : boolean := true;
+            alias m         : tMemX08(0 to msg'length-1) is msg;    --! zero align
+            variable ret    : boolean := true;
         begin
             -- CRC check enabled?
-            -- if ( "1" = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range) ) then
-                -- if ( msg(msg'length-1) /= crc8(msg(0 to msg'length-2)) ) then
-                    -- ret := false;
-                    -- if ( this.verbose >= C_MSG_ERROR ) then
-                        -- Report "eSpiMasterBfm:checkCRC rcv=0x" & to_hstring(msg(msg'length-1)) & "; calc=0x" & to_hstring(crc8(msg(0 to msg'length-2))) & ";" severity error;
-                    -- end if;
-                -- end if;
-            -- end if;
+            if ( "1" = this.slaveRegs(to_integer(unsigned(C_GENERAL)/4))(C_GENERAL_CRC'range) ) then
+                if ( m(m'length-1) /= crc8(m(0 to m'length-2)) ) then
+                    ret := false;
+                    if ( this.verbose >= C_MSG_ERROR ) then
+                        Report "eSpiMasterBfm:checkCRC is=0x" & to_hstring(m(m'length-1)) & "; exp=0x" & to_hstring(crc8(m(0 to m'length-2))) & ";" severity error;
+                    end if;
+                end if;
+            end if;
             return ret;
         end function checkCRC;
         --***************************
@@ -2539,6 +2540,8 @@ package body eSpiMasterBfm is
             variable msgLen     : natural := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
         begin
+            -- user message
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32"; end if;
             -- prepare
             msg := (others => (others => '0'));                                         --! init message array
             -- determine instruction type
@@ -2672,8 +2675,12 @@ package body eSpiMasterBfm is
             variable msgLen     : integer := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
         begin
+            -- user message
+            if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:MEMRD32"; end if;
             -- init
-            msg := (others => (others => '0'));
+            msg         := (others => (others => '0'));
+            response    := FATAL_ERROR;
+            status      := (others => '0');
             -- determine instruction type
             if ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then    --! CMD: PUT_MEMWR32_SHORT
                 -- user message
@@ -2689,8 +2696,8 @@ package body eSpiMasterBfm is
                 msgLen      := msgLen + 4;
             else                                                                        --! CMD: PUT_NP
                 --! TODO
-
-
+                if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMRD32: NOT IMPLEMENTED CALL " severity error; end if;
+                return;
             end if;
             -- send and get response
                 -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte, response)
@@ -2699,8 +2706,6 @@ package body eSpiMasterBfm is
             if ( ACCEPT = rsp ) then
                 data    := msg(1 to data'length);                   --! extract data from message
                 status  := msg(data'length+2) & msg(data'length+1); --! status
-            else
-                status  := (others => '0');
             end if;
             -- propagate response
             response := rsp;
