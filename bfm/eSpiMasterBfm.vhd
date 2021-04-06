@@ -12,6 +12,7 @@
 -- @date:       2020-01-04
 --
 -- @see:        https://www.intel.com/content/dam/support/us/en/documents/software/chipset-software/327432-004_espi_base_specification_rev1.0_cb.pdf
+-- @see:        https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_embedded_ip.pdf
 -- @see:        https://github.com/akaeba/eSpiMasterBfm
 -- @brief:      bus functional model for enhanced SPI (eSPI)
 --              provides function to interact with an eSPI
@@ -48,7 +49,8 @@ package eSpiMasterBfm is
 
         --***************************
         -- Virtual Wires Index/Name resolving
-        type tSysEventName is array(2 to 7, 0 to 3) of string(1 to 22); --! resolves index to name, required by print
+        type tSysEventName is array(2 to 7, 0 to 3) of string(1 to 22);     --! System Event Virtual Wires;                     resolves index to name, required by print
+        type tServerPfmName is array(64 to 71, 0 to 3) of string(1 to 15);  --! Server Platform Specific Virtual Wire Index;    resolves index to name, required by print
         --***************************
 
         --***************************
@@ -499,7 +501,7 @@ package body eSpiMasterBfm is
         -- BFM
         constant C_BFM_LICENSE  : string := "BSDv3";
         constant C_BFM_AUTHORS  : string := "Andreas Kaeberlein";
-        constant C_BFM_VERSION  : string := "v0.1.1";
+        constant C_BFM_VERSION  : string := "v0.1.2";
         --***************************
 
         --***************************
@@ -713,6 +715,23 @@ package body eSpiMasterBfm is
                                                         (padStr("HOST_RST_WARN",        ' ', 22), padStr("SMIOUT#",     ' ', 22), padStr("NMIOUT#",        ' ', 22), padStr("RSV",                    ' ', 22))
                                                     );
         --***************************
+
+
+        --***************************
+        -- Server Platform Wires
+        --  @see Table 24 Server Platform Specific Virtual Wire Index
+        --  @see https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_embedded_ip.pdf
+        constant C_SRV_PFM_NAME : tServerPfmName := (   (padStr("SUS_ACK#",    ' ', 15), padStr("RSV",           ' ', 15), padStr("RSV",         ' ', 15), padStr("RSV",         ' ', 15)),
+                                                        (padStr("SUS_WARN#",   ' ', 15), padStr("SUS_PWRDN_ACK", ' ', 15), padStr("RSV",         ' ', 15), padStr("SLP_A#",      ' ', 15)),
+                                                        (padStr("SLP_LAN#",    ' ', 15), padStr("SLP_WLAN#",     ' ', 15), padStr("RSV",         ' ', 15), padStr("RSV",         ' ', 15)),
+                                                        (padStr("PCH_TO_EC_0", ' ', 15), padStr("PCH_TO_EC_1",   ' ', 15), padStr("PCH_TO_EC_2", ' ', 15), padStr("PCH_TO_EC_3", ' ', 15)),
+                                                        (padStr("PCH_TO_EC_4", ' ', 15), padStr("PCH_TO_EC_5",   ' ', 15), padStr("PCH_TO_EC_6", ' ', 15), padStr("PCH_TO_EC_7", ' ', 15)),
+                                                        (padStr("EC_TO_PCH_0", ' ', 15), padStr("EC_TO_PCH_1",   ' ', 15), padStr("EC_TO_PCH_2", ' ', 15), padStr("EC_TO_PCH_3", ' ', 15)),
+                                                        (padStr("EC_TO_PCH_4", ' ', 15), padStr("EC_TO_PCH_5",   ' ', 15), padStr("EC_TO_PCH_6", ' ', 15), padStr("EC_TO_PCH_7", ' ', 15)),
+                                                        (padStr("HOST_C10",    ' ', 15), padStr("RSV",           ' ', 15), padStr("RSV",         ' ', 15), padStr("RSV",         ' ', 15))
+                                                    );
+        --***************************
+
 
         --***************************
         -- Timing Parameters
