@@ -72,13 +72,13 @@ package eSpiMasterBfm is
         --***************************
         -- Configures the BFM
         type tESpiBfm is record
-            sigSkew         : time;             --! defines Signal Skew to prevent timing errors in back-anno
-            verbose         : natural;          --! message level; 0: no message, 1: errors, 2: error + warnings
-            tiout           : time;             --! time out when master give up an interaction
-            tioutAlert      : natural;          --! number of clock cycles before BFM gives with time out up
-            tioutRd         : natural;          --! number of Get Status Cycles before data read gives up
-            slaveRegs       : tMemX32(0 to 16); --! Mirrored Slave Configuration Registers (0x00 - 0x40)
-            virtualWires    : tMemX08(0 to 7);  --! Table 9: Virtual Wire Index Definition; 0-1: Interrupt event, 2-7: System Event
+            sigSkew         : time;                 --! defines Signal Skew to prevent timing errors in back-anno
+            verbose         : natural;              --! message level; 0: no message, 1: errors, 2: error + warnings
+            tiout           : time;                 --! time out when master give up an interaction
+            tioutAlert      : natural;              --! number of clock cycles before BFM gives with time out up
+            tioutRd         : natural;              --! number of Get Status Cycles before data read gives up
+            slaveRegs       : tMemX32(0 to 16);     --! Mirrored Slave Configuration Registers (0x00 - 0x40)
+            virtualWires    : tMemX08(0 to 255);    --! Table 9: Virtual Wire Index Definition; 0-1: Interrupt event, 2-7: System Event
         end record tESpiBfm;
         --***************************
 
@@ -1292,24 +1292,24 @@ package body eSpiMasterBfm is
                                      );
                     end if;
                 end loop;
-                ret := strcat(ret, LF); --! empty line
+                ret := strcat(ret, LF); --! separate from next header
             end if;
             -- System Event Wire
             if ( -1 /= strSysEventLen ) then
                 ret := strcat(ret, cBlankPad5 & "System Event Wire (0x02-0x07):" & character(LF));  --! header
                 for i in 0 to vw'length/2 - 1 loop                                  --! look for System Event Wire in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));                         --! convert to integer
-                    if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
+                    if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then  --! index=2-7: system event wire
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
-                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SYSEVENT_NAME(index, j)), ' ', strSysEventLen+7) &    --! system wire name, +7: leading blanks
+                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SYSEVENT_NAME(index, j)), ' ', strSysEventLen+7) &    --! +7: leading blanks
                                                     " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
                                              );
                             end if;
                         end loop;
                     end if;
                 end loop;
-                ret := strcat(ret, LF); --! empty line
+                ret := strcat(ret, LF); --! separate from next header
             end if;
             -- Reserved
             if ( -1 /= strRsvLen ) then
@@ -1322,7 +1322,7 @@ package body eSpiMasterBfm is
                                      );
                     end if;
                 end loop;
-                ret := strcat(ret, LF); --! empty line
+                ret := strcat(ret, LF); --! separate from next header
             end if;
             -- Server Platform Specific
             if ( -1 /= strSrvPfmLen ) then
@@ -1339,7 +1339,7 @@ package body eSpiMasterBfm is
                         end loop;
                     end if;
                 end loop;
-                ret := strcat(ret, LF); --! empty line
+                ret := strcat(ret, LF); --! separate from next header
             end if;
             -- Platform specific wires
             if ( -1 /= strPfmSpLen ) then
@@ -1352,14 +1352,14 @@ package body eSpiMasterBfm is
                                      );
                     end if;
                 end loop;
-                ret := strcat(ret, LF); --! empty line
+                ret := strcat(ret, LF); --! separate from next header
             end if;
             -- GPIO
             if ( -1 /= strGpioLen ) then
                 ret := strcat(ret, cBlankPad5 & "GPIO (0x80-0xFF):" & character(LF));   --! header
                 for i in 0 to vw'length/2 - 1 loop                  --! look for Platform specific wires in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));         --! convert to integer
-                    if ( (128 <= index) and (index <= 255) ) then   --! index=128-255: Platform specific wires
+                    if ( (128 <= index) and (index <= 255) ) then   --! index=128-255: GPIO wires
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
                                 ret := strcat( ret, padStr(cBlankPad7 & "GPIO" & integer'image((index-128)*4+j), ' ', strGpioLen+7) &   --! +7: leading blanks
@@ -1369,7 +1369,7 @@ package body eSpiMasterBfm is
                         end loop;
                     end if;
                 end loop;
-                ret := strcat(ret, LF); --! empty line
+                ret := strcat(ret, LF); --! separate from next header
             end if;
             -- all done
             return ret(1 to strlen(ret)-2); --! drop last two line feed
@@ -3336,17 +3336,28 @@ package body eSpiMasterBfm is
             -- first: index
             -- second: data
             for i in 0 to vw'length/2 - 1 loop
-                if ( (0 <= to_integer(to_01(unsigned(vw(2*i))))) and  (to_integer(to_01(unsigned(vw(2*i)))) <= 1) ) then    -- IRQ?
+                -- IRQ (indexes: 0-1)
+                if ( (0 <= to_integer(to_01(unsigned(vw(2*i))))) and  (to_integer(to_01(unsigned(vw(2*i)))) <= 1) ) then
                     this.virtualWires(to_integer(to_01(unsigned(vw(2*i))))) := vw(2*i+1);   --! store in BFM
-                elsif ( (2 <= to_integer(to_01(unsigned(vw(2*i))))) and  (to_integer(to_01(unsigned(vw(2*i)))) <= 7) ) then --! System Wire
-                    -- iterate over packed system event virtual wires
+                -- Packed Wires (indexes: 2-7, 64-71, 128-255)
+                elsif   (       ((C_SYSEVENT_NAME'low <= to_integer(to_01(unsigned(vw(2*i))))) and (to_integer(to_01(unsigned(vw(2*i)))) <= C_SYSEVENT_NAME'high))  --! index=2-7: system event wire
+                            or  ((C_SRV_PFM_NAME'low <= to_integer(to_01(unsigned(vw(2*i)))))  and (to_integer(to_01(unsigned(vw(2*i)))) <= C_SRV_PFM_NAME'high))   --! index=64-71: Server Platform Specific Virtual Wire
+                            or  ((128 <= to_integer(to_01(unsigned(vw(2*i)))))                 and (to_integer(to_01(unsigned(vw(2*i)))) <= 255))                   --! index=128-255: GPIO wires
+                        ) then
+                    -- iterate over packed virtual wires
                     for j in 0 to 3 loop
                         if ( '1' = vw(2*i+1)(j+4) ) then
                             this.virtualWires(to_integer(to_01(unsigned(vw(2*i)))))(j+4) := '1';
                             this.virtualWires(to_integer(to_01(unsigned(vw(2*i)))))(j)   := vw(2*i+1)(j);
                         end if;
                     end loop;
-                else    --! Unsupported?
+                -- Binary
+                elsif   (       ((8 <= to_integer(to_01(unsigned(vw(2*i)))))    and (to_integer(to_01(unsigned(vw(2*i)))) <= 63))   --! index=8-63: Reserved?
+                            or  ((72 <= to_integer(to_01(unsigned(vw(2*i)))))   and (to_integer(to_01(unsigned(vw(2*i)))) <= 127))  --! index=72-127: Platform specific wires, uninterpreted
+                        ) then
+                    this.virtualWires(to_integer(to_01(unsigned(vw(2*i))))) := vw(2*i+1);
+                --! Unsupported
+                else
                     good := false;
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VW_UPDATE_BFM: Unsupported virtual wire index " & integer'image(to_integer(to_01(unsigned(vw(2*i))))) severity error; end if;
                     return;
