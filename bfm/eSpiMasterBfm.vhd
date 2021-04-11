@@ -532,9 +532,9 @@ package body eSpiMasterBfm is
         --   creates an string with a fixed length, padded with pad
         function padStr
             (
-                constant str : in string;
-                constant pad : in character;
-                constant len : in positive
+                constant str : in string;                       --! input string
+                constant pad : in character := character(LF);   --! pad with
+                constant len : in positive                      --! resulting length
             )
         return string is
             alias    alignStr : string(1 to str'length) is str; --! make one aligned
@@ -549,21 +549,6 @@ package body eSpiMasterBfm is
             -- pad
             padedStr(1 to alignStr'length) := alignStr;
             return padedStr;
-        end function padStr;
-        --***************************
-
-        --***************************
-        -- padStr
-        --   creates an string with a fixed length, padded with NUL
-        function padStr
-            (
-                constant str : in string;
-                constant len : in positive
-            )
-        return string is
-        begin
-                -- padStr( str, pad, len )
-            return padStr( str, character(NUL), len );
         end function padStr;
         --***************************
 
@@ -1241,22 +1226,20 @@ package body eSpiMasterBfm is
         function vw2str
             (
                 constant virtualWire    : in tMemX08;           --! virtual wire index/data pairs
-                constant len            : in positive := 2048   --! max string length
+                constant maxLen         : in positive := 2048   --! max string length
             )
         return string is
             alias vw                : tMemX08(0 to virtualWire'length-1) is virtualWire;    --! zero align
-            constant cBlankPad7     : string(1 to 7)    := "       ";                       --! blank padding for log alignment
-            constant cBlankPad5     : string(1 to 5)    := "     ";                         --! blank padding for log alignment
-            variable ret            : string(1 to len)  := (others => character(NUL));      --! make empty
-            variable maxLen         : integer           := 0;                               --! maximum wire name len, required for blank pad
-            variable strIrqLen      : integer           := -1;                              --! max length of IRQ,                      -1 not in list
-            variable strSysEventLen : integer           := -1;                              --! max length of system event,             -1 not in list
-            variable strRsvLen      : integer           := -1;                              --! max length of reserved wires,           -1 not in list
-            variable strSrvPfmLen   : integer           := -1;                              --! max length of server specific wires,    -1 not in list
-            variable strPfmSpLen    : integer           := -1;                              --! max length of platform specific wires,  -1 not in list
-            variable strGpioLen     : integer           := -1;                              --! max length of GPIO wires,               -1 not in list
+            constant cBlankPad7     : string(1 to 7)        := "       ";                   --! blank padding for log alignment
+            constant cBlankPad5     : string(1 to 5)        := "     ";                     --! blank padding for log alignment
+            variable ret            : string(1 to maxLen)   := (others => character(NUL));  --! make empty
+            variable strIrqLen      : integer               := -1;                          --! max length of IRQ,                      -1 not in list
+            variable strSysEventLen : integer               := -1;                          --! max length of system event,             -1 not in list
+            variable strRsvLen      : integer               := -1;                          --! max length of reserved wires,           -1 not in list
+            variable strSrvPfmLen   : integer               := -1;                          --! max length of server specific wires,    -1 not in list
+            variable strPfmSpLen    : integer               := -1;                          --! max length of platform specific wires,  -1 not in list
+            variable strGpioLen     : integer               := -1;                          --! max length of GPIO wires,               -1 not in list
             variable index          : integer;                                              --! idx converted to integer
-
         begin
             -- no virtual wires available
             if ( 0 = vw'length ) then
@@ -1300,31 +1283,33 @@ package body eSpiMasterBfm is
             end loop;
             -- IRQ wire
             if ( -1 /= strIrqLen ) then
-                ret := strcat(ret, cBlankPad5 & "IRQs (0x00-0x01):"& character(LF));    --! header
+                ret := strcat(ret, cBlankPad5 & "IRQs (0x00-0x01):" & character(LF));   --! header
                 for i in 0 to vw'length/2 - 1 loop                      --! look for IRQs in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));             --! convert to integer
                     if ( (0 <= index) and (index <= 1) ) then           --! index=0-1: IRQ
-                        ret := strcat(ret, padStr(cBlankPad7 & "IRQ" & integer'image(to_integer(unsigned(vw(2*i+1)(6 downto 0)))), ' ', strIrqLen+7));  --! IRQ number, +7: leading blanks
-                        ret := strcat(ret, " : "             & integer'image(to_integer(unsigned(vw(2*i+1)(7 downto 7)))) & character(LF));             --! IRQ level
+                        ret := strcat( ret, padStr(cBlankPad7 & "IRQ" & integer'image(to_integer(unsigned(vw(2*i+1)(6 downto 0)))), ' ', strIrqLen+7) & --! IRQ number, +7: leading blanks
+                                            " : " & integer'image(to_integer(unsigned(vw(2*i+1)(7 downto 7)))) & character(LF)                          --! IRQ level
+                                     );
                     end if;
                 end loop;
-                ret := strcat(ret, character(LF));  --! empty line
+                ret := strcat(ret, LF); --! empty line
             end if;
             -- System Event Wire
             if ( -1 /= strSysEventLen ) then
-                ret := strcat(ret, cBlankPad5 & "System Event Wire (0x02-0x07):"& character(LF));   --! header
+                ret := strcat(ret, cBlankPad5 & "System Event Wire (0x02-0x07):" & character(LF));  --! header
                 for i in 0 to vw'length/2 - 1 loop                                  --! look for System Event Wire in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));                         --! convert to integer
                     if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
-                                ret := strcat(ret, padStr(cBlankPad7 & strtrim(C_SYSEVENT_NAME(index, j)), ' ', strSysEventLen+7));     --! system wire name, +7: leading blanks
-                                ret := strcat(ret, " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)); --! wire level
+                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SYSEVENT_NAME(index, j)), ' ', strSysEventLen+7) &    --! system wire name, +7: leading blanks
+                                                    " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
+                                             );
                             end if;
                         end loop;
                     end if;
                 end loop;
-                ret := strcat(ret, character(LF));  --! empty line
+                ret := strcat(ret, LF); --! empty line
             end if;
             -- Reserved
             if ( -1 /= strRsvLen ) then
@@ -1332,11 +1317,12 @@ package body eSpiMasterBfm is
                 for i in 0 to vw'length/2 - 1 loop                              --! look for Reserved in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));                     --! convert to integer
                     if ( (8 <= index) and (index <= 63) ) then                  --! index=8-63: Reserved?
-                        ret := strcat(ret, padStr(cBlankPad7 & "idx=0x" & to_hstring(vw(2*i)), strRsvLen+7));   --! +7: leading blanks
-                        ret := strcat(ret, " : 0x" & to_hstring(vw(2*i+1)) & character(LF));                    --! value
+                        ret := strcat( ret, padStr(cBlankPad7 & "idx=0x" & to_hstring(vw(2*i)), ' ', strRsvLen+7) & --! +7: leading blanks
+                                            " : 0x" & to_hstring(vw(2*i+1)) & character(LF)                         --! value
+                                     );
                     end if;
                 end loop;
-                ret := strcat(ret, character(LF));  --! empty line
+                ret := strcat(ret, LF); --! empty line
             end if;
             -- Server Platform Specific
             if ( -1 /= strSrvPfmLen ) then
@@ -1346,19 +1332,45 @@ package body eSpiMasterBfm is
                     if ( (C_SRV_PFM_NAME'low <= index) and (index <= C_SRV_PFM_NAME'high) ) then    --! index=64-71: Server Platform Specific Virtual Wire Index
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
-                                ret := strcat(ret, padStr(cBlankPad7 & strtrim(C_SRV_PFM_NAME(index, j)), ' ', strSrvPfmLen+7));        --! system wire name, +7: leading blanks
-                                ret := strcat(ret, " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)); --! wire level
+                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SRV_PFM_NAME(index, j)), ' ', strSrvPfmLen+7) &       --! system wire name, +7: leading blanks
+                                                    " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
+                                             );
                             end if;
                         end loop;
                     end if;
                 end loop;
-                ret := strcat(ret, character(LF));  --! empty line
+                ret := strcat(ret, LF); --! empty line
             end if;
-
-
-
-
-
+            -- Platform specific wires
+            if ( -1 /= strPfmSpLen ) then
+                ret := strcat(ret, cBlankPad5 & "Platform specific wires (0x48-0x7F):" & character(LF));    --! header
+                for i in 0 to vw'length/2 - 1 loop                  --! look for Platform specific wires in virtual wire list
+                    index := to_integer(unsigned(vw(2*i)));         --! convert to integer
+                    if ( (72 <= index) and (index <= 127) ) then    --! index=72-127: Platform specific wires
+                        ret := strcat( ret, padStr(cBlankPad7 & "idx=0x" & to_hstring(vw(2*i)), ' ', strPfmSpLen+7) &   --! +7: leading blanks
+                                            " : 0x" & to_hstring(vw(2*i+1)) & character(LF)                             --! value
+                                     );
+                    end if;
+                end loop;
+                ret := strcat(ret, LF); --! empty line
+            end if;
+            -- GPIO
+            if ( -1 /= strGpioLen ) then
+                ret := strcat(ret, cBlankPad5 & "GPIO (0x80-0xFF):" & character(LF));   --! header
+                for i in 0 to vw'length/2 - 1 loop                  --! look for Platform specific wires in virtual wire list
+                    index := to_integer(unsigned(vw(2*i)));         --! convert to integer
+                    if ( (128 <= index) and (index <= 255) ) then   --! index=128-255: Platform specific wires
+                        for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
+                            if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
+                                ret := strcat( ret, padStr(cBlankPad7 & "GPIO" & integer'image((index-128)*4+j), ' ', strGpioLen+7) &   --! +7: leading blanks
+                                                    " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
+                                             );
+                            end if;
+                        end loop;
+                    end if;
+                end loop;
+                ret := strcat(ret, LF); --! empty line
+            end if;
             -- all done
             return ret(1 to strlen(ret)-2); --! drop last two line feed
         end function vw2str;
