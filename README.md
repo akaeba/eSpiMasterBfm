@@ -14,12 +14,12 @@ Currently are procedures available for:
 
 ## Releases
 
-| Version                                                       | Date                    | Source                                                                                            | Change log                                                                                       |
-| ------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| latest                                                        |                         | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> |                                                                                                  |
-| [v0.1.2](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.2) | <nobr>2021-04-12</nobr> | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.2.zip ">v0.1.2.zip</a> | bugfixes: Reset, alert mode, strlen, testbench; Features: Server Specific Platform wire decoding |
-| [v0.1.1](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.1) | <nobr>2021-03-12</nobr> | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.1.zip ">v0.1.1.zip</a> | bugfixes: Supported to used IO mode; wait on virtual wire                                        |
-| [v0.1.0](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.0) | <nobr>2020-12-30</nobr> | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.0.zip ">v0.1.0.zip</a> | Configuration; IO read/write; Memory read/write                                                  |
+| Version                                                       | Date       | Source                                                                                            | Change log                                                                                              |
+| ------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| latest                                                        |            | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/master.zip ">latest.zip</a> |                                                                                                         |
+| [v0.1.2](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.2) | 2021-04-12 | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.2.zip ">v0.1.2.zip</a> | bugfixes: Reset, alert mode, strlen, testbench; <br /> Features: Server Specific Platform wire decoding |
+| [v0.1.1](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.1) | 2021-03-12 | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.1.zip ">v0.1.1.zip</a> | bugfixes: Supported to used IO mode; wait on virtual wire                                               |
+| [v0.1.0](https://github.com/akaeba/eSpiMasterBfm/tree/v0.1.0) | 2020-12-30 | <a id="raw-url" href="https://github.com/akaeba/eSpiMasterBfm/archive/v0.1.0.zip ">v0.1.0.zip</a> | Configuration; IO read/write; Memory read/write                                                         |
 
 
 ## Example
