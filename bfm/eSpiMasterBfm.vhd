@@ -98,8 +98,19 @@ package eSpiMasterBfm is
 
     -----------------------------
     -- Functions (public)
-        function crc8 ( msg : in tMemX08 ) return std_logic_vector; --! crc8: calculate crc from a message
-        function decodeClk ( this : in tESpiBfm ) return time;      --! decodeClk: decodes slave register into a proper time for clock generation
+        -- CRC calculation
+        function crc8
+            (
+                constant msg        : in tMemX08;
+                constant polynom    : in std_logic_vector(7 downto 0) := x"07"
+            )
+        return std_logic_vector;
+        -- get current set espi clock period
+        function decodeClk
+            (
+                constant this : in tESpiBfm
+            )
+        return time;
     -----------------------------
 
 
@@ -121,25 +132,17 @@ package eSpiMasterBfm is
                     signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
                     signal ALERTn   : in std_logic;                         --! slaves alert pin
                     variable good   : inout boolean;                        --! successful
-                    constant log    : in tMsgLevel                          --! BFM log level
-                );
-            -- init, bfm and slave 'Exit G3' sequence, errors printed to console
-            procedure init
-                (
-                    variable this   : inout tESpiBfm;                       --! common handle
-                    signal RESETn   : out std_logic;                        --! reset signal
-                    signal CSn      : out std_logic;                        --! slave select
-                    signal SCK      : out std_logic;                        --! shift clock
-                    signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
-                    signal ALERTn   : in std_logic;                         --! slaves alert pin
-                    variable good   : inout boolean                         --! successful
+                    constant log    : in tMsgLevel  := ERROR;               --! BFM log level
+                    constant crc    : in boolean    := false;               --! true: CRC is enabled
+                    constant maxClk : in boolean    := true;                --! true: enable maximum supported SPI clock, false: reset settings used
+                    constant maxDIO : in boolean    := true                 --! true: max supported data lines are used, false: reset setting used
                 );
 
         -- setLogLevel: sets bfm log level
         procedure setLogLevel
             (
-                variable this   : inout tESpiBfm;   --! common handle
-                constant log    : in tMsgLevel      --! BFM log level
+                variable this   : inout tESpiBfm;       --! common handle
+                constant log    : in tMsgLevel  := INFO --! BFM log level
             );
 
         -- RESET: apply reset sequence
@@ -502,7 +505,7 @@ package body eSpiMasterBfm is
         -- BFM
         constant C_BFM_LICENSE  : string := "BSDv3";
         constant C_BFM_AUTHORS  : string := "Andreas Kaeberlein";
-        constant C_BFM_VERSION  : string := "v0.1.2";
+        constant C_BFM_VERSION  : string := "v0.1.3";
         --***************************
 
         --***************************
@@ -532,9 +535,9 @@ package body eSpiMasterBfm is
         --   creates an string with a fixed length, padded with pad
         function padStr
             (
-                constant str : in string;                       --! input string
-                constant pad : in character := character(LF);   --! pad with
-                constant len : in positive                      --! resulting length
+                constant str : in string;       --! input string
+                constant pad : in character;    --! pad with
+                constant len : in positive      --! resulting length
             )
         return string is
             alias    alignStr : string(1 to str'length) is str; --! make one aligned
@@ -549,6 +552,22 @@ package body eSpiMasterBfm is
             -- pad
             padedStr(1 to alignStr'length) := alignStr;
             return padedStr;
+        end function padStr;
+        --***************************
+
+
+        --***************************
+        -- padStr
+        --   creates an string with a fixed length, padded with pad
+        function padStr
+            (
+                constant str : in string;           --! input string
+                constant len : in positive          --! resulting length
+            )
+        return string is
+        begin
+            -- padStr( str, pad, len )
+            return padStr( str, ' ', len );
         end function padStr;
         --***************************
 
@@ -693,12 +712,12 @@ package body eSpiMasterBfm is
         -- System Event Wires
         --  @see 5.2.2.2 System Event Virtual Wires
         --  @ https://stackoverflow.com/questions/17160878/how-to-declare-two-dimensional-arrays-and-their-elements-in-vhdl/17161967
-        constant C_SYSEVENT_NAME : tSysEventName := (   (padStr("SLP_S3#",              ' ', 22), padStr("SLP_S4#",     ' ', 22), padStr("SLP_S5#",        ' ', 22), padStr("RSV",                    ' ', 22)),
-                                                        (padStr("SUS_STAT#",            ' ', 22), padStr("PLTRST#",     ' ', 22), padStr("OOB_RST_WARN",   ' ', 22), padStr("RSV",                    ' ', 22)),
-                                                        (padStr("OOB_RST_ACK",          ' ', 22), padStr("RSV",         ' ', 22), padStr("WAKE#",          ' ', 22), padStr("PME#",                   ' ', 22)),
-                                                        (padStr("SLAVE_BOOT_LOAD_DONE", ' ', 22), padStr("ERROR_FATAL", ' ', 22), padStr("ERROR_NONFATAL", ' ', 22), padStr("SLAVE_BOOT_LOAD_STATUS", ' ', 22)),
-                                                        (padStr("SCI#",                 ' ', 22), padStr("SMI#",        ' ', 22), padStr("RCIN#",          ' ', 22), padStr("HOST_RST_ACK",           ' ', 22)),
-                                                        (padStr("HOST_RST_WARN",        ' ', 22), padStr("SMIOUT#",     ' ', 22), padStr("NMIOUT#",        ' ', 22), padStr("RSV",                    ' ', 22))
+        constant C_SYSEVENT_NAME : tSysEventName := (   (padStr("SLP_S3#",              22), padStr("SLP_S4#",     22), padStr("SLP_S5#",        22), padStr("RSV",                    22)),
+                                                        (padStr("SUS_STAT#",            22), padStr("PLTRST#",     22), padStr("OOB_RST_WARN",   22), padStr("RSV",                    22)),
+                                                        (padStr("OOB_RST_ACK",          22), padStr("RSV",         22), padStr("WAKE#",          22), padStr("PME#",                   22)),
+                                                        (padStr("SLAVE_BOOT_LOAD_DONE", 22), padStr("ERROR_FATAL", 22), padStr("ERROR_NONFATAL", 22), padStr("SLAVE_BOOT_LOAD_STATUS", 22)),
+                                                        (padStr("SCI#",                 22), padStr("SMI#",        22), padStr("RCIN#",          22), padStr("HOST_RST_ACK",           22)),
+                                                        (padStr("HOST_RST_WARN",        22), padStr("SMIOUT#",     22), padStr("NMIOUT#",        22), padStr("RSV",                    22))
                                                     );
         --***************************
 
@@ -707,14 +726,14 @@ package body eSpiMasterBfm is
         -- Server Platform Wires
         --  @see Table 24 Server Platform Specific Virtual Wire Index
         --  @see https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_embedded_ip.pdf
-        constant C_SRV_PFM_NAME : tServerPfmName := (   (padStr("SUS_ACK#",    ' ', 15), padStr("RSV",           ' ', 15), padStr("RSV",         ' ', 15), padStr("RSV",         ' ', 15)),
-                                                        (padStr("SUS_WARN#",   ' ', 15), padStr("SUS_PWRDN_ACK", ' ', 15), padStr("RSV",         ' ', 15), padStr("SLP_A#",      ' ', 15)),
-                                                        (padStr("SLP_LAN#",    ' ', 15), padStr("SLP_WLAN#",     ' ', 15), padStr("RSV",         ' ', 15), padStr("RSV",         ' ', 15)),
-                                                        (padStr("PCH_TO_EC_0", ' ', 15), padStr("PCH_TO_EC_1",   ' ', 15), padStr("PCH_TO_EC_2", ' ', 15), padStr("PCH_TO_EC_3", ' ', 15)),
-                                                        (padStr("PCH_TO_EC_4", ' ', 15), padStr("PCH_TO_EC_5",   ' ', 15), padStr("PCH_TO_EC_6", ' ', 15), padStr("PCH_TO_EC_7", ' ', 15)),
-                                                        (padStr("EC_TO_PCH_0", ' ', 15), padStr("EC_TO_PCH_1",   ' ', 15), padStr("EC_TO_PCH_2", ' ', 15), padStr("EC_TO_PCH_3", ' ', 15)),
-                                                        (padStr("EC_TO_PCH_4", ' ', 15), padStr("EC_TO_PCH_5",   ' ', 15), padStr("EC_TO_PCH_6", ' ', 15), padStr("EC_TO_PCH_7", ' ', 15)),
-                                                        (padStr("HOST_C10",    ' ', 15), padStr("RSV",           ' ', 15), padStr("RSV",         ' ', 15), padStr("RSV",         ' ', 15))
+        constant C_SRV_PFM_NAME : tServerPfmName := (   (padStr("SUS_ACK#",    15), padStr("RSV",           15), padStr("RSV",         15), padStr("RSV",         15)),
+                                                        (padStr("SUS_WARN#",   15), padStr("SUS_PWRDN_ACK", 15), padStr("RSV",         15), padStr("SLP_A#",      15)),
+                                                        (padStr("SLP_LAN#",    15), padStr("SLP_WLAN#",     15), padStr("RSV",         15), padStr("RSV",         15)),
+                                                        (padStr("PCH_TO_EC_0", 15), padStr("PCH_TO_EC_1",   15), padStr("PCH_TO_EC_2", 15), padStr("PCH_TO_EC_3", 15)),
+                                                        (padStr("PCH_TO_EC_4", 15), padStr("PCH_TO_EC_5",   15), padStr("PCH_TO_EC_6", 15), padStr("PCH_TO_EC_7", 15)),
+                                                        (padStr("EC_TO_PCH_0", 15), padStr("EC_TO_PCH_1",   15), padStr("EC_TO_PCH_2", 15), padStr("EC_TO_PCH_3", 15)),
+                                                        (padStr("EC_TO_PCH_4", 15), padStr("EC_TO_PCH_5",   15), padStr("EC_TO_PCH_6", 15), padStr("EC_TO_PCH_7", 15)),
+                                                        (padStr("HOST_C10",    15), padStr("RSV",           15), padStr("RSV",         15), padStr("RSV",         15))
                                                     );
         --***************************
 
@@ -749,8 +768,12 @@ package body eSpiMasterBfm is
 
         --***************************
         -- calc crc
-        function crc8 ( msg : in tMemX08 ) return std_logic_vector is
-            constant polynom    : std_logic_vector(7 downto 0) := x"07";
+        function crc8
+            (
+                constant msg        : in tMemX08;
+                constant polynom    : in std_logic_vector(7 downto 0) := x"07"
+            )
+        return std_logic_vector is
             variable remainder  : std_logic_vector(7 downto 0);
         begin
             -- init
@@ -1287,8 +1310,8 @@ package body eSpiMasterBfm is
                 for i in 0 to vw'length/2 - 1 loop                      --! look for IRQs in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));             --! convert to integer
                     if ( (0 <= index) and (index <= 1) ) then           --! index=0-1: IRQ
-                        ret := strcat( ret, padStr(cBlankPad7 & "IRQ" & integer'image(to_integer(unsigned(vw(2*i+1)(6 downto 0)))), ' ', strIrqLen+7) & --! IRQ number, +7: leading blanks
-                                            " : " & integer'image(to_integer(unsigned(vw(2*i+1)(7 downto 7)))) & character(LF)                          --! IRQ level
+                        ret := strcat( ret, padStr(cBlankPad7 & "IRQ" & integer'image(to_integer(unsigned(vw(2*i+1)(6 downto 0)))), strIrqLen+7) &  --! IRQ number, +7: leading blanks
+                                            " : " & integer'image(to_integer(unsigned(vw(2*i+1)(7 downto 7)))) & character(LF)                      --! IRQ level
                                      );
                     end if;
                 end loop;
@@ -1302,7 +1325,7 @@ package body eSpiMasterBfm is
                     if ( (C_SYSEVENT_NAME'low <= index) and (index <= C_SYSEVENT_NAME'high) ) then  --! index=2-7: system event wire
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
-                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SYSEVENT_NAME(index, j)), ' ', strSysEventLen+7) &    --! +7: leading blanks
+                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SYSEVENT_NAME(index, j)), strSysEventLen+7) &         --! +7: leading blanks
                                                     " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
                                              );
                             end if;
@@ -1332,7 +1355,7 @@ package body eSpiMasterBfm is
                     if ( (C_SRV_PFM_NAME'low <= index) and (index <= C_SRV_PFM_NAME'high) ) then    --! index=64-71: Server Platform Specific Virtual Wire Index
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
-                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SRV_PFM_NAME(index, j)), ' ', strSrvPfmLen+7) &       --! system wire name, +7: leading blanks
+                                ret := strcat( ret, padStr(cBlankPad7 & strtrim(C_SRV_PFM_NAME(index, j)), strSrvPfmLen+7) &            --! system wire name, +7: leading blanks
                                                     " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
                                              );
                             end if;
@@ -1347,8 +1370,8 @@ package body eSpiMasterBfm is
                 for i in 0 to vw'length/2 - 1 loop                  --! look for Platform specific wires in virtual wire list
                     index := to_integer(unsigned(vw(2*i)));         --! convert to integer
                     if ( (72 <= index) and (index <= 127) ) then    --! index=72-127: Platform specific wires
-                        ret := strcat( ret, padStr(cBlankPad7 & "idx=0x" & to_hstring(vw(2*i)), ' ', strPfmSpLen+7) &   --! +7: leading blanks
-                                            " : 0x" & to_hstring(vw(2*i+1)) & character(LF)                             --! value
+                        ret := strcat( ret, padStr(cBlankPad7 & "idx=0x" & to_hstring(vw(2*i)), strPfmSpLen+7) &    --! +7: leading blanks
+                                            " : 0x" & to_hstring(vw(2*i+1)) & character(LF)                         --! value
                                      );
                     end if;
                 end loop;
@@ -1362,7 +1385,7 @@ package body eSpiMasterBfm is
                     if ( (128 <= index) and (index <= 255) ) then   --! index=128-255: GPIO wires
                         for j in 0 to 3 loop                    --! four wires a packed into one virtual wire nibble
                             if ( '1' = vw(2*i+1)(j+4) ) then    --! valid?
-                                ret := strcat( ret, padStr(cBlankPad7 & "GPIO" & integer'image((index-128)*4+j), ' ', strGpioLen+7) &   --! +7: leading blanks
+                                ret := strcat( ret, padStr(cBlankPad7 & "GPIO" & integer'image((index-128)*4+j), strGpioLen+7) &        --! +7: leading blanks
                                                     " : " & integer'image(to_integer(unsigned(vw(2*i+1)(j downto j)))) & character(LF)  --! wire level
                                              );
                             end if;
@@ -1600,10 +1623,10 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
                 signal ALERTn   : in std_logic;                         --! slaves alert pin
                 variable good   : inout boolean;                        --! successful
-                constant log    : in tMsgLevel;                         --! BFM log level
-                constant crc    : in boolean;                           --! true: CRC is enabled
-                constant maxClk : in boolean;                           --! true: enable maximum supported SPI clock, false: reset setting
-                constant maxDIO : in boolean                            --! true: max supported data lines are used, false: reset setting
+                constant log    : in tMsgLevel  := ERROR;               --! BFM log level
+                constant crc    : in boolean    := false;               --! true: CRC is enabled
+                constant maxClk : in boolean    := true;                --! true: enable maximum supported SPI clock, false: reset settings used
+                constant maxDIO : in boolean    := true                 --! true: max supported data lines are used, false: reset setting used
             )
         is
             variable pgood  : boolean;                          --! internal procedure good
@@ -1814,53 +1837,12 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- init, only log is settable
-        procedure init
-            (
-                variable this   : inout tESpiBfm;                       --! common handle
-                signal RESETn   : out std_logic;                        --! reset signal
-                signal CSn      : out std_logic;                        --! slave select
-                signal SCK      : out std_logic;                        --! shift clock
-                signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
-                signal ALERTn   : in std_logic;                         --! slaves alert pin
-                variable good   : inout boolean;                        --! successful
-                constant log    : in tMsgLevel                          --! BFM log level
-            )
-        is
-        begin
-                -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log, crc, maxClk, maxDIO );
-            init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log, false, true, true );
-        end procedure init;
-        --***************************
-
-
-        --***************************
-        -- init, default: errors printed to console
-        procedure init
-            (
-                variable this   : inout tESpiBfm;                       --! common handle
-                signal RESETn   : out std_logic;                        --! reset signal
-                signal CSn      : out std_logic;                        --! slave select
-                signal SCK      : out std_logic;                        --! shift clock
-                signal DIO      : inout std_logic_vector(3 downto 0);   --! bidirectional data
-                signal ALERTn   : in std_logic;                         --! slaves alert pin
-                variable good   : inout boolean                         --! successful
-            )
-        is
-        begin
-                -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log )
-            init( this, RESETn, CSn, SCK, DIO, ALERTn, good, ERROR );   -- only errors are printed to console
-        end procedure init;
-        --***************************
-
-
-        --***************************
         -- setLogLevel
         --  sets bfm log level
         procedure setLogLevel
             (
-                variable this   : inout tESpiBfm;   --! common handle
-                constant log    : in tMsgLevel      --! BFM log level
+                variable this   : inout tESpiBfm;       --! common handle
+                constant log    : in tMsgLevel  := INFO --! BFM log level
             )
         is
         begin
