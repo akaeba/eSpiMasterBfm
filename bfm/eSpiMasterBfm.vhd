@@ -1845,16 +1845,11 @@ package body eSpiMasterBfm is
         is
         begin
             case log is
-                -- no messages are printed to console
-                when NOMSG      => this.verbose := C_MSG_NO;
-                -- errors are logged
-                when ERROR      => this.verbose := C_MSG_ERROR;
-                -- errors + warnings are logged
-                when WARNING    => this.verbose := C_MSG_WARN;
-                -- errors + warnings + info are logged
-                when INFO       => this.verbose := C_MSG_INFO;
-                -- default
-                when others     => this.verbose := C_MSG_NO;
+                when NOMSG      => this.verbose := C_MSG_NO;	--! no messages are printed to console
+                when ERROR      => this.verbose := C_MSG_ERROR;	--! errors are logged
+                when WARNING    => this.verbose := C_MSG_WARN;	--! errors + warnings are logged
+                when INFO       => this.verbose := C_MSG_INFO;	--! errors + warnings + info are logged
+                when others     => this.verbose := C_MSG_NO;	--! default
             end case;
         end procedure setLogLevel;
         --***************************
