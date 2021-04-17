@@ -1002,11 +1002,11 @@ package body eSpiMasterBfm is
             alias    tmp : string(1 to str'length) is str;  --! alignment
             variable idx : integer;
         begin
-            if ( 0 = str'length ) then  --! empty string
+            if ( 0 = tmp'length ) then  --! empty string
                 return 0;
             end if;
+            idx := tmp'length;                      --! if no breakout in loop, string has full length
             for i in tmp'range loop                 --! iterate over string
-                idx := i;                           --! save for loop breakout
                 if ( character(NUL) = tmp(i) ) then --! end of string reached?
                     idx := i - 1;                   --! last valid character is one position before
                     exit;
@@ -1103,7 +1103,12 @@ package body eSpiMasterBfm is
         --***************************
         -- checkCRC
         --   calculates CRC from msglen-1 and compares with last byte of msg len
-        function checkCRC ( this : in tESpiBfm; msg : in tMemX08 ) return boolean is
+        function checkCRC
+            (
+                constant this   : in tESpiBfm;
+                constant msg    : in tMemX08
+            )
+        return boolean is
             alias m         : tMemX08(0 to msg'length-1) is msg;    --! zero align
             variable ret    : boolean := true;
         begin
@@ -1174,21 +1179,17 @@ package body eSpiMasterBfm is
         -- rsp2str
         --   print decoded response register to string in a human-readable way
         function rsp2str ( rsp : tESpiRsp ) return string is
-            variable ret : string(1 to 16) := (others => character(NUL));   --! make empty
         begin
-            -- convert
             case rsp is
-                when ACCEPT             => ret(1 to 6)  := "ACCEPT";
-                when DEFER              => ret(1 to 5)  := "DEFER";
-                when NON_FATAL_ERROR    => ret(1 to 15) := "NON_FATAL_ERROR";
-                when FATAL_ERROR        => ret(1 to 11) := "FATAL_ERROR";
-                when WAIT_STATE         => ret(1 to 10) := "WAIT_STATE";
-                when NO_RESPONSE        => ret(1 to 11) := "NO_RESPONSE";
-                when NO_DECODE          => ret(1 to 9)  := "NO_DECODE";
-                when others             => ret(1 to 9)  := "NO_DECODE";
+                when ACCEPT             => return string'("ACCEPT");
+                when DEFER              => return string'("DEFER");
+                when NON_FATAL_ERROR    => return string'("NON_FATAL_ERROR");
+                when FATAL_ERROR        => return string'("FATAL_ERROR");
+                when WAIT_STATE         => return string'("WAIT_STATE");
+                when NO_RESPONSE        => return string'("NO_RESPONSE");
+                when NO_DECODE          => return string'("NO_DECODE");
+                when others             => return string'("NO_DECODE");
             end case;
-            -- release
-            return ret(1 to strlen(ret));
         end function rsp2str;
         --***************************
 
@@ -1197,22 +1198,18 @@ package body eSpiMasterBfm is
         -- ct2str
         --   print decoded cycle type in human readable form to string
         function ct2str ( ct : std_logic_vector(7 downto 0) ) return string is
-            variable ret : string(1 to 40) := (others => character(NUL));   --! make empty
         begin
-            -- convert
-            if    ( std_match(ct, C_CT_MEMRD32) )           then ret(1 to 7)    := "MEMRD32";
-            elsif ( std_match(ct, C_CT_MEMRD64) )           then ret(1 to 7)    := "MEMRD64";
-            elsif ( std_match(ct, C_CT_MEMWR32) )           then ret(1 to 7)    := "MEMWR32";
-            elsif ( std_match(ct, C_CT_MEMWR64) )           then ret(1 to 7)    := "MEMWR64";
-            elsif ( std_match(ct, C_CT_MSG) )               then ret(1 to 7)    := "Message";
-            elsif ( std_match(ct, C_CT_MSG_W_DAT) )         then ret(1 to 17)   := "Message with Data";
-            elsif ( std_match(ct, C_CT_CPL_OK_WO_DAT) )     then ret(1 to 34)   := "Successful Completion Without Data";
-            elsif ( std_match(ct, C_CT_CPL_OK_W_DAT) )      then ret(1 to 31)   := "Successful Completion With Data";
-            elsif ( std_match(ct, C_CT_CPL_FAIL_W_DAT) )    then ret(1 to 36)   := "Unsuccessful Completion Without Data";
-            else                                                 ret(1 to 7)    := "UNKNOWN";
+            if    ( std_match(ct, C_CT_MEMRD32) )           then return string'("MEMRD32");
+            elsif ( std_match(ct, C_CT_MEMRD64) )           then return string'("MEMRD64");
+            elsif ( std_match(ct, C_CT_MEMWR32) )           then return string'("MEMWR32");
+            elsif ( std_match(ct, C_CT_MEMWR64) )           then return string'("MEMWR64");
+            elsif ( std_match(ct, C_CT_MSG) )               then return string'("Message");
+            elsif ( std_match(ct, C_CT_MSG_W_DAT) )         then return string'("Message with Data");
+            elsif ( std_match(ct, C_CT_CPL_OK_WO_DAT) )     then return string'("Successful Completion Without Data");
+            elsif ( std_match(ct, C_CT_CPL_OK_W_DAT) )      then return string'("Successful Completion With Data");
+            elsif ( std_match(ct, C_CT_CPL_FAIL_W_DAT) )    then return string'("Unsuccessful Completion Without Data");
+            else                                                 return string'("UNKNOWN");
             end if;
-            -- release
-            return ret(1 to strlen(ret));
         end function ct2str;
         --***************************
 
@@ -1224,19 +1221,20 @@ package body eSpiMasterBfm is
         return string is
             variable ret : string(1 to 1024) := (others => (character(NUL)));   --! make empty
         begin
-            ret := strcat(ret, "     Status           : 0x" & to_hstring(sts)                                                                                    & character(LF));
-            ret := strcat(ret, "       PC_FREE        : "   & to_hstring(sts(C_STS_PC_FREE'range))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF));
-            ret := strcat(ret, "       NP_FREE        : "   & to_hstring(sts(C_STS_NP_FREE'range))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF));
-            ret := strcat(ret, "       VWIRE_FREE     : "   & to_hstring(sts(C_STS_VWIRE_FREE'range))     & "       Virtual Wire Rx Queue Free"                  & character(LF));
-            ret := strcat(ret, "       OOB_FREE       : "   & to_hstring(sts(C_STS_OOB_FREE'range))       & "       OOB Posted Rx Queue Free"                    & character(LF));
-            ret := strcat(ret, "       PC_AVAIL       : "   & to_hstring(sts(C_STS_PC_AVAIL'range))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF));
-            ret := strcat(ret, "       NP_AVAIL       : "   & to_hstring(sts(C_STS_NP_AVAIL'range))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF));
-            ret := strcat(ret, "       VWIRE_AVAIL    : "   & to_hstring(sts(C_STS_VWIRE_AVAIL'range))    & "       Virtual Wire Tx Queue Avail"                 & character(LF));
-            ret := strcat(ret, "       OOB_AVAIL      : "   & to_hstring(sts(C_STS_OOB_AVAIL'range))      & "       OOB Posted Tx Queue Avail"                   & character(LF));
-            ret := strcat(ret, "       FLASH_C_FREE   : "   & to_hstring(sts(C_STS_FLASH_C_FREE'range))   & "       Flash Completion Rx Queue Free"              & character(LF));
-            ret := strcat(ret, "       FLASH_NP_FREE  : "   & to_hstring(sts(C_STS_FLASH_NP_FREE'range))  & "       Flash Non-Posted Rx Queue Free"              & character(LF));
-            ret := strcat(ret, "       FLASH_C_AVAIL  : "   & to_hstring(sts(C_STS_FLASH_C_AVAIL'range))  & "       Flash Completion Tx Queue Avail"             & character(LF));
-            ret := strcat(ret, "       FLASH_NP_AVAIL : "   & to_hstring(sts(C_STS_FLASH_NP_AVAIL'range)) & "       Flash Non-Posted Tx Queue Avail"             & character(LF));
+            ret := strcat(  ret, "     Status           : 0x" & to_hstring(sts)                                                                                    & character(LF) &
+                                 "       PC_FREE        : "   & to_hstring(sts(C_STS_PC_FREE'range))        & "       Peripheral Posted/Completion Rx Queue Free"  & character(LF) &
+                                 "       NP_FREE        : "   & to_hstring(sts(C_STS_NP_FREE'range))        & "       Peripheral Non-Posted Rx Queue Free"         & character(LF) &
+                                 "       VWIRE_FREE     : "   & to_hstring(sts(C_STS_VWIRE_FREE'range))     & "       Virtual Wire Rx Queue Free"                  & character(LF) &
+                                 "       OOB_FREE       : "   & to_hstring(sts(C_STS_OOB_FREE'range))       & "       OOB Posted Rx Queue Free"                    & character(LF) &
+                                 "       PC_AVAIL       : "   & to_hstring(sts(C_STS_PC_AVAIL'range))       & "       Peripheral Posted/Completion Tx Queue Avail" & character(LF) &
+                                 "       NP_AVAIL       : "   & to_hstring(sts(C_STS_NP_AVAIL'range))       & "       Peripheral Non-Posted Tx Queue Avail"        & character(LF) &
+                                 "       VWIRE_AVAIL    : "   & to_hstring(sts(C_STS_VWIRE_AVAIL'range))    & "       Virtual Wire Tx Queue Avail"                 & character(LF) &
+                                 "       OOB_AVAIL      : "   & to_hstring(sts(C_STS_OOB_AVAIL'range))      & "       OOB Posted Tx Queue Avail"                   & character(LF) &
+                                 "       FLASH_C_FREE   : "   & to_hstring(sts(C_STS_FLASH_C_FREE'range))   & "       Flash Completion Rx Queue Free"              & character(LF) &
+                                 "       FLASH_NP_FREE  : "   & to_hstring(sts(C_STS_FLASH_NP_FREE'range))  & "       Flash Non-Posted Rx Queue Free"              & character(LF) &
+                                 "       FLASH_C_AVAIL  : "   & to_hstring(sts(C_STS_FLASH_C_AVAIL'range))  & "       Flash Completion Tx Queue Avail"             & character(LF) &
+                                 "       FLASH_NP_AVAIL : "   & to_hstring(sts(C_STS_FLASH_NP_AVAIL'range)) & "       Flash Non-Posted Tx Queue Avail"             & character(LF)
+                         );
             return ret(1 to strlen(ret)-1); --! -1: drops last 'LF'
         end function sts2str;
         --***************************
