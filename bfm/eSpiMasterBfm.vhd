@@ -63,7 +63,7 @@ package eSpiMasterBfm is
                 NON_FATAL_ERROR,    --! The received command had an error with nonfatal severity
                 FATAL_ERROR,        --! The received command had a fatal error that prevented the transaction layer packet from being successfully processed
                 WAIT_STATE,         --! Adds one byte-time of delay when responding to a transaction on the bus.
-                NO_RESPONSE,        --! The response encoding of all 1’s is defined as no response
+                NO_RESPONSE,        --! The response encoding of all 1's is defined as no response
                 NO_DECODE           --! not in eSPI Spec, no decoding possible
             );
         --***************************
@@ -637,7 +637,7 @@ package body eSpiMasterBfm is
         constant C_GENERAL_OP_FREQ_33MHz                : std_logic_vector(02 downto 00) := "010";      --! 010: 33 MHz.
         constant C_GENERAL_OP_FREQ_50MHz                : std_logic_vector(02 downto 00) := "011";      --! 011: 50 MHz.
         constant C_GENERAL_OP_FREQ_66MHz                : std_logic_vector(02 downto 00) := "100";      --! 100: 66 MHz.
-        constant C_GENERAL_MAX_WAIT                     : std_logic_vector(15 downto 12) := "0000";     --! Maximum WAIT STATE Allowed: This is a 1-based field in the granularity of byte time. When “0”, it indicates a value of 16 byte time.
+        constant C_GENERAL_MAX_WAIT                     : std_logic_vector(15 downto 12) := "0000";     --! Maximum WAIT STATE Allowed: This is a 1-based field in the granularity of byte time. When "0", it indicates a value of 16 byte time.
         constant C_GENERAL_CHN_SUP                      : std_logic_vector(07 downto 00) := "--------"; --! Channel Supported: Each of the bits when set indicates that the corresponding channel is supported by the slave.
         constant C_GENERAL_CHN_SUP_PERI                 : std_logic_vector(00 downto 00) := "1";        --! Peripheral Channel
         constant C_GENERAL_CHN_SUP_VW                   : std_logic_vector(01 downto 01) := "1";        --! Virtual Wire Channel
@@ -650,7 +650,7 @@ package body eSpiMasterBfm is
         --  @see 7.2.1.4 Offset 10h: Channel 0 Capabilities and Configurations
         --  constants are initialized with Specs defaults
         constant C_PERI_READY     : std_logic_vector(01 downto 01) := "1";    --! Virtual Wire Channel Ready: 0b: Channel is not ready. 1b: Channel is ready.
-        constant C_PERI_ENABLE    : std_logic_vector(00 downto 00) := "1";    --! Virtual Wire Channel Enable: his bit is set to ‘1’ by eSPI master to enable the Virtual Wire channel.
+        constant C_PERI_ENABLE    : std_logic_vector(00 downto 00) := "1";    --! Virtual Wire Channel Enable: his bit is set to '1' by eSPI master to enable the Virtual Wire channel.
         --***************************
 
         --***************************
@@ -658,7 +658,7 @@ package body eSpiMasterBfm is
         --  @see 7.2.1.5 Offset 20h: Channel 1 Capabilities and Configurations
         --  constants are initialized with Specs defaults
         constant C_VW_READY     : std_logic_vector(01 downto 01) := "1";    --! Virtual Wire Channel Ready: 0b: Channel is not ready. 1b: Channel is ready.
-        constant C_VW_ENABLE    : std_logic_vector(00 downto 00) := "1";    --! Virtual Wire Channel Enable: his bit is set to ‘1’ by eSPI master to enable the Virtual Wire channel.
+        constant C_VW_ENABLE    : std_logic_vector(00 downto 00) := "1";    --! Virtual Wire Channel Enable: his bit is set to '1' by eSPI master to enable the Virtual Wire channel.
         --***************************
 
         --***************************
@@ -676,7 +676,7 @@ package body eSpiMasterBfm is
         constant C_NON_FATAL_ERROR  : std_logic_vector(7 downto 0)  := "00000010";  --! The received command had an error with nonfatal severity
         constant C_FATAL_ERROR      : std_logic_vector(7 downto 0)  := "00000011";  --! The received command had a fatal error that prevented the transaction layer packet from being successfully processed
         constant C_WAIT_STATE       : std_logic_vector(7 downto 0)  := "00001111";  --! Adds one byte-time of delay when responding to a transaction on the bus.
-        constant C_NO_RESPONSE      : std_logic_vector(7 downto 0)  := "11111111";  --! The response encoding of all 1’s is defined as no response
+        constant C_NO_RESPONSE      : std_logic_vector(7 downto 0)  := "11111111";  --! The response encoding of all 1's is defined as no response
         --***************************
 
         --***************************
@@ -693,7 +693,7 @@ package body eSpiMasterBfm is
         --***************************
 
         --***************************
-        -- Status Register, Figure 16: Slave’s Status Register Definition
+        -- Status Register, Figure 16: Slave's Status Register Definition
         constant C_STS_PC_FREE          : std_logic_vector(00 downto 00) := "-";    --! Peripheral Posted/Completion Rx Queue Free
         constant C_STS_NP_FREE          : std_logic_vector(01 downto 01) := "-";    --! Peripheral Non-Posted Rx Queue Free
         constant C_STS_VWIRE_FREE       : std_logic_vector(02 downto 02) := "-";    --! Virtual Wire Rx Queue Free
@@ -1157,7 +1157,11 @@ package body eSpiMasterBfm is
         --***************************
         -- decodeClk
         --   decodes slave register into a proper time for clock generation
-        function decodeClk ( this : in tESpiBfm ) return time is
+        function decodeClk
+            (
+                constant this : in tESpiBfm
+            )
+        return time is
             variable tclk : time;
         begin
             -- get register setting
@@ -1845,11 +1849,11 @@ package body eSpiMasterBfm is
         is
         begin
             case log is
-                when NOMSG      => this.verbose := C_MSG_NO;	--! no messages are printed to console
-                when ERROR      => this.verbose := C_MSG_ERROR;	--! errors are logged
-                when WARNING    => this.verbose := C_MSG_WARN;	--! errors + warnings are logged
-                when INFO       => this.verbose := C_MSG_INFO;	--! errors + warnings + info are logged
-                when others     => this.verbose := C_MSG_NO;	--! default
+                when NOMSG      => this.verbose := C_MSG_NO;    --! no messages are printed to console
+                when ERROR      => this.verbose := C_MSG_ERROR; --! errors are logged
+                when WARNING    => this.verbose := C_MSG_WARN;  --! errors + warnings are logged
+                when INFO       => this.verbose := C_MSG_INFO;  --! errors + warnings + info are logged
+                when others     => this.verbose := C_MSG_NO;    --! default
             end case;
         end procedure setLogLevel;
         --***************************
