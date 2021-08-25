@@ -31,6 +31,14 @@ jobs:
       - uses: ghdl/setup-ghdl-ci@nightly
         with:
           backend: mcode
-      - name: Version
+      - name: Prepare
         run: |
           ghdl --version
+          mkdir -p ./sim/work
+      - name: eSpiStaticSlave
+        run: |
+          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
+          ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiStaticSlave_tb.vhd
+          ghdl -r --std=93c --workdir=./sim/work eSpiStaticSlave
+          ghdl -r --std=93c --workdir=./sim/work eSpiStaticSlave_tb
+          ghdl -e --workdir=./sim/work eSpiStaticSlave_tb
