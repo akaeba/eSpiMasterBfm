@@ -1,3 +1,5 @@
+[![Unittest](https://github.com/akaeba/eSpiMasterBfm/workflows/Unittest/badge.svg)](https://github.com/akaeba/eSpiMasterBfm/actions)
+
 # eSpiMasterBfm
 
 Enhanced SPI Master Bus Functional Model
