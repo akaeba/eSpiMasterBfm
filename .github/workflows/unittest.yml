@@ -40,3 +40,9 @@ jobs:
           ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
           ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiStaticSlave_tb.vhd
           if [[ -z $(ghdl -r --workdir=./sim/work eSpiStaticSlave_tb | grep "Test SUCCESSFUL") ]]; then echo "FAIL"; exit 1; fi;
+      - name: eSpiMasterBfm
+        run: |
+          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
+          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiMasterBfm.vhd
+          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiMasterBfm_tb.vhd
+          if [[ -z $(ghdl -r --workdir=./sim/work eSpiMasterBfm_tb | grep "Test SUCCESSFUL") ]]; then echo "FAIL"; exit 1; fi;
