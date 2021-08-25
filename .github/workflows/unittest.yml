@@ -44,5 +44,5 @@ jobs:
         run: |
           ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
           ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiMasterBfm.vhd
-          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiMasterBfm_tb.vhd
+          ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiMasterBfm_tb.vhd
           if [[ -z $(ghdl -r --workdir=./sim/work eSpiMasterBfm_tb | grep "Test SUCCESSFUL") ]]; then echo "FAIL"; exit 1; fi;
