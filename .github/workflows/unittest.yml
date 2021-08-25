@@ -1,0 +1,36 @@
+# ************************************************************************
+#  @author:     Andreas Kaeberlein
+#  @copyright:  Copyright 2021
+#  @credits:    AKAE
+#
+#  @license:    BSDv3
+#  @maintainer: Andreas Kaeberlein
+#  @email:      andreas.kaeberlein@web.de
+#
+#  @file:       unittest.yml
+#  @date:       2021-08-25
+#
+#  @brief:      runs test and deploy
+#
+# ************************************************************************
+
+
+name: Unittest
+
+on:
+  push:
+    paths-ignore:
+      - 'doc/**'
+      - 'README.md'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ghdl/setup-ghdl-ci@nightly
+        with:
+          backend: mcode
+      - name: Version
+        run: |
+          ghdl --version
