@@ -41,4 +41,4 @@ jobs:
           ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiStaticSlave_tb.vhd
           ghdl -r --std=93c --workdir=./sim/work eSpiStaticSlave
           ghdl -r --std=93c --workdir=./sim/work eSpiStaticSlave_tb
-          [[ -z $(ghdl -e --workdir=./sim/work eSpiStaticSlave_tb | grep "Test SUCCESSFUL" ]] && echo "FAIL" && exit 1
+          [[ -z $(ghdl -e --workdir=./sim/work eSpiStaticSlave_tb | grep "Test SUCCESSFUL") ]] && echo "FAIL" && exit 1
