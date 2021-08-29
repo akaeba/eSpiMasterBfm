@@ -26,6 +26,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GHDL_OPTS: "--std=93c --ieee=synopsys --time-resolution=ps --workdir=./sim/work"
     steps:
       - uses: actions/checkout@v1
       - uses: ghdl/setup-ghdl-ci@nightly
@@ -37,12 +39,12 @@ jobs:
           mkdir -p ./sim/work
       - name: eSpiStaticSlave
         run: |
-          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
-          ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiStaticSlave_tb.vhd
-          ((ghdl -r --workdir=./sim/work eSpiStaticSlave_tb -gDO_ALL_TEST=True) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiStaticSlave"; exit 1; fi)
+          ghdl -a ${GHDL_OPTS} ./bfm/eSpiStaticSlave.vhd
+          ghdl -a ${GHDL_OPTS} ./tb/eSpiStaticSlave_tb.vhd
+          ((ghdl -r ${GHDL_OPTS} eSpiStaticSlave_tb -gDO_ALL_TEST=True) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiStaticSlave"; exit 1; fi)
       - name: eSpiMasterBfm
         run: |
-          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
-          ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiMasterBfm.vhd
-          ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiMasterBfm_tb.vhd
-          ((ghdl -r --workdir=./sim/work eSpiMasterBfm_tb -gDO_ALL_TEST=True) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiMasterBfm"; exit 1; fi)
+          ghdl -a ${GHDL_OPTS} ./bfm/eSpiStaticSlave.vhd
+          ghdl -a ${GHDL_OPTS} ./bfm/eSpiMasterBfm.vhd
+          ghdl -a ${GHDL_OPTS} ./tb/eSpiMasterBfm_tb.vhd
+          ((ghdl -r ${GHDL_OPTS} eSpiMasterBfm_tb -gDO_ALL_TEST=True) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiMasterBfm"; exit 1; fi)
