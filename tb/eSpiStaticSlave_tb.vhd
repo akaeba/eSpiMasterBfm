@@ -367,7 +367,7 @@ begin
             if ( good and SLGOOD ) then
                 Report "Test SUCCESSFULL";
             else
-                Report "Test FAILED" severity error;
+                Report "Test FAILED" severity failure;
             end if;
             wait;                   -- stop process continuous run
         -------------------------

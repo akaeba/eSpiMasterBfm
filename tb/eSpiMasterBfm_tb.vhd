@@ -602,7 +602,7 @@ begin
             if ( good and slvGood ) then
                 Report "Test SUCCESSFUL";
             else
-                Report "Test FAILED" severity error;
+                Report "Test FAILED" severity failure;
             end if;
             wait;                   -- stop process continuous run
         -------------------------
