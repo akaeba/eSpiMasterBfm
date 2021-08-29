@@ -39,10 +39,10 @@ jobs:
         run: |
           ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
           ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiStaticSlave_tb.vhd
-          ((ghdl -r --workdir=./sim/work eSpiStaticSlave_tb) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiStaticSlave"; exit 1; fi)
+          ((ghdl -r --workdir=./sim/work eSpiStaticSlave_tb -gDO_ALL_TEST=True) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiStaticSlave"; exit 1; fi)
       - name: eSpiMasterBfm
         run: |
           ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiStaticSlave.vhd
           ghdl -a --std=93c --workdir=./sim/work ./bfm/eSpiMasterBfm.vhd
           ghdl -a --std=93c --workdir=./sim/work ./tb/eSpiMasterBfm_tb.vhd
-          ((ghdl -r --workdir=./sim/work eSpiMasterBfm_tb) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiMasterBfm"; exit 1; fi)
+          ((ghdl -r --workdir=./sim/work eSpiMasterBfm_tb -gDO_ALL_TEST=True) || if [ $? -ne 0 ]; then echo "[ FAIL ]   eSpiMasterBfm"; exit 1; fi)
