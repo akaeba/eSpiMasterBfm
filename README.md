@@ -26,7 +26,7 @@ Currently are procedures available for:
 
 ## Example
 
-The full provided function set demonstrates the _[eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)_.
+The full provided function set demonstrates the _[eSpiMasterBfm_tb.vhd](./tb/eSpiMasterBfm_tb.vhd)_.
 A tiny testbench example shows the snippet below:
 
 ```vhdl
@@ -106,15 +106,15 @@ end architecture sim;
 
 The table below lists the major files in this project:
 
-| File                                                                                                                             | Group | Remark                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------- |
-| [eSpiMasterBfm.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd)                                   | BFM   | BFM itself, provides procedures to interact with an eSPI Slave |
-| [eSpiMasterBfm_tb.vhd](https://github.com/akaeba/eSpiMasterBfm/blob/master/tb/eSpiMasterBfm_tb.vhd)                              | TB    | _eSpiMasterBfm_ testbench, example BFM procedure calls         |
-| [eSpiMasterBfm_compile.tcl](https://github.com/akaeba/eSpiMasterBfm/blob/master/tcl/sim/eSpiMasterBfm/eSpiMasterBfm_compile.tcl) | SIM   | compile script for Modelsim                                    |
-| [eSpiMasterBfm_runsim.tcl](https://github.com/akaeba/eSpiMasterBfm/blob/master/tcl/sim/eSpiMasterBfm/eSpiMasterBfm_runsim.tcl)   | SIM   | starts simulation                                              |
+| File                                                                           | Group | Remark                                                         |
+| ------------------------------------------------------------------------------ | ----- | -------------------------------------------------------------- |
+| [eSpiMasterBfm.vhd](./bfm/eSpiMasterBfm.vhd)                                   | BFM   | BFM itself, provides procedures to interact with an eSPI Slave |
+| [eSpiMasterBfm_tb.vhd](./tb/eSpiMasterBfm_tb.vhd)                              | TB    | _eSpiMasterBfm_ testbench, example BFM procedure calls         |
+| [eSpiMasterBfm_compile.tcl](./tcl/sim/eSpiMasterBfm/eSpiMasterBfm_compile.tcl) | SIM   | compile script for Modelsim                                    |
+| [eSpiMasterBfm_runsim.tcl](./tcl/sim/eSpiMasterBfm/eSpiMasterBfm_runsim.tcl)   | SIM   | starts simulation                                              |
 
 
-## [BFM](https://github.com/akaeba/eSpiMasterBfm/blob/master/bfm/eSpiMasterBfm.vhd) procedures
+## [BFM](./bfm/eSpiMasterBfm.vhd) procedures
 
 | Category            | Procedures                                                            | Example                                                     |
 | ------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------- |
