@@ -76,7 +76,7 @@ package eSpiMasterBfm is
             verbose         : natural;                          --! message level; 0: no message, 1: errors, 2: error + warnings
             tiout           : time;                             --! time out when master give up an interaction
             tioutAlert      : natural;                          --! number of clock cycles before BFM gives with time out up
-            tioutRd         : natural;                          --! number of Get Status Cycles before data read gives up
+            tioutStatusPoll : natural;                          --! tiout how often is Status polled before giving up
             slaveRegs       : tMemX32(0 to 16);                 --! Mirrored Slave Configuration Registers (0x00 - 0x40)
             virtualWires    : tMemX08(0 to 255);                --! Table 9: Virtual Wire Index Definition; 0-1: Interrupt event, 2-7: System Event
             slaveStatus     : std_logic_vector(15 downto 0);    --! Slaves status register
@@ -520,7 +520,7 @@ package body eSpiMasterBfm is
         --***************************
         -- Time-out
         constant C_TIOUT_CYC_ALERT  : integer := 100;   --! number of clock cycles before BFM gives with time out up
-        constant C_TIOUT_CYC_RD     : integer := 20;    --! number of status retries for read completion before BFM gives uo
+        constant C_TIOUT_STS_POLL   : integer := 20;    --! number of status retries before BFM giving up
         --***************************
 
     ----------------------------------------------
@@ -1603,13 +1603,13 @@ package body eSpiMasterBfm is
         is
         begin
             -- common handle
-            this.sigSkew        := 0 ns;                        --! no skew between clock edge and data defined
-            this.verbose        := C_MSG_NO;                    --! all messages disabled
-            this.tiout          := 100 us;                      --! 100us master time out for wait
-            this.tioutAlert     := C_TIOUT_CYC_ALERT;           --! number of clock cycles before BFM gives up with waiting for ALERTn
-            this.tioutRd        := C_TIOUT_CYC_RD;              --! number of clock cycles before BFM gives up with waiting for ALERTn
-            this.slaveRegs      := (others => (others => '0')); --! defined value, not according spec
-            this.slaveStatus    := (others => 'X');             --! invalid until first read
+            this.sigSkew            := 0 ns;                        --! no skew between clock edge and data defined
+            this.verbose            := C_MSG_NO;                    --! all messages disabled
+            this.tiout              := 100 us;                      --! 100us master time out for wait
+            this.tioutAlert         := C_TIOUT_CYC_ALERT;           --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.tioutStatusPoll    := C_TIOUT_STS_POLL;            --! number of clock cycles before BFM gives up with waiting for ALERTn
+            this.slaveRegs          := (others => (others => '0')); --! defined value, not according spec
+            this.slaveStatus        := (others => 'X');             --! invalid until first read
             -- Slave Registers
             init_cap_reg_08( this );    --! Slaves General Capabilities and Configurations
         end procedure init;
@@ -2508,7 +2508,7 @@ package body eSpiMasterBfm is
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Acquires read data after DEFER"; end if;
             -- check for PC_AVAIL
             tiout   := 0;
-            while ( ("0" = this.slaveStatus(C_STS_PC_AVAIL'range)) and tiout < this.tioutRd ) loop   --! no PC_AVAIL, wait for it
+            while ( ("0" = this.slaveStatus(C_STS_PC_AVAIL'range)) and tiout < this.tioutStatusPoll ) loop  --! no PC_AVAIL, wait for it
                 -- check slave status
                     -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
                 GET_STATUS ( this, CSn, SCK, DIO, slv16, rsp ); --! status captures BFM internally
@@ -2521,7 +2521,7 @@ package body eSpiMasterBfm is
                 tiout := tiout + 1;
             end loop;
             -- check for reach tiout
-            if ( (tiout = this.tioutRd) and ("0" = this.slaveStatus(C_STS_PC_AVAIL'range)) ) then
+            if ( (tiout = this.tioutStatusPoll) and ("0" = this.slaveStatus(C_STS_PC_AVAIL'range)) ) then
                 rsp := NO_RESPONSE; --! no data available
                 if ( this.verbose >= C_MSG_WARN ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: No data available in allowed response time" severity warning; end if;
             end if;
@@ -2639,9 +2639,32 @@ package body eSpiMasterBfm is
             variable dLenSlv    : std_logic_vector(11 downto 0);    --! needed for 'PUT_MEMWR32_SHORT'
             variable msgLen     : natural := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable sts        : std_logic_vector(15 downto 0);    --! status
+            variable tiout      : natural := this.tioutStatusPoll;  --! status retry time out
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:MEMWR32"; end if;
+            -- check for NP_FREE
+            --   poll status if not free
+            while ( "1" /= this.slaveStatus(C_STS_NP_FREE'range) ) loop
+                    -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
+                GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
+                -- Slave request good?
+                if ( ACCEPT /= rsp ) then
+                    status      := sts;
+                    response    := rsp;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(rsp) severity error; end if;
+                    return;
+                end if;
+                -- tiout?
+                tiout := tiout - 1; -- decrement time out counter
+                if ( 0 = tiout ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave:GET_STATUS retry time out reached, giving up..." severity error; end if;
+                    status      := sts;
+                    response    := FATAL_ERROR; --! retry reached
+                    return;
+                end if;
+            end loop;
             -- prepare
             msg := (others => (others => '0'));                                         --! init message array
             -- determine instruction type
@@ -2875,17 +2898,40 @@ package body eSpiMasterBfm is
                 variable response   : out tESpiRsp                          --! command response
             )
         is
-            variable msg        : tMemX08(0 to data'length + 3);    --! CMD 1Byte, 2Byte Address
-            variable msgLen     : natural := 0;                     --! message length can vary
-            variable rsp        : tESpiRsp;                         --! Slaves response to performed request
+            variable msg    : tMemX08(0 to data'length + 3);    --! CMD 1Byte, 2Byte Address
+            variable msgLen : natural := 0;                     --! message length can vary
+            variable rsp    : tESpiRsp;                         --! Slaves response to performed request
+            variable sts    : std_logic_vector(15 downto 0);    --! status
+            variable tiout  : natural := this.tioutStatusPoll;  --! status retry time out
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IOWR: PUT_IOWR_SHORT"; end if;
             -- check length
             if not ( (1 = data'length) or (2 = data'length) or (4 = data'length ) ) then    --! PUT_IOWR_SHORT; Figure 26: Master Initiated Short Non-Posted Transaction
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR: data length " & integer'image(data'length) & " unsupported; Only 1/2/4 Bytes allowed" severity error; end if;
-                return;         --! leave procedure
+                return;
             end if;
+            -- check for NP_FREE
+            --   poll status if not free
+            while ( "1" /= this.slaveStatus(C_STS_NP_FREE'range) ) loop
+                    -- GET_STATUS ( this, CSn, SCK, DIO, status, response )
+                GET_STATUS ( this, CSn, SCK, DIO, sts, rsp );
+                -- Slave request good?
+                if ( ACCEPT /= rsp ) then
+                    status      := sts;
+                    response    := rsp;
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(rsp) severity error; end if;
+                    return;
+                end if;
+                -- tiout?
+                tiout := tiout - 1; -- decrement time out counter
+                if ( 0 = tiout ) then
+                    if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave:GET_STATUS retry time out reached, giving up..." severity error; end if;
+                    status      := sts;
+                    response    := FATAL_ERROR; --! retry reached
+                    return;
+                end if;
+            end loop;
             -- prepare data packet
             msg     := (others => (others => '0'));                                             --! init message array
             msg(0)  := C_PUT_IOWR_SHORT & std_logic_vector(to_unsigned(data'length - 1, 2));    --! CPUT_IOWR_SHORT w/ 1/2/4 data bytes
