@@ -117,14 +117,14 @@ package eSpiMasterBfm is
 
     -----------------------------
     -- Procedures
-        -- init: initializes espi system
+        -- INIT: initializes espi system
             -- bfm common handle only
-            procedure init
+            procedure INIT
                 (
                     variable this   : inout tESpiBfm    --! common handle
                 );
             -- bfm and slave 'Exit G3' sequence
-            procedure init
+            procedure INIT
                 (
                     variable this   : inout tESpiBfm;                       --! common handle
                     signal RESETn   : out std_logic;                        --! reset signal
@@ -1596,7 +1596,7 @@ package body eSpiMasterBfm is
 
         --***************************
         -- init, bfm only
-        procedure init
+        procedure INIT
             (
                 variable this   : inout tESpiBfm    --! common handle
             )
@@ -1612,13 +1612,13 @@ package body eSpiMasterBfm is
             this.slaveStatus        := (others => 'X');             --! invalid until first read
             -- Slave Registers
             init_cap_reg_08( this );    --! Slaves General Capabilities and Configurations
-        end procedure init;
+        end procedure INIT;
         --***************************
 
 
         --***************************
         -- init
-        procedure init
+        procedure INIT
             (
                 variable this   : inout tESpiBfm;                       --! common handle
                 signal RESETn   : out std_logic;                        --! reset signal
@@ -1836,7 +1836,7 @@ package body eSpiMasterBfm is
                             cfgReg2Str( this )      & character(LF) &
                             generalReg2Str( this );
             end if;
-        end procedure init;
+        end procedure INIT;
         --***************************
 
 
@@ -2228,6 +2228,8 @@ package body eSpiMasterBfm is
             --   eSPI Interface Base Specification, 2016, Revision 1.0, 327432-002, p. 128
             --   008h-00Bh: General Capabilities and Configurations to default reset value
             init_cap_reg_08( this );
+            -- make captures slave status invalid
+            this.slaveStatus := (others => 'X');
             -- limits CSn bandwidth to SCK
             wait for tSpiClk;
         end procedure RESET;

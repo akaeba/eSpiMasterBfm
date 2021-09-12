@@ -51,13 +51,13 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest3    : boolean := true;  --! test3:  GET_STATUS
         constant doTest4    : boolean := true;  --! test4:  MEMWR32
         constant doTest5    : boolean := true;  --! test5:  MEMRD32
-        constant doTest6    : boolean := true;  --! test6:  RESET
-        constant doTest7    : boolean := true;  --! test7:  IOWR
-        constant doTest8    : boolean := true;  --! test8:  IORD
-        constant doTest9    : boolean := true;  --! test9:  VWIRE Name
-        constant doTest10   : boolean := true;  --! test10: VWIRERD
-        constant doTest11   : boolean := true;  --! test11: VW_ADD, adds virtual wires to a list
-        constant doTest12   : boolean := true;  --! test12: WAIT_VW_IS_EQ
+        constant doTest6    : boolean := true;  --! test6:  IOWR
+        constant doTest7    : boolean := true;  --! test7:  IORD
+        constant doTest8    : boolean := true;  --! test8:  VWIRE Name
+        constant doTest9    : boolean := true;  --! test9:  VWIRERD
+        constant doTest10   : boolean := true;  --! test10: VW_ADD, adds virtual wires to a list
+        constant doTest11   : boolean := true;  --! test11: WAIT_VW_IS_EQ
+        constant doTest12   : boolean := true;  --! test12:  RESET
         constant doTest13   : boolean := true;  --! test13: init, applies 'Exit G3 Sequence'
     -----------------------------
 
@@ -316,31 +316,10 @@ begin
 
 
         -------------------------
-        -- Test6: Reset
+        -- Test6: IOWR
         -------------------------
         if ( doTest6 or DO_ALL_TEST ) then
-            Report "Test6: In-band Reset";
-            -- load message
-            REQMSG          <= (others => character(NUL));
-            CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 5)  <= "FFFF"   & character(NUL);       --! sent Request        (BFM to Slave)
-            LDMSG           <= '1';
-            wait for decodeClk( eSpiMasterBfm )/2;
-            LDMSG           <= '0';
-            wait for decodeClk( eSpiMasterBfm )/2;
-            -- Request BFM
-                -- RESET ( this, CSn, SCK, DIO );
-            RESET ( eSpiMasterBfm, CSn, SCK, DIO );
-            wait for 1 us;
-        end if;
-        -------------------------
-
-
-        -------------------------
-        -- Test7: IOWR
-        -------------------------
-        if ( doTest7 or DO_ALL_TEST ) then
-            Report "Test7: IOWR";
+            Report "Test6: IOWR";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -359,16 +338,16 @@ begin
 
 
         -------------------------
-        -- Test8: IORD
+        -- Test7: IORD
         -------------------------
-        if ( doTest8 or DO_ALL_TEST ) then
-            Report "Test8: IORD";
+        if ( doTest7 or DO_ALL_TEST ) then
+            Report "Test7: IORD";
             Report "  Slave Responds directly";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 9)  <= "4000800F"               & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 23) <= "0F0F0F08010000000F0309" & character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 9)  <= "4000800F"         & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 17) <= "0F0F0F08014F034A" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for decodeClk( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -403,10 +382,10 @@ begin
 
 
         -------------------------
-        -- Test9: VWIRE Name
+        -- Test8: VWIRE Name
         -------------------------
-        if ( doTest9 or DO_ALL_TEST ) then
-            Report "Test9: VWIRE Name";
+        if ( doTest8 or DO_ALL_TEST ) then
+            Report "Test8: VWIRE Name";
             Report "  XSUSSTAT = 1";
             -- load message
             REQMSG          <= (others => character(NUL));
@@ -440,11 +419,11 @@ begin
 
 
         -------------------------
-        -- Test10: VWIRERD
+        -- Test9: VWIRERD
         -------------------------
-        if ( doTest10 or DO_ALL_TEST ) then
+        if ( doTest9 or DO_ALL_TEST ) then
             -- first test
-            Report "Test10: VWIRERD - Status Wires";
+            Report "Test9: VWIRERD - Status Wires";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -519,10 +498,10 @@ begin
 
 
         -------------------------
-        -- Test11: VW_ADD
+        -- Test10: VW_ADD
         -------------------------
-        if ( doTest11 or DO_ALL_TEST ) then
-            Report "Test11: VW_ADD - Composes List of Virtual Wires";
+        if ( doTest10 or DO_ALL_TEST ) then
+            Report "Test10: VW_ADD - Composes List of Virtual Wires";
             vwLen   := 0;
             vw      := (others => (others => '0'));
             VW_ADD( eSpiMasterBfm, "PLTRST#",                   '1', vw, vwLen, good ); --! 'PLTRST#' and 'SUS_STAT#' same index, not set virtual wires are don't care ('-')
@@ -554,10 +533,10 @@ begin
 
 
         -------------------------
-        -- Test12: WAIT_VW_IS_EQ
+        -- Test11: WAIT_VW_IS_EQ
         -------------------------
-        if ( doTest12 or DO_ALL_TEST ) then
-            Report "Test12: WAIT_VW_IS_EQ - Waits until the Virtual Wires with Value are read";
+        if ( doTest11 or DO_ALL_TEST ) then
+            Report "Test11: WAIT_VW_IS_EQ - Waits until the Virtual Wires with Value are read";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -576,10 +555,31 @@ begin
 
 
         -------------------------
-        -- Test13: init
+        -- Test12: Reset
+        -------------------------
+        if ( doTest12 or DO_ALL_TEST ) then
+            Report "Test12: In-band Reset";
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 5)  <= "FFFF"   & character(NUL);       --! sent Request        (BFM to Slave)
+            LDMSG           <= '1';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            LDMSG           <= '0';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            -- Request BFM
+                -- RESET ( this, CSn, SCK, DIO );
+            RESET ( eSpiMasterBfm, CSn, SCK, DIO );
+            wait for 1 us;
+        end if;
+        -------------------------
+
+
+        -------------------------
+        -- Test13: INIT
         -------------------------
         if ( doTest13 or DO_ALL_TEST ) then
-            Report "Test13: init with 'Exit G3 Sequence'";
+            Report "Test13: INIT with 'Exit G3 Sequence'";
             -- load message
             REQMSG              <= (others => character(NUL));
             CMPMSG              <= (others => character(NUL));
@@ -590,8 +590,8 @@ begin
             LDMSG               <= '0';
             wait for decodeClk( eSpiMasterBfm )/2;
             -- Request BFM
-                -- init( this, RESETn, CSn, SCK, DIO, ALERTn, good, log );
-            init( eSpiMasterBfm, foo, CSn, SCK, DIO, ALERTn, good, INFO );
+                -- INIT( this, RESETn, CSn, SCK, DIO, ALERTn, good, log );
+            INIT( eSpiMasterBfm, foo, CSn, SCK, DIO, ALERTn, good, INFO );
             wait for 1 us;
         end if;
         -------------------------
