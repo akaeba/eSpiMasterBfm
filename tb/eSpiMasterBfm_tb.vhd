@@ -71,12 +71,13 @@ architecture sim of eSpiMasterBfm_tb is
         signal ALERTn   : std_logic;
         signal RESETn   : std_logic;
         -- ESPI Static Slave
-        signal slvGood  : boolean;              --! all request to slave good?
-        signal REQMSG   : string(1 to 150);     --! request message
-        signal CMPMSG   : string(1 to 150);     --! complete message, if request was ok
-        signal LDMSG    : std_logic;            --! load message on rising edge
+        signal slvGood  : boolean;                      --! all request to slave good?
+        signal REQMSG   : string(1 to 150);             --! request message
+        signal CMPMSG   : string(1 to 150);             --! complete message, if request was ok
+        signal ALRTMSG  : std_logic_vector(0 to 149);   --! activates alert (MISO/XALERT after sending segment, 1: activate after segment, no activation
+        signal LDMSG    : std_logic;                    --! load message on rising edge
         -- Help
-        signal foo      : std_logic;            --! init applies reset
+        signal foo      : std_logic;    --! init applies reset
     -----------------------------
 
 begin
@@ -110,6 +111,7 @@ begin
             LDMSG   <= '0';
             REQMSG  <= (others => character(NUL));
             CMPMSG  <= (others => character(NUL));
+            ALRTMSG <= (others => '0');             --! alert never activated
             -- init( this )
             init( eSpiMasterBfm );  --! BFM common data handle only
                 -- setLogLevel( this, log )
@@ -615,19 +617,21 @@ begin
     -- eSPI Message Recorder
     i_eSpiStaticSlave : entity work.eSpiStaticSlave
         generic map (
-                        MAXMSGLEN => REQMSG'length  --! max length of ascii hex request and answer string
+                        MAXMSGLEN   => REQMSG'length,   --! max length of ascii hex request and answer string
+                        ALRTWTTIME  => 1 us             --! wait time from CSN disable to alert activation
                     )
         port map    (
-                        SCK    => SCK,      --! shift clock
-                        MOSI   => DIO(0),   --! Single mode, data in from Master
-                        MISO   => DIO(1),   --! Single mode, data out to master
-                        XCS    => CSn,      --! slave select
-                        XALERT => ALERTn,   --! Alert
-                        XRESET => RESETn,   --! reset
-                        REQMSG => REQMSG,   --! request message
-                        CMPMSG => CMPMSG,   --! complete message, if request was ok
-                        LDMSG  => LDMSG,    --! load message on rising edge
-                        GOOD   => slvGood   --! all request messages were good, set with RESETn
+                        SCK     => SCK,     --! shift clock
+                        MOSI    => DIO(0),  --! Single mode, data in from Master
+                        MISO    => DIO(1),  --! Single mode, data out to master
+                        XCS     => CSn,     --! slave select
+                        XALERT  => open,    --! Alert, in BFM test never used
+                        XRESET  => RESETn,  --! reset
+                        REQMSG  => REQMSG,  --! request message
+                        CMPMSG  => CMPMSG,  --! complete message, if request was ok
+                        ALRTMSG => ALRTMSG, --! activates alert (MISO/XALERT after sending segment, 1: activate after segment, no activation
+                        LDMSG   => LDMSG,   --! load message on rising edge
+                        GOOD    => slvGood  --! all request messages were good, set with RESETn
                     );
     ----------------------------------------------
 

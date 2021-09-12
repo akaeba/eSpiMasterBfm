@@ -36,6 +36,7 @@
 library IEEE;
     use IEEE.std_logic_1164.all;
     use IEEE.numeric_std.all;
+    use IEEE.math_real.realmax;
 --------------------------------------------------------------------------
 
 
@@ -44,22 +45,24 @@ library IEEE;
 -- eSpiStaticSlave: receives and generates telegrams
 entity eSpiStaticSlave is
 generic (
-            MAXMSGLEN   : positive  := 100  --! max length of ascii hex request and answer string
+            MAXMSGLEN   : positive  := 100; --! max length of ascii hex request and answer string
+            ALRTWTTIME  : time      := 1 ns --! wait time from CSN disable to alert activation
         );
 port    (
             -- ESPI
-            SCK     : in    std_logic;              --! shift clock
-            MOSI    : in    std_logic;              --! Single mode, data in from Master;   DIO(0)
-            MISO    : out   std_logic;              --! Single mode, data out to master;    DIO(1)
-            XCS     : in    std_logic;              --! slave select
-            XALERT  : inout std_logic;              --! Alert
-            XRESET  : in    std_logic;              --! reset
+            SCK     : in    std_logic;  --! shift clock
+            MOSI    : in    std_logic;  --! Single mode, data in from Master;   DIO(0)
+            MISO    : out   std_logic;  --! Single mode, data out to master;    DIO(1)
+            XCS     : in    std_logic;  --! slave select
+            XALERT  : inout std_logic;  --! Alert
+            XRESET  : in    std_logic;  --! reset
             -- Message control
-            REQMSG  : in    string(1 to MAXMSGLEN); --! request message
-            CMPMSG  : in    string(1 to MAXMSGLEN); --! complete message, if request was ok
-            LDMSG   : in    std_logic;              --! load message on rising edge
+            REQMSG  : in    string(1 to MAXMSGLEN);             --! request message
+            CMPMSG  : in    string(1 to MAXMSGLEN);             --! complete message, if request was ok
+            ALRTMSG : in    std_logic_vector(0 to MAXMSGLEN-1); --! activates alert (MISO/XALERT after sending segment, 1: activate after segment, no activation
+            LDMSG   : in    std_logic;                          --! load message on rising edge
             -- Status
-            GOOD    : out   boolean                 --! all request messages were good, set with XRESET
+            GOOD    : out   boolean     --! all request messages were good, set with XRESET
         );
 end entity eSpiStaticSlave;
 --------------------------------------------------------------------------
@@ -188,24 +191,25 @@ begin
     ----------------------------------------------
     -- eSPI Message Recorder
     p_espiSlave : process (SCK, XCS, XRESET, LDMSG)
-        variable requestMsg         : string(REQMSG'range);         --! request message; created by BFM
-        variable completeMsg        : string(CMPMSG'range);         --! complete message; evaluated be BFM
-        variable numReqSegs         : natural;                      --! by 'LF' divided segments of request message
-        variable numCpltSegs        : natural;                      --! by 'LF' divided segments of complete message
-        variable reqMsgStartIdx     : integer;                      --! in current segment start pointer of message to receive
-        variable reqMsgStopIdx      : integer;                      --! in current segment stop pointer of message to receive
+        variable requestMsg         : string(REQMSG'range);             --! request message; created by BFM
+        variable completeMsg        : string(CMPMSG'range);             --! complete message; evaluated be BFM
+        variable alertMsg           : std_logic_vector(ALRTMSG'range);  --! alert activation message, after sending/receiving segment decides SLV to activate to ALERT
+        variable numReqSegs         : natural;                          --! by 'LF' divided segments of request message
+        variable numCpltSegs        : natural;                          --! by 'LF' divided segments of complete message
+        variable reqMsgStartIdx     : integer;                          --! in current segment start pointer of message to receive
+        variable reqMsgStopIdx      : integer;                          --! in current segment stop pointer of message to receive
         variable cpltSegStartIdx    : integer;
         variable cpltSegStopIdx     : integer;
-        variable reqBitsPend        : integer;                      --! number of pending command nibbles
+        variable reqBitsPend        : integer;                          --! number of pending command nibbles
         variable reqBitsCap         : integer;
-        variable reqMsgCap          : string(REQMSG'range);         --! recorded request
-        variable totalSeg           : natural;                      --! total number of segment
-        variable currentSeg         : natural;                      --! current number of segment
-        variable stage              : t_tEspiSlv;                   --! transmission stage
-        variable tarPend            : integer := C_TAR_CYCLES;      --! turn-around
-        variable SFR                : std_logic_vector(3 downto 0); --! shift-forward-register
-        variable str1               : string(1 to 1);               --! help variable for slv to char conversion
-        variable rspBitsSend        : integer;                      --! counts sent bits
+        variable reqMsgCap          : string(REQMSG'range);             --! recorded request
+        variable totalSeg           : natural;                          --! total number of segment
+        variable currentSeg         : natural;                          --! current number of segment
+        variable stage              : t_tEspiSlv;                       --! transmission stage
+        variable tarPend            : integer := C_TAR_CYCLES;          --! turn-around
+        variable SFR                : std_logic_vector(3 downto 0);     --! shift-forward-register
+        variable str1               : string(1 to 1);                   --! help variable for slv to char conversion
+        variable rspBitsSend        : integer;                          --! counts sent bits
     begin
         if ( '0' = XRESET ) then    --! init ESPI
             MISO        <= 'Z';
@@ -218,6 +222,7 @@ begin
             -- prepare
             requestMsg      := REQMSG;  --! copy to internal
             completeMsg     := CMPMSG;
+            alertMsg        := ALRTMSG;
             numCpltSegs     := 0;       --! temporary segment counter
             numReqSegs      := 0;
             totalSeg        := 0;       --! control counter
@@ -290,6 +295,9 @@ begin
                 reqMsgCap   := (others => character(NUL));
 
             elsif ( XCS = '0' ) then
+                -- in case of alert disable alert
+                MISO    <= 'Z';
+                XALERT  <= 'Z';
                 -- receive command
                 if ( CMD_S = stage ) then
                     if ( rising_edge(SCK) ) then
@@ -348,8 +356,9 @@ begin
                                 rspBitsSend := rspBitsSend - 1;
                             else
                                 -- single/multi CSn request?
-                                if ( currentSeg > totalSeg ) then   --! Single CSn
-                                    stage := NOMSG_S;
+                                if ( currentSeg >= totalSeg ) then  --! Single CSn
+                                    stage       := NOMSG_S;
+                                    alertMsg    := (others => '0');
                                 else                                --! multi CSN
                                     stage := CMD_S;
                                 end if;
@@ -359,8 +368,13 @@ begin
                     end if;
                 end if;
             else
-                tarPend := C_TAR_CYCLES;    --! restore for next cycle
                 MISO    <= 'Z';             --! line disable
+                tarPend := C_TAR_CYCLES;    --! restore for next cycle
+                -- alert requested
+                if ( '1' = alertMsg(integer(realmax(real(currentSeg)-1.0, 0.0))) ) then
+                    MISO    <= '0' after ALRTWTTIME;
+                    XALERT  <= '0' after ALRTWTTIME;
+                end if;
             end if;
         end if;
     end process p_espiSlave;
