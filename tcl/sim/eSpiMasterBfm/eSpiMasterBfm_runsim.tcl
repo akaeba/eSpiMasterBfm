@@ -27,4 +27,4 @@ vsim -novopt -gDO_ALL_TEST=true -t 1ps work.eSpiMasterBfm_tb
 do "../tcl/sim/eSpiMasterBfm/eSpiMasterBfm_waveform.do"
 
 # sim until finish
-run 160 us
+run 200 us
