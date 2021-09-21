@@ -57,8 +57,9 @@ architecture sim of eSpiMasterBfm_tb is
         constant doTest9    : boolean := true;  --! test9:  VWIRERD
         constant doTest10   : boolean := true;  --! test10: VW_ADD, adds virtual wires to a list
         constant doTest11   : boolean := true;  --! test11: WAIT_VW_IS_EQ
-        constant doTest12   : boolean := true;  --! test12:  RESET
-        constant doTest13   : boolean := true;  --! test13: init, applies 'Exit G3 Sequence'
+        constant doTest12   : boolean := true;  --! Test12: IOWR with NP_FREE = 0
+        constant doTest13   : boolean := true;  --! test13: RESET
+        constant doTest14   : boolean := true;  --! test14: init, applies 'Exit G3 Sequence'
     -----------------------------
 
 
@@ -555,10 +556,45 @@ begin
 
 
         -------------------------
-        -- Test12: Reset
+        -- Test12: IOWR with NP_FREE = 0
         -------------------------
         if ( doTest12 or DO_ALL_TEST ) then
-            Report "Test12: In-band Reset";
+            Report "Test12: IOWR with NP_FREE = 0";
+                -- setups NP_FREE=0
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 5)  <= "25FB"           & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 15) <= "0F0F0F080D03B1" & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            LDMSG           <= '0';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            -- Request BFM
+            GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );      --! get status from slave
+                -- perform IOWR with Wait
+            -- load message
+            REQMSG          <= (others => character(NUL));
+            CMPMSG          <= (others => character(NUL));
+            REQMSG(1 to 16) <= "25FB"           & character(LF) & "440080151E"      & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 30) <= "0F0F0F080F039B" & character(LF) & "0F0F0F084F03C0"  & character(NUL);   --! received response   (Slave to BFM)
+            LDMSG           <= '1';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            LDMSG           <= '0';
+            wait for decodeClk( eSpiMasterBfm )/2;
+            -- Request BFM
+                -- IOWR( this, CSn, SCK, DIO, adr, data, good )
+            IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"15", good );    --! write data byte 0x47 to IO space adr 0x80 (Port 80)
+            wait for 1 us;
+        end if;
+        -------------------------
+
+
+        -------------------------
+        -- Test13: Reset
+        -------------------------
+        if ( doTest13 or DO_ALL_TEST ) then
+            Report "Test13: In-band Reset";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
@@ -576,10 +612,10 @@ begin
 
 
         -------------------------
-        -- Test13: INIT
+        -- Test14: INIT
         -------------------------
-        if ( doTest13 or DO_ALL_TEST ) then
-            Report "Test13: INIT with 'Exit G3 Sequence'";
+        if ( doTest14 or DO_ALL_TEST ) then
+            Report "Test14: INIT with 'Exit G3 Sequence'";
             -- load message
             REQMSG              <= (others => character(NUL));
             CMPMSG              <= (others => character(NUL));
