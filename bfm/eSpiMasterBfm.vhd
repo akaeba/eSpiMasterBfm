@@ -506,7 +506,7 @@ package body eSpiMasterBfm is
         -- BFM
         constant C_BFM_LICENSE  : string := "BSDv3";
         constant C_BFM_AUTHORS  : string := "Andreas Kaeberlein";
-        constant C_BFM_VERSION  : string := "v0.1.3";
+        constant C_BFM_VERSION  : string := "v0.1.4";
         --***************************
 
         --***************************
