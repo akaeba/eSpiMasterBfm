@@ -3787,8 +3787,11 @@ package body eSpiMasterBfm is
                 end loop;
                 -- wait for next virtual wire list only when "needle" list isn't completed
                 if ( false = waitDone ) then
-                        -- WAIT_ALERT( this, CSn, SCK, DIO, ALERTn )
-                    WAIT_ALERT( this, CSn, SCK, DIO, ALERTn );  --! wait for new wires
+                    -- go to wait for ALERT only if no new wires are signaled in the slave status register
+                    if ( "0" = this.slaveStatus(C_STS_VWIRE_AVAIL'range) ) then
+                            -- WAIT_ALERT( this, CSn, SCK, DIO, ALERTn )
+                        WAIT_ALERT( this, CSn, SCK, DIO, ALERTn );  --! wait for new wires
+                    end if;
                 end if;
             end loop;
         end procedure WAIT_VW_IS_EQ;
