@@ -107,7 +107,7 @@ package eSpiMasterBfm is
             )
         return std_logic_vector;
         -- get current set espi clock period
-        function decodeClk
+        function tespi
             (
                 constant this : in tESpiBfm
             )
@@ -1156,9 +1156,9 @@ package body eSpiMasterBfm is
 
 
         --***************************
-        -- decodeClk
+        -- tespi
         --   decodes slave register into a proper time for clock generation
-        function decodeClk
+        function tespi
             (
                 constant this : in tESpiBfm
             )
@@ -1176,7 +1176,7 @@ package body eSpiMasterBfm is
             end case;
             -- release time
             return tclk;
-        end function decodeClk;
+        end function tespi;
         --***************************
 
 
@@ -1649,13 +1649,13 @@ package body eSpiMasterBfm is
                     "       Authors : "  & C_BFM_AUTHORS    & character(LF) &
                     "       Version : "  & C_BFM_VERSION;
             -- reset startup sequence
-            RESETn  <= '0';                 --! send core to reset
-            CSn     <= '1';                 --! deselect device
-            SCK     <= '0';                 --! rising edge active clock
-            DIO     <= (others => 'Z');     --! lines are in TB pulled
-            wait for 2*decodeClk( this );   --! apply reset
-            RESETn  <= '1';                 --! disable reset
-            wait for C_TINIT;               --! slave initialization time
+            RESETn  <= '0';             --! send core to reset
+            CSn     <= '1';             --! deselect device
+            SCK     <= '0';             --! rising edge active clock
+            DIO     <= (others => 'Z'); --! lines are in TB pulled
+            wait for 2*tespi( this );   --! apply reset
+            RESETn  <= '1';             --! disable reset
+            wait for C_TINIT;           --! slave initialization time
             -- *****
             -- General capabilities
             --  @see Exit from G3, 4.)
@@ -1880,7 +1880,7 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
-            constant tSpiClk : time := decodeClk(this); --! get current SPI period
+            constant tSpiClk : time := tespi(this); --! get current SPI period
         begin
             -- iterate over message bytes
             for i in msg'low to msg'high loop
@@ -1933,7 +1933,7 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
-            constant tSpiClk : time := decodeClk(this); --! get current SPI period
+            constant tSpiClk : time := tespi(this); --! get current SPI period
         begin
             -- one clock cycle drive high
             SCK     <= '0';     --! falling edge
@@ -1991,7 +1991,7 @@ package body eSpiMasterBfm is
                 signal DIO      : inout std_logic_vector(3 downto 0)    --! bidirectional data
             )
         is
-            constant tSpiClk    : time := decodeClk(this);      --! get current SPI period
+            constant tSpiClk    : time := tespi(this);          --! get current SPI period
             variable slv1       : std_logic_vector(0 downto 0); --! help
         begin
             -- iterate over message bytes
@@ -2055,7 +2055,7 @@ package body eSpiMasterBfm is
                 variable response   : out tESpiRsp                          --! Slaves response to performed request
             )
         is
-            constant tSpiClk    : time := decodeClk(this);  --! get current SPI period
+            constant tSpiClk    : time := tespi(this);      --! get current SPI period
             variable crcMsg     : tMemX08(0 to msg'length); --! message with calculated CRC
             variable rsp        : tESpiRsp;                 --! decoded slave response
             variable rxStart    : integer;                  --! start index in message
@@ -2584,7 +2584,7 @@ package body eSpiMasterBfm is
                 signal ALERTn       : in std_logic                          --! slaves alert pin
             )
         is
-            constant tSpiClk : time := decodeClk(this); --! get current SPI period
+            constant tSpiClk : time := tespi(this); --! get current SPI period
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:WAIT_ALERT"; end if;
