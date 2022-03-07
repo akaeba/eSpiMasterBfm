@@ -1,5 +1,18 @@
 [![Unittest](https://github.com/akaeba/eSpiMasterBfm/workflows/Unittest/badge.svg)](https://github.com/akaeba/eSpiMasterBfm/actions)
 
+- [eSpiMasterBfm](#espimasterbfm)
+  * [Features](#features)
+  * [Releases](#releases)
+  * [Example](#example)
+  * [File Listing](#file-listing)
+  * [[BFM](./bfm/eSpiMasterBfm.vhd) procedures](#-bfm---bfm-espimasterbfmvhd--procedures)
+  * [FAQ](#faq)
+    + [_INIT_ ends with _WAIT_ALERT_](#-init--ends-with--wait-alert-)
+  * [Contributors wanted](#contributors-wanted)
+  * [eSPI Slaves](#espi-slaves)
+  * [References](#references)
+
+
 # eSpiMasterBfm
 
 Enhanced SPI Master Bus Functional Model
@@ -119,7 +132,7 @@ The table below lists the major files in this project:
 
 | Category            | Procedures                                                            | Example                                                     |
 | ------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------- |
-| initialization      | _INIT_              <br /> _RESET_                                    | `init(bfm, RESETn, CSn, SCK, DIO, ALERTn, good)`            |
+| initialization      | _INIT_              <br /> _RESET_                                    | `INIT(bfm, RESETn, CSn, SCK, DIO, ALERTn, good)`            |
 | slave configuration | _GET_CONFIGURATION_ <br /> _SET_CONFIGURATION_ <br /> _GET_STATUS_    | `GET_CONFIGURATION(bfm, CSn, SCK, DIO, adr, cfg, sts, rsp)` |
 | virtual wire        | _VWIREWR_           <br /> _VWIRERD_           <br /> _WAIT_VW_IS_EQ_ | `VWIREWR(bfm, CSn, SCK, DIO, "PLTRST#", '1', good)`         |
 | IO write            | _IOWR_BYTE_         <br /> _IOWR_WORD_         <br /> _IOWR_DWORD_    | `IOWR(bfm, CSn, SCK, DIO, adr16, dat08, good)`              |
@@ -127,6 +140,16 @@ The table below lists the major files in this project:
 | memory write        | _MEMWR32_                                                             | `MEMWR32(bfm, CSn, SCK, DIO, adr32, dat08, good)`           |
 | memory read         | _MEMRD32_                                                             | `MEMRD32(bfm, CSn, SCK, DIO, adr32, dat08, good)`           |
 | misc                | _tespi_                                                               | `tespi(bfm)`                                                |
+
+
+## FAQ
+
+### _INIT_ ends with _WAIT_ALERT_
+
+ESPI slave initialization `init(bfm, RESETn, CSn, SCK, DIO, ALERTn, good)` stops with the log message `** Note: eSpiMasterBfm:WAIT_ALERT`.
+This is caused by non asserting the two virtual wire inputs `SLAVE_BOOT_LOAD_DONE=1` and `SLAVE_BOOT_LOAD_STATUS=1`. According the
+[eSPI Specification](https://www.intel.com/content/dam/support/us/en/documents/software/chipset-software/327432-004_espi_base_specification_rev1.0_cb.pdf)
+chapter _Exit from G3_ point 8 needs both virtual wires set to logical one for exit G3.
 
 
 ## Contributors wanted
