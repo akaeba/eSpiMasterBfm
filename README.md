@@ -146,7 +146,7 @@ The table below lists the major files in this project:
 
 ### _INIT_ ends with _WAIT_ALERT_
 
-ESPI slave initialization `init(bfm, RESETn, CSn, SCK, DIO, ALERTn, good)` stops with the log message `** Note: eSpiMasterBfm:WAIT_ALERT`.
+ESPI slave initialization `INIT(bfm, RESETn, CSn, SCK, DIO, ALERTn, good)` stops with the log message `** Note: eSpiMasterBfm:WAIT_ALERT`.
 This is caused by non asserting the two virtual wire inputs `SLAVE_BOOT_LOAD_DONE=1` and `SLAVE_BOOT_LOAD_STATUS=1`. According the
 [eSPI Specification](https://www.intel.com/content/dam/support/us/en/documents/software/chipset-software/327432-004_espi_base_specification_rev1.0_cb.pdf)
 chapter _Exit from G3_ point 8 needs both virtual wires set to logical one for exit G3.
@@ -155,7 +155,7 @@ chapter _Exit from G3_ point 8 needs both virtual wires set to logical one for e
 ## Contributors wanted
 
 If you think useful project and also helpful, feel free to fork and contribute.
-The licence does not require this, but the project will love it :-). Contributors welcome.
+The license does not require this, but the project will love it :-). Contributors welcome.
 
 
 ## eSPI Slaves
