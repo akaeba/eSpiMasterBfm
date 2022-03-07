@@ -5,7 +5,7 @@
   * [Releases](#releases)
   * [Example](#example)
   * [File Listing](#file-listing)
-  * [[BFM](./bfm/eSpiMasterBfm.vhd) procedures](#-bfm---bfm-espimasterbfmvhd--procedures)
+  * [BFM procedures](#BFM-procedures)
   * [FAQ](#faq)
     + [_INIT_ ends with _WAIT_ALERT_](#-init--ends-with--wait-alert-)
   * [Contributors wanted](#contributors-wanted)
