@@ -93,7 +93,6 @@ begin
             variable eSpiMsg        : tMemX08(0 to 9);                                  --! eSPI Message
             variable config         : std_logic_vector(31 downto 0) := (others => '0'); --! slave configuration
             variable status         : std_logic_vector(15 downto 0) := (others => '0'); --! slave status
-            variable response       : tESpiRsp;                                         --! slave response
             variable slv8           : std_logic_vector(7 downto 0);                     --! help
             variable memX08         : tMemX08(0 to 2);                                  --! help
             variable vw             : tMemX08(0 to 127);                                --! virtual wire index, @see Table 9: Virtual Wire Index Definition, max. 64 virtual wires
@@ -180,7 +179,7 @@ begin
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
             -- Request BFM
-            GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, status, response );   --! read from Slave
+            GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, status );   --! read from Slave
             -- check
                 -- config
             assert ( x"00000001" = config ) report "GET_CONFIGURATION:  Expected config 0x00000001" severity warning;
@@ -189,8 +188,8 @@ begin
             assert ( x"030F" = status ) report "GET_CONFIGURATION:  Expected status 0x030F" severity warning;
             if not ( x"030F" = status ) then good := false; end if;
                 -- response
-            assert ( ACCEPT = response ) report "GET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
-            if not ( ACCEPT = response ) then good := false; end if;
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "GET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             -- divide wait
             wait for 1 us;
         end if;
@@ -212,14 +211,14 @@ begin
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
             -- Request BFM
-                -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config, status, response );
-            SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", status, response );
+                -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config, status );
+            SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", status );
                 -- status
             assert ( x"030F" = status ) report "SET_CONFIGURATION:  Expected status 0x030F" severity warning;
             if not ( x"030F" = status ) then good := false; end if;
                 -- response
-            assert ( ACCEPT = response ) report "SET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
-            if not ( ACCEPT = response ) then good := false; end if;
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "SET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             -- divide wait
             wait for 1 us;
         end if;
@@ -438,14 +437,14 @@ begin
             vwLen   := 0;
             vw      := (others => (others => '0'));
                 -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status, response );
-            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status, response );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status );
             -- check
                 -- status
             assert ( x"030F" = status ) report "VWIRERD:  Expected status 0x030F" severity warning;
             if not ( x"030F" = status ) then good := false; end if;
                 -- response
-            assert ( ACCEPT = response ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
-            if not ( ACCEPT = response ) then good := false; end if;
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
                 -- wire length
             assert ( 6 = vwLen ) Report "VWIRERD: Wrong list length" severity warning;
             if not ( 6 = vwLen ) then good := false; end if;
@@ -476,15 +475,15 @@ begin
             -- Request BFM
             vwLen   := 0;
             vw      := (others => (others => '0'));
-                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status, response );
-            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status, response );
+                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status );
             -- check
                 -- status
             assert ( x"030F" = status ) report "VWIRERD:  Expected status 0x030F" severity warning;
             if not ( x"030F" = status ) then good := false; end if;
                 -- response
-            assert ( ACCEPT = response ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
-            if not ( ACCEPT = response ) then good := false; end if;
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
                 -- wire length
             assert ( 2 = vwLen ) Report "VWIRERD: Wrong list length" severity warning;
             if not ( 2 = vwLen ) then good := false; end if;
