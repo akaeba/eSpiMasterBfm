@@ -11,15 +11,15 @@ add wave -noupdate -expand /espimasterbfm_tb/DIO
 add wave -noupdate -divider {BFM State}
 add wave -noupdate -radix hexadecimal /espimasterbfm_tb/p_stimuli/config
 add wave -noupdate -radix hexadecimal /espimasterbfm_tb/p_stimuli/status
-add wave -noupdate /espimasterbfm_tb/p_stimuli/response
+add wave -noupdate /espimasterbfm_tb/p_stimuli/eSpiMasterBfm.slaveResponse
 add wave -noupdate -radix hexadecimal /espimasterbfm_tb/p_stimuli/eSpiMasterBfm.slaveStatus
 add wave -noupdate -divider Help
 add wave -noupdate -radix hexadecimal /espimasterbfm_tb/p_stimuli/eSpiMsg
 add wave -noupdate -radix hexadecimal /espimasterbfm_tb/p_stimuli/slv8
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {165000000 ps} 0}
+WaveRestoreCursors {{Cursor 1} {66436395 ps} 0}
 quietly wave cursor active 1
-configure wave -namecolwidth 284
+configure wave -namecolwidth 396
 configure wave -valuecolwidth 114
 configure wave -justifyvalue left
 configure wave -signalnamewidth 0
@@ -33,4 +33,4 @@ configure wave -griddelta 40
 configure wave -timeline 0
 configure wave -timelineunits ps
 update
-WaveRestoreZoom {0 ps} {170714286 ps}
+WaveRestoreZoom {50177892 ps} {207885375 ps}
