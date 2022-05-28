@@ -185,8 +185,8 @@ begin
             assert ( x"00000001" = config ) report "GET_CONFIGURATION:  Expected config 0x00000001" severity warning;
             if not ( x"00000001" = config ) then good := false; end if;
                 -- status
-            assert ( x"030F" = status ) report "GET_CONFIGURATION:  Expected status 0x030F" severity warning;
-            if not ( x"030F" = status ) then good := false; end if;
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "GET_CONFIGURATION:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
                 -- response
             assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "GET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
             if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
@@ -214,8 +214,8 @@ begin
                 -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config, status );
             SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", status );
                 -- status
-            assert ( x"030F" = status ) report "SET_CONFIGURATION:  Expected status 0x030F" severity warning;
-            if not ( x"030F" = status ) then good := false; end if;
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "SET_CONFIGURATION:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
                 -- response
             assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "SET_CONFIGURATION:  Expected 'ACCEPT' slave response" severity warning;
             if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
@@ -440,8 +440,8 @@ begin
             VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status );
             -- check
                 -- status
-            assert ( x"030F" = status ) report "VWIRERD:  Expected status 0x030F" severity warning;
-            if not ( x"030F" = status ) then good := false; end if;
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "VWIRERD:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
                 -- response
             assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
             if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
@@ -479,8 +479,8 @@ begin
             VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status );
             -- check
                 -- status
-            assert ( x"030F" = status ) report "VWIRERD:  Expected status 0x030F" severity warning;
-            if not ( x"030F" = status ) then good := false; end if;
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "VWIRERD:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
                 -- response
             assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "VWIRERD:  Expected 'ACCEPT' slave response" severity warning;
             if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
