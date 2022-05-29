@@ -238,8 +238,7 @@ package eSpiMasterBfm is
                     signal SCK          : out std_logic;
                     signal DIO          : inout std_logic_vector(3 downto 0);
                     constant adr        : in std_logic_vector(31 downto 0); --! memory address
-                    constant data       : in tMemX08;                       --! arbitrary number of data bytes
-                    variable status     : out std_logic_vector(15 downto 0) --! slave status
+                    constant data       : in tMemX08                        --! arbitrary number of data bytes
                 );
             -- single data byte, w/o response and status register
             procedure MEMWR32
@@ -2602,8 +2601,7 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;
                 signal DIO          : inout std_logic_vector(3 downto 0);
                 constant adr        : in std_logic_vector(31 downto 0);
-                constant data       : in tMemX08;
-                variable status     : out std_logic_vector(15 downto 0)
+                constant data       : in tMemX08
             )
         is
             variable msg        : tMemX08(0 to data'length + 9);    --! 4Byte Address, Length 1Byte, Length/Tag 1Byte, Cycle Type 1Byte, CMD 1Byte, CRC 1Byte
@@ -2622,7 +2620,6 @@ package body eSpiMasterBfm is
                 GET_STATUS ( this, CSn, SCK, DIO, sts );
                 -- Slave request good?
                 if ( ACCEPT /= this.slaveResponse ) then
-                    status      := sts;
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(this.slaveResponse) severity error; end if;
                     return;
                 end if;
@@ -2630,7 +2627,6 @@ package body eSpiMasterBfm is
                 tiout := tiout - 1; -- decrement time out counter
                 if ( 0 = tiout ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave:GET_STATUS retry time out reached, giving up..." severity error; end if;
-                    status              := sts;
                     this.slaveResponse  := FATAL_ERROR;
                     return;
                 end if;
@@ -2674,8 +2670,6 @@ package body eSpiMasterBfm is
             else
                 this.slaveStatus := (others => 'X');
             end if;
-            -- propagate response
-            status      := this.slaveStatus;
         end procedure MEMWR32;
         --***************************
 
@@ -2700,8 +2694,8 @@ package body eSpiMasterBfm is
         begin
             -- fill in data
             dBuf(0) := data;
-                -- MEMWR32(this, CSn, SCK, DIO, adr, data, status)
-            MEMWR32(this, CSn, SCK, DIO, adr, dBuf, sts);
+                -- MEMWR32(this, CSn, SCK, DIO, adr, data)
+            MEMWR32(this, CSn, SCK, DIO, adr, dBuf);
             -- Slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
@@ -2731,8 +2725,8 @@ package body eSpiMasterBfm is
         is
             variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
         begin
-                -- MEMWR32(this, CSn, SCK, DIO, adr, data, status)
-            MEMWR32(this, CSn, SCK, DIO, adr, data, sts);
+                -- MEMWR32(this, CSn, SCK, DIO, adr, data)
+            MEMWR32(this, CSn, SCK, DIO, adr, data);
             -- Slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
