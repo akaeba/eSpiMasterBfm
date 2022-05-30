@@ -211,8 +211,8 @@ begin
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
             -- Request BFM
-                -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config, status );
-            SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000", status );
+                -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config );
+            SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000" );
                 -- status
             assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "SET_CONFIGURATION:  Expected status 0x030F" severity warning;
             if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;

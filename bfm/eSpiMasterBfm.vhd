@@ -192,8 +192,7 @@ package eSpiMasterBfm is
                     signal SCK          : out std_logic;
                     signal DIO          : inout std_logic_vector(3 downto 0);
                     constant adr        : in std_logic_vector(15 downto 0);
-                    constant config     : in std_logic_vector(31 downto 0);
-                    variable status     : out std_logic_vector(15 downto 0)
+                    constant config     : in std_logic_vector(31 downto 0)
                 );
             -- w/o status, response; Writes changed registers into BFM shadow registers (slaveRegs) back
             procedure SET_CONFIGURATION
@@ -2313,18 +2312,15 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;
                 signal DIO          : inout std_logic_vector(3 downto 0);
                 constant adr        : in std_logic_vector(15 downto 0);
-                constant config     : in std_logic_vector(31 downto 0);
-                variable status     : out std_logic_vector(15 downto 0)
+                constant config     : in std_logic_vector(31 downto 0)
             )
         is
-            variable msg    : tMemX08(0 to 6);                                      --! eSpi message buffer
-            variable cfg    : std_logic_vector(config'range) := (others => '0');    --! internal buffer
-            variable sts    : std_logic_vector(status'range) := (others => '0');    --! internal buffer
+            variable msg    : tMemX08(0 to 6);  --! eSpi message buffer
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:SET_CONFIGURATION"; end if;
             -- default
-            status              := (others => '0');
+            this.slaveStatus    := (others => 'X');
             this.slaveResponse  := FATAL_ERROR;
             -- check address for 32bit alignment
             if ( 0 /= (unsigned(adr) mod 4) ) then
@@ -2349,7 +2345,6 @@ package body eSpiMasterBfm is
             if ( ACCEPT = this.slaveResponse ) then
                 this.slaveRegs(to_integer(unsigned(adr)/4)) := config;              --! bfm internal
                 this.slaveStatus                            := msg(2) & msg(1);     --! status
-                status                                      := this.slaveStatus;    -- external
             end if;
         end procedure SET_CONFIGURATION;
         --***************************
@@ -2369,12 +2364,11 @@ package body eSpiMasterBfm is
                 variable good   : inout boolean
             )
         is
-            variable sts : std_logic_vector(15 downto 0);   --! wrapper variable for status
         begin
             -- get configuration
-            SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config, sts );
+            SET_CONFIGURATION( this, CSn, SCK, DIO, adr, config );
             -- in case of no output print to console
-            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if;    --! INFO: print status
             -- Slave good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
