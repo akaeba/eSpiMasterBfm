@@ -426,8 +426,7 @@ package eSpiMasterBfm is
                     signal SCK              : out std_logic;                        --! shift clock
                     signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
                     variable virtualWire    : out tMemX08(0 to 127);                --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
-                    variable virtualWireLen : out integer range 0 to 64;            --! number of wire pairs
-                    variable status         : out std_logic_vector(15 downto 0)     --! slave status
+                    variable virtualWireLen : out integer range 0 to 64             --! number of wire pairs
                 );
             -- read wires into BFM buffer
             procedure VWIRERD
@@ -3468,8 +3467,7 @@ package body eSpiMasterBfm is
                 signal SCK              : out std_logic;                        --! shift clock
                 signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
                 variable virtualWire    : out tMemX08(0 to 127);                --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
-                variable virtualWireLen : out integer range 0 to 64;            --! number of wire pairs
-                variable status         : out std_logic_vector(15 downto 0)     --! slave status
+                variable virtualWireLen : out integer range 0 to 64             --! number of wire pairs
             )
         is
             variable msg        : tMemX08(0 to 2*64 + 1 + 2);       --! max. 64 Wires in same packet, +1 response, +2 status
@@ -3520,7 +3518,6 @@ package body eSpiMasterBfm is
             end if;
             -- assign to output
             virtualWireLen  := 2*wireCnt;
-            status          := this.slaveStatus;
         end procedure VWIRERD;
         --***************************
 
@@ -3540,18 +3537,17 @@ package body eSpiMasterBfm is
         is
             variable vw     : tMemX08(0 to 127);                --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
             variable vwLen  : integer range 0 to 64;            --! number of wire pairs
-            variable sts    : std_logic_vector(15 downto 0);    --! slaves status buffer
         begin
             -- read wires and print
-                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen, status );
-            VWIRERD( this, CSn, SCK, DIO, vw, vwLen, sts );
+                -- VWIRERD( this, CSn, SCK, DIO, vwireIdx, vwireData, vwireLen );
+            VWIRERD( this, CSn, SCK, DIO, vw, vwLen );
             --slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIRERD:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
             end if;
         end procedure VWIRERD;
         --***************************

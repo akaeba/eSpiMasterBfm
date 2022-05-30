@@ -436,8 +436,8 @@ begin
             -- Request BFM
             vwLen   := 0;
             vw      := (others => (others => '0'));
-                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status, response );
-            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status );
+                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen );
             -- check
                 -- status
             assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "VWIRERD:  Expected status 0x030F" severity warning;
@@ -475,8 +475,8 @@ begin
             -- Request BFM
             vwLen   := 0;
             vw      := (others => (others => '0'));
-                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen, status );
-            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen, status );
+                -- VWIRERD( this, CSn, SCK, DIO, virtualWire, virtualWireLen );
+            VWIRERD( eSpiMasterBfm, CSn, SCK, DIO, vw, vwLen );
             -- check
                 -- status
             assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "VWIRERD:  Expected status 0x030F" severity warning;
