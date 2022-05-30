@@ -179,7 +179,7 @@ begin
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
             -- Request BFM
-            GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config, status );   --! read from Slave
+            GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config );   --! read from Slave
             -- check
                 -- config
             assert ( x"00000001" = config ) report "GET_CONFIGURATION:  Expected config 0x00000001" severity warning;

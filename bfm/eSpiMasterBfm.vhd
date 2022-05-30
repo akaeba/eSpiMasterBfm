@@ -167,8 +167,7 @@ package eSpiMasterBfm is
                     signal SCK          : out std_logic;                        --! shift clock
                     signal DIO          : inout std_logic_vector(3 downto 0);   --! data lines
                     constant adr        : in std_logic_vector(15 downto 0);     --! config address
-                    variable config     : out std_logic_vector(31 downto 0);    --! config data
-                    variable status     : out std_logic_vector(15 downto 0)     --! status
+                    variable config     : out std_logic_vector(31 downto 0)     --! config data
                 );
             -- w/o status, response; instead general good, updates BFMs shadows registers of slaves capabilities regs
             procedure GET_CONFIGURATION
@@ -2231,19 +2230,16 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;
                 signal DIO          : inout std_logic_vector(3 downto 0);
                 constant adr        : in std_logic_vector(15 downto 0);
-                variable config     : out std_logic_vector(31 downto 0);
-                variable status     : out std_logic_vector(15 downto 0)
+                variable config     : out std_logic_vector(31 downto 0)
             )
         is
             variable msg    : tMemX08(0 to 6);                                      --! eSpi message buffer
-            variable cfg    : std_logic_vector(config'range) := (others => '0');    --! internal buffer
-            variable sts    : std_logic_vector(status'range) := (others => '0');    --! internal buffer
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:GET_CONFIGURATION"; end if;
             -- default assignments
-            status              := (others => '0');
-            config              := (others => '0');
+            this.slaveStatus    := (others => 'X');
+            config              := (others => 'X');
             this.slaveResponse  := FATAL_ERROR;
             -- check address for 32bit alignment
             if ( 0 /= (unsigned(adr) mod 4) ) then
@@ -2263,7 +2259,6 @@ package body eSpiMasterBfm is
                 this.slaveRegs(to_integer(unsigned(adr)/4)) := msg(4) & msg(3) & msg(2) & msg(1);    --! extract and assemble config for store in bfm
                 config                                      := msg(4) & msg(3) & msg(2) & msg(1);    --! extract and assemble config
                 this.slaveStatus                            := msg(6) & msg(5);                      --! bfm internal
-                status                                      := this.slaveStatus;                     --! propagate
             end if;
         end procedure GET_CONFIGURATION;
         --***************************
@@ -2283,20 +2278,16 @@ package body eSpiMasterBfm is
                 variable good   : inout boolean                         --! successful?
             )
         is
-            variable sts : std_logic_vector(15 downto 0);   --! wrapper variable for status
-            variable cfg : std_logic_vector(31 downto 0);   --! wrapper for config
         begin
             -- get configuration
-            GET_CONFIGURATION( this, CSn, SCK, DIO, adr, cfg, sts );
+                -- GET_CONFIGURATION ( this, CSn, SCK, DIO, adr, config )
+            GET_CONFIGURATION( this, CSn, SCK, DIO, adr, config );
             -- in case of no output print to console
-            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
             -- Function is good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good    := false;
-                config  := (others => 'X');
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:GET_CONFIGURATION:Slave " & rsp2str(this.slaveResponse) severity error; end if;
-            else
-                config  := cfg;
             end if;
         end procedure GET_CONFIGURATION;
         --***************************
