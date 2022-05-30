@@ -392,8 +392,7 @@ package eSpiMasterBfm is
                     signal CSn              : out std_logic;                        --! slave select
                     signal SCK              : out std_logic;                        --! shift clock
                     signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
-                    constant virtualWire    : in tMemX08;                           --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
-                    variable status         : out std_logic_vector(15 downto 0)     --! slave status
+                    constant virtualWire    : in tMemX08                            --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
                 );
             -- arbitrary vwire instruction, w/o response and status register
             procedure VWIREWR
@@ -3333,8 +3332,7 @@ package body eSpiMasterBfm is
                 signal CSn              : out std_logic;                        --! slave select
                 signal SCK              : out std_logic;                        --! shift clock
                 signal DIO              : inout std_logic_vector(3 downto 0);   --! data lines
-                constant virtualWire    : in tMemX08;                           --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
-                variable status         : out std_logic_vector(15 downto 0)     --! slave status
+                constant virtualWire    : in tMemX08                            --! virtual wire index/data pairs, @see Table 9: Virtual Wire Index Definition
             )
         is
             alias vw        : tMemX08(0 to virtualWire'length-1) is virtualWire;    --! zero align
@@ -3386,8 +3384,6 @@ package body eSpiMasterBfm is
             else
                 this.slaveStatus := (others => 'X');
             end if;
-            -- propagate response
-            status      := this.slaveStatus;
         end procedure VWIREWR;
         --***************************
 
@@ -3406,18 +3402,17 @@ package body eSpiMasterBfm is
                 variable good           : inout boolean                         --! successful
             )
         is
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stuck
         begin
             -- call more general function
-                -- VWIREWR( this, CSn, SCK, DIO, virtualWire, status );
-            VWIREWR( this, CSn, SCK, DIO, virtualWire, sts );
+                -- VWIREWR( this, CSn, SCK, DIO, virtualWire );
+            VWIREWR( this, CSn, SCK, DIO, virtualWire );
             -- Slave response good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:VWIREWR:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
             end if;
         end procedure VWIREWR;
         --***************************
