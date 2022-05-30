@@ -3060,8 +3060,7 @@ package body eSpiMasterBfm is
                 signal SCK          : out std_logic;
                 signal DIO          : inout std_logic_vector(3 downto 0);
                 constant adr        : in std_logic_vector(15 downto 0); --! IO space address, 16Bits
-                variable data       : out tMemX08;                      --! read data, 1/2/4 Bytes supported
-                variable status     : out std_logic_vector(15 downto 0) --! slave status
+                variable data       : out tMemX08                       --! read data, 1/2/4 Bytes supported
             )
         is
             variable msg    : tMemX08(0 to data'length + 6);    --! +1Byte Response, +3Byte Header, +2Byte Status
@@ -3096,8 +3095,6 @@ package body eSpiMasterBfm is
             else
                 this.slaveStatus := (others => 'X');    --! invalid
             end if;
-            -- propagate response
-            status      := this.slaveStatus;
         end procedure IORD;
         --***************************
 
@@ -3118,14 +3115,13 @@ package body eSpiMasterBfm is
             )
         is
             variable dBuf   : tMemX08(0 to 0);
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:IORD_BYTE"; end if;
             -- prepare
             dBuf := (others => (others => '0'));    -- init
-                -- IORD( this, CSn, SCK, DIO, adr, data, status )
-            IORD( this, CSn, SCK, DIO, adr, dBuf, sts );
+                -- IORD( this, CSn, SCK, DIO, adr, data )
+            IORD( this, CSn, SCK, DIO, adr, dBuf );
             -- Slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
@@ -3133,7 +3129,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
                 -- release data
                 data := dBuf(0);
             end if;
@@ -3157,7 +3153,6 @@ package body eSpiMasterBfm is
             )
         is
             variable dBuf       : tMemX08(0 to 1);
-            variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
             variable adr_word   : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
@@ -3171,8 +3166,8 @@ package body eSpiMasterBfm is
             -- prepare
             adr_word    := adr(adr'left downto adr'right + 1) & "0";    --! align addresses to data width
             dBuf        := (others => (others => '0'));                 --! init
-                -- IORD( this, CSn, SCK, DIO, adr, data, status )
-            IORD( this, CSn, SCK, DIO, adr_word, dBuf, sts );
+                -- IORD( this, CSn, SCK, DIO, adr, data, )
+            IORD( this, CSn, SCK, DIO, adr_word, dBuf );
             -- Slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
@@ -3180,7 +3175,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
                 -- release data
                 data := dBuf(1) & dBuf(0);
             end if;
@@ -3204,7 +3199,6 @@ package body eSpiMasterBfm is
             )
         is
             variable dBuf       : tMemX08(0 to 3);
-            variable sts        : std_logic_vector(15 downto 0);    --! needed for stucking
             variable adr_dword  : std_logic_vector(adr'range);      --! word aligned address
         begin
             -- user message
@@ -3218,8 +3212,8 @@ package body eSpiMasterBfm is
             -- prepare
             adr_dword   := adr(adr'left downto adr'right + 2) & "00";   --! align addresses to data width
             dBuf        := (others => (others => '0'));                 --! init
-                -- IORD( this, CSn, SCK, DIO, adr, data, status )
-            IORD( this, CSn, SCK, DIO, adr_dword, dBuf, sts );
+                -- IORD( this, CSn, SCK, DIO, adr, data )
+            IORD( this, CSn, SCK, DIO, adr_dword, dBuf );
             -- Slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
@@ -3227,7 +3221,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IORD:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
                 -- release data
                 data := dBuf(3) & dBuf(2) & dBuf(1) & dBuf(0);
             end if;
