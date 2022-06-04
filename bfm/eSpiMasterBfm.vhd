@@ -213,17 +213,17 @@ package eSpiMasterBfm is
                     variable this       : inout tESpiBfm;
                     signal CSn          : out std_logic;
                     signal SCK          : out std_logic;
-                    signal DIO          : inout std_logic_vector(3 downto 0);
-                    variable status     : out std_logic_vector(15 downto 0)
+                    signal DIO          : inout std_logic_vector(3 downto 0)
                 );
             -- print to console only
             procedure GET_STATUS
                 (
-                    variable this   : inout tESpiBfm;
-                    signal CSn      : out std_logic;
-                    signal SCK      : out std_logic;
-                    signal DIO      : inout std_logic_vector(3 downto 0);
-                    variable good   : inout boolean
+                    variable this       : inout tESpiBfm;
+                    signal CSn          : out std_logic;
+                    signal SCK          : out std_logic;
+                    signal DIO          : inout std_logic_vector(3 downto 0);
+                    variable good       : inout boolean;
+                    constant prtStatus  : in boolean := true    --! print read slave status to simulator log
                 );
 
         -- MEMWR32
@@ -2374,14 +2374,13 @@ package body eSpiMasterBfm is
         --  @see Figure 20: GET_STATUS Command
         procedure GET_STATUS
             (
-                variable this       : inout tESpiBfm;
-                signal CSn          : out std_logic;
-                signal SCK          : out std_logic;
-                signal DIO          : inout std_logic_vector(3 downto 0);
-                variable status     : out std_logic_vector(15 downto 0)
+                variable this   : inout tESpiBfm;
+                signal CSn      : out std_logic;
+                signal SCK      : out std_logic;
+                signal DIO      : inout std_logic_vector(3 downto 0)
             )
         is
-            variable msg    : tMemX08(0 to 2);  --! eSpi message buffer
+            variable msg : tMemX08(0 to 2);  --! eSpi message buffer
         begin
             -- assemble command
             msg     := (others => (others => '0')); --! clear
@@ -2395,31 +2394,31 @@ package body eSpiMasterBfm is
             else
                 this.slaveStatus := (others => 'X');
             end if;
-            -- propagate response
-            status      := this.slaveStatus;
         end procedure GET_STATUS;
         --***************************
 
 
         --***************************
-        -- GET_STATUS w/o register, prints only to console
+        -- GET_STATUS w/o register
         --  @see Figure 20: GET_STATUS Command
         procedure GET_STATUS
             (
-                variable this   : inout tESpiBfm;
-                signal CSn      : out std_logic;
-                signal SCK      : out std_logic;
-                signal DIO      : inout std_logic_vector(3 downto 0);
-                variable good   : inout boolean
+                variable this       : inout tESpiBfm;
+                signal CSn          : out std_logic;
+                signal SCK          : out std_logic;
+                signal DIO          : inout std_logic_vector(3 downto 0);
+                variable good       : inout boolean;
+                constant prtStatus  : in boolean := true
             )
         is
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
         begin
             -- acquire status
-                -- GET_STATUS(this, CSn, SCK, DIO, status, response, good)
-            GET_STATUS(this, CSn, SCK, DIO, sts);
-            -- in case of no output print to console
-            if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                -- GET_STATUS(this, CSn, SCK, DIO)
+            GET_STATUS(this, CSn, SCK, DIO);
+            -- print to simulator log?
+            if ( prtStatus ) then
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if;
+            end if;
             -- Slave request good?
             if ( ACCEPT /= this.slaveResponse ) then
                 good := false;
@@ -2457,7 +2456,6 @@ package body eSpiMasterBfm is
             variable dlen       : integer range 0 to 1024;          --! data length of completion packet
             variable cycTyp     : std_logic_vector(7 downto 0);     --! cycle type, @see:
             variable tag        : std_logic_vector(3 downto 0);     --! tag, @see:
-            variable slv16      : std_logic_vector(15 downto 0);    --! temporary variable
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: Acquires read data after DEFER"; end if;
@@ -2465,8 +2463,8 @@ package body eSpiMasterBfm is
             tiout   := 0;
             while ( ("0" = this.slaveStatus(C_STS_PC_AVAIL'range)) and tiout < this.tioutStatusPoll ) loop  --! no PC_AVAIL, wait for it
                 -- check slave status
-                    -- GET_STATUS ( this, CSn, SCK, DIO, status )
-                GET_STATUS ( this, CSn, SCK, DIO, slv16 ); --! status captures BFM internally
+                    -- GET_STATUS ( this, CSn, SCK, DIO )
+                GET_STATUS ( this, CSn, SCK, DIO ); --! status captures BFM internally
                 if ( ACCEPT /= this.slaveResponse ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:RD_DEFER_PC_AVAIL: GET_STATUS failed with '" & rsp2str(this.slaveResponse) & "'" severity error; end if;
                     this.slaveResponse := FATAL_ERROR;  --! make to fail
@@ -2590,7 +2588,6 @@ package body eSpiMasterBfm is
             variable dLenSlv    : std_logic_vector(11 downto 0);    --! needed for 'PUT_MEMWR32_SHORT'
             variable msgLen     : natural := 0;                     --! message length can vary
             variable rsp        : tESpiRsp;                         --! Slaves response to performed request
-            variable sts        : std_logic_vector(15 downto 0);    --! status
             variable tiout      : natural := this.tioutStatusPoll;  --! status retry time out
         begin
             -- user message
@@ -2598,8 +2595,8 @@ package body eSpiMasterBfm is
             -- check for NP_FREE
             --   poll status if not free
             while ( "1" /= this.slaveStatus(C_STS_NP_FREE'range) ) loop
-                    -- GET_STATUS ( this, CSn, SCK, DIO, status )
-                GET_STATUS ( this, CSn, SCK, DIO, sts );
+                    -- GET_STATUS ( this, CSn, SCK, DIO )
+                GET_STATUS ( this, CSn, SCK, DIO );
                 -- Slave request good?
                 if ( ACCEPT /= this.slaveResponse ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(this.slaveResponse) severity error; end if;
@@ -2671,8 +2668,7 @@ package body eSpiMasterBfm is
                 variable good       : inout boolean                         --! successful
             )
         is
-            variable dBuf   : tMemX08(0 to 0);                  --! captures single data word
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
+            variable dBuf : tMemX08(0 to 0);  --! captures single data word
         begin
             -- fill in data
             dBuf(0) := data;
@@ -2684,7 +2680,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
             end if;
         end procedure MEMWR32;
         --***************************
@@ -2705,7 +2701,6 @@ package body eSpiMasterBfm is
                 variable good       : inout boolean                         --! successful
             )
         is
-            variable sts    : std_logic_vector(15 downto 0);    --! needed for stucking
         begin
                 -- MEMWR32(this, CSn, SCK, DIO, adr, data)
             MEMWR32(this, CSn, SCK, DIO, adr, data);
@@ -2715,7 +2710,7 @@ package body eSpiMasterBfm is
                 if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:MEMWR32:Slave " & rsp2str(this.slaveResponse) severity error; end if;
             else
                 -- in case of no output print to console
-                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(sts); end if; --! INFO: print status
+                if ( this.verbose >= C_MSG_INFO ) then Report character(LF) & sts2str(this.slaveStatus); end if; --! INFO: print status
             end if;
         end procedure MEMWR32;
         --***************************
@@ -2833,7 +2828,6 @@ package body eSpiMasterBfm is
         is
             variable msg    : tMemX08(0 to data'length + 3);    --! CMD 1Byte, 2Byte Address
             variable msgLen : natural := 0;                     --! message length can vary
-            variable sts    : std_logic_vector(15 downto 0);    --! status
             variable tiout  : natural := this.tioutStatusPoll;  --! status retry time out
         begin
             -- user message
@@ -2847,7 +2841,7 @@ package body eSpiMasterBfm is
             --   poll status if not free
             while ( "1" /= this.slaveStatus(C_STS_NP_FREE'range) ) loop
                     -- GET_STATUS ( this, CSn, SCK, DIO )
-                GET_STATUS ( this, CSn, SCK, DIO, sts );
+                GET_STATUS ( this, CSn, SCK, DIO );
                 -- Slave request good?
                 if ( ACCEPT /= this.slaveResponse ) then
                     if ( this.verbose >= C_MSG_ERROR ) then Report "eSpiMasterBfm:IOWR:Slave " & rsp2str(this.slaveResponse) severity error; end if;
@@ -3458,7 +3452,6 @@ package body eSpiMasterBfm is
             variable msg        : tMemX08(0 to 2*64 + 1 + 2);       --! max. 64 Wires in same packet, +1 response, +2 status
             variable wireCnt    : natural;                          --! number of virtual wires
             variable pgood      : boolean;                          --! help variable
-            variable slv16      : std_logic_vector(15 downto 0);    --! help variable
         begin
             -- user message
             if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD"; end if;
@@ -3467,8 +3460,8 @@ package body eSpiMasterBfm is
             wireCnt     := 0;
             pgood       := true;
             -- check for virtual message available
-                -- GET_STATUS ( this, CSn, SCK, DIO, status )
-            GET_STATUS ( this, CSn, SCK, DIO, slv16 );
+                -- GET_STATUS ( this, CSn, SCK, DIO )
+            GET_STATUS ( this, CSn, SCK, DIO );
             if ( (ACCEPT = this.slaveResponse) and ("1" = this.slaveStatus(C_STS_VWIRE_AVAIL'range)) ) then
                 -- message
                 if ( this.verbose >= C_MSG_INFO ) then Report "eSpiMasterBfm:VWIRERD:GET_VWIRE"; end if;
