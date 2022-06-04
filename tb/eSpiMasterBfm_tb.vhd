@@ -346,10 +346,10 @@ begin
             assert ( x"01" = slv8 ) report "MEMRD32:  Read value unequal 0x01" severity warning;
             if not ( x"01" = slv8 ) then good := false; end if;
                 -- status
-            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "MEMWR32:  Expected status 0x030F" severity warning;
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "MEMRD32:  Expected status 0x030F" severity warning;
             if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
                 -- response
-            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "MEMWR32:  Expected 'ACCEPT' slave response" severity warning;
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "MEMRD32:  Expected 'ACCEPT' slave response" severity warning;
             if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
         end if;
