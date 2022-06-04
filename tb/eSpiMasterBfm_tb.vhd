@@ -178,6 +178,8 @@ begin
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
             -- Request BFM
             GET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0004", config );   --! read from Slave
             -- check
@@ -210,6 +212,8 @@ begin
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
             -- Request BFM
                 -- SET_CONFIGURATION( this, CSn, SCK , DIO, adr, config );
             SET_CONFIGURATION( eSpiMasterBfm, CSn, SCK, DIO, x"0008", x"80000000" );
@@ -239,8 +243,17 @@ begin
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
             -- Request BFM
-            GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );      --! get status from slave
+            GET_STATUS ( eSpiMasterBfm, CSn, SCK, DIO, good );  --! get status from slave
+            -- check
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "GET_STATUS:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "GET_STATUS:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             -- divide wait
             wait for 1 us;
         end if;
@@ -257,33 +270,52 @@ begin
                 -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 15) <= "4C0000008047F9" & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 15) <= "0F0F0F080F039B" & character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 20) <= "25FB"           & character(LF) & "4C0000008047F9" & character(NUL);    --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 30) <= "0F0F0F080F039B" & character(LF) & "0F0F0F080F039B" & character(NUL);    --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
             -- Request BFM
                 -- MEMWR32( this, CSn, SCK, DIO, adr, data, good );
             MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", x"47", good ); --! write single byte to address 0x80
-            wait for 4*tespi( eSpiMasterBfm );                              --! divide wait
+            -- check
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "MEMWR32:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "MEMWR32:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
+            -- divide
+            wait for 4*tespi( eSpiMasterBfm );
             -- Memory write non-short command
             Report "         multiple Byte write";
                 -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 25) <= "00010003000000800123454A"   & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 15) <= "0F0F0F080F039B"             & character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 30) <= "25FB"           & character(LF) & "00010003000000800123454A"   & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 30) <= "0F0F0F080F039B" & character(LF) & "0F0F0F080F039B"             & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
                 -- Request BFM
             memX08(0)   := x"01";   --! prepare data to write
             memX08(1)   := x"23";
             memX08(2)   := x"45";
                 -- MEMWR32( this, CSn, SCK, DIO, adr, data, good );
             MEMWR32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", memX08, good );    --! write to memory
+            -- check
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "MEMWR32:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "MEMWR32:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             -- divide wait
             wait for 1 us;
         end if;
@@ -304,12 +336,21 @@ begin
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
             -- Request BFM
                 -- MEMRD32( this, CSn, SCK, DIO, adr, data, good );
             MEMRD32 ( eSpiMasterBfm, CSn, SCK, DIO, x"00000080", slv8, good );  --! read single byte from address 0x80
             -- check
+                -- data
             assert ( x"01" = slv8 ) report "MEMRD32:  Read value unequal 0x01" severity warning;
             if not ( x"01" = slv8 ) then good := false; end if;
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "MEMWR32:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "MEMWR32:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
