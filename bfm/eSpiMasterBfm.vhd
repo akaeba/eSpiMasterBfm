@@ -2493,12 +2493,12 @@ package body eSpiMasterBfm is
                 -- slave has the data?
                 if ( ACCEPT = this.slaveResponse ) then
                     -- disassemble read packet, @see: Figure 39: Peripheral Memory or I/O Completion With and Without Data Packet Format
-                    cycTyp              := msg(1);                                              --! cycle type
-                    tag                 := msg(2)(7 downto 4);                                  --! tag
-                    dlen_slv            := msg(2)(3 downto 0) & msg(3);                         --! intermediate
-                    dlen                := to_integer(unsigned(dlen_slv));                      --! data length
-                    data                := msg(4 to data'length + 4 - 1);                       --! data
-                    this.slaveStatus    := msg(4 + data'length + 2) & msg(4 + data'length + 1); --! status register
+                    cycTyp              := msg(1);                                          --! cycle type
+                    tag                 := msg(2)(7 downto 4);                              --! tag
+                    dlen_slv            := msg(2)(3 downto 0) & msg(3);                     --! intermediate
+                    dlen                := to_integer(unsigned(dlen_slv));                  --! data length
+                    data                := msg(4 to data'length + 4 - 1);                   --! data
+                    this.slaveStatus    := msg(4 + data'length + 1) & msg(4 + data'length);	--! status register
                     -- Some Info
                     if ( this.verbose >= C_MSG_INFO ) then
                         -- print to console log
