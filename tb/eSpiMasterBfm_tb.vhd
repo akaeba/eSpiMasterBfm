@@ -397,7 +397,7 @@ begin
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
             REQMSG(1 to 9)  <= "4000800F"         & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 17) <= "0F0F0F08014F034A" & character(NUL);   --! received response   (Slave to BFM)
+            CMPMSG(1 to 17) <= "0F0F0F08010F0311" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -407,15 +407,22 @@ begin
                 -- IORD( this, CSn, SCK, DIO, adr, data, good );
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good ); --! read data byte from io space adr 0x80
             -- check
+                -- data
             assert ( x"01" = slv8 ) report "IORD:  Read value unequal 0x01" severity warning;
             if not ( x"01" = slv8 ) then good := false; end if;
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "IOWR:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "IOWR:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
             Report "  Slave Responds responds with DEFER";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
             REQMSG(1 to 14) <= "4000800F"   & character(LF) & "0107"                & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 26) <= "015F03AD"   & character(LF) & "080F0001154F039F"    & character(NUL);   --! received response   (Slave to BFM)
+            CMPMSG(1 to 26) <= "015F03AD"   & character(LF) & "080F0001150F03C4"    & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -424,8 +431,15 @@ begin
             slv8 := (others => 'X');                                    --! make invalid
             IORD ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", slv8, good ); --! read data byte from io space adr 0x80
             -- check
+                -- data
             assert ( x"15" = slv8 ) report "IORD:  Read value unequal 0x15" severity warning;
             if not ( x"15" = slv8 ) then good := false; end if;
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "IOWR:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "IOWR:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
