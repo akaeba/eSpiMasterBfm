@@ -364,15 +364,24 @@ begin
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
-            REQMSG(1 to 11) <= "44008047A7"     & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 15) <= "0F0F0F084F03C0" & character(NUL);   --! received response   (Slave to BFM)
+            REQMSG(1 to 16) <= "25FB"           & character(LF) & "44008047A7"     & character(NUL);   --! sent Request        (BFM to Slave)
+            CMPMSG(1 to 30) <= "0F0F0F080F039B" & character(LF) & "0F0F0F080F039B" & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
             wait for tespi( eSpiMasterBfm )/2;
+            -- clear bfm internal
+            eSpiMasterBfm.slaveStatus := (others => 'X');
             -- Request BFM
                 -- IOWR( this, CSn, SCK, DIO, adr, data, good )
             IOWR ( eSpiMasterBfm, CSn, SCK, DIO, x"0080", x"47", good );    --! write data byte 0x47 to IO space adr 0x80 (Port 80)
+            -- check
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "IOWR:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "IOWR:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
