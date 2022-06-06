@@ -449,13 +449,13 @@ begin
         -- Test8: VWIRE Name
         -------------------------
         if ( doTest8 or DO_ALL_TEST ) then
-            Report "Test8: VWIRE Name";
+            Report "Test8: VWIREWR Name";
             Report "  XSUSSTAT = 1";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
             REQMSG(1 to 11) <= "0400031110" & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 9)  <= "084F03C0"   & character(NUL);   --! received response   (Slave to BFM)
+            CMPMSG(1 to 9)  <= "080F039B"   & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -463,13 +463,20 @@ begin
             -- Request BFM
                 -- VWIREWR( this, CSn, SCK, DIO, name, value, good  )
             VWIREWR( eSpiMasterBfm, CSn, SCK, DIO, "SUS_STAT#", '1', good );
+            -- check
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "VWIREWR:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "VWIREWR:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
             Report "  XPLTRST = 1";
             -- load message
             REQMSG          <= (others => character(NUL));
             CMPMSG          <= (others => character(NUL));
             REQMSG(1 to 11) <= "0400032289" & character(NUL);   --! sent Request        (BFM to Slave)
-            CMPMSG(1 to 9)  <= "084F03C0"   & character(NUL);   --! received response   (Slave to BFM)
+            CMPMSG(1 to 9)  <= "080F039B"   & character(NUL);   --! received response   (Slave to BFM)
             LDMSG           <= '1';
             wait for tespi( eSpiMasterBfm )/2;
             LDMSG           <= '0';
@@ -477,6 +484,13 @@ begin
             -- Request BFM
                 -- VWIREWR( this, CSn, SCK, DIO, name, value, good  )
             VWIREWR( eSpiMasterBfm, CSn, SCK, DIO, "PLTRST#", '1', good );
+            -- check
+                -- status
+            assert ( x"030F" = eSpiMasterBfm.slaveStatus ) report "VWIREWR:  Expected status 0x030F" severity warning;
+            if not ( x"030F" = eSpiMasterBfm.slaveStatus ) then good := false; end if;
+                -- response
+            assert ( ACCEPT = eSpiMasterBfm.slaveResponse ) report "VWIREWR:  Expected 'ACCEPT' slave response" severity warning;
+            if not ( ACCEPT = eSpiMasterBfm.slaveResponse ) then good := false; end if;
             wait for 1 us;
         end if;
         -------------------------
