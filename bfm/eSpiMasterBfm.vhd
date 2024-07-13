@@ -2498,7 +2498,7 @@ package body eSpiMasterBfm is
                     dlen_slv            := msg(2)(3 downto 0) & msg(3);                     --! intermediate
                     dlen                := to_integer(unsigned(dlen_slv));                  --! data length
                     data                := msg(4 to data'length + 4 - 1);                   --! data
-                    this.slaveStatus    := msg(4 + data'length + 1) & msg(4 + data'length);	--! status register
+                    this.slaveStatus    := msg(4 + data'length + 1) & msg(4 + data'length); --! status register
                     -- Some Info
                     if ( this.verbose >= C_MSG_INFO ) then
                         -- print to console log
@@ -3341,8 +3341,8 @@ package body eSpiMasterBfm is
             msg(0)                              := C_PUT_VWIRE;
             msg(1)                              := "00" & std_logic_vector(to_unsigned(vw'length/2-1, 6));  --! set length of vwire message, 0-based count
             msgLen                              := msgLen+2;
-            msg(msgLen to msgLen+vw'length/2)   := TO_01(vw);                                               --! add data, filter out all don't cares
-            msgLen                              := msgLen+vw'length/2+1;
+            msg(msgLen to msgLen+vw'length-1)   := TO_01(vw);                                               --! add data, filter out all don't cares
+            msgLen                              := msgLen+vw'length;
             -- send and get response
                 -- spiXcv(this, msg, CSn, SCK, DIO, numTxByte, numRxByte)
             spiXcv(this, msg, CSn, SCK, DIO, msgLen, 3);    --! CRC added and checked by transceiver procedure
