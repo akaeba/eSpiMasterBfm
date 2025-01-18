@@ -25,13 +25,14 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       GHDL_OPTS: "--std=93c --ieee=synopsys --time-resolution=ps --workdir=./sim/work"
     steps:
-      - uses: actions/checkout@v1
-      - uses: ghdl/setup-ghdl-ci@nightly
+      - uses: actions/checkout@v4
+      - uses: ghdl/setup-ghdl@v1
         with:
+          version: nightly
           backend: mcode
       - name: Prepare
         run: |
@@ -39,12 +40,13 @@ jobs:
           mkdir -p ./sim/work
       - name: eSpiStaticSlave
         run: |
-          ghdl -a ${GHDL_OPTS} ./bfm/eSpiStaticSlave.vhd
-          ghdl -a ${GHDL_OPTS} ./tb/eSpiStaticSlave_tb.vhd
+          pwd
+          ghdl -a ${GHDL_OPTS} ${GITHUB_WORKSPACE}/bfm/eSpiStaticSlave.vhd
+          ghdl -a ${GHDL_OPTS} ${GITHUB_WORKSPACE}/tb/eSpiStaticSlave_tb.vhd
           if [[ -z $(ghdl -r ${GHDL_OPTS} eSpiStaticSlave_tb -gDO_ALL_TEST=True | grep "Test SUCCESSFUL") ]]; then echo "[ FAIL ]   eSpiStaticSlave"; exit 1; fi;
       - name: eSpiMasterBfm
         run: |
-          ghdl -a ${GHDL_OPTS} ./bfm/eSpiStaticSlave.vhd
-          ghdl -a ${GHDL_OPTS} ./bfm/eSpiMasterBfm.vhd
-          ghdl -a ${GHDL_OPTS} ./tb/eSpiMasterBfm_tb.vhd
+          ghdl -a ${GHDL_OPTS} ${GITHUB_WORKSPACE}/bfm/eSpiStaticSlave.vhd
+          ghdl -a ${GHDL_OPTS} ${GITHUB_WORKSPACE}/bfm/eSpiMasterBfm.vhd
+          ghdl -a ${GHDL_OPTS} ${GITHUB_WORKSPACE}/tb/eSpiMasterBfm_tb.vhd
           if [[ -z $(ghdl -r ${GHDL_OPTS} eSpiMasterBfm_tb -gDO_ALL_TEST=True | grep "Test SUCCESSFUL") ]]; then echo "[ FAIL ]   eSpiMasterBfm"; exit 1; fi;
