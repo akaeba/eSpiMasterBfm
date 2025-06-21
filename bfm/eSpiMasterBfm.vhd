@@ -100,11 +100,12 @@ package eSpiMasterBfm is
 
     -----------------------------
     -- Functions (public)
-        -- CRC calculation
-        function crc8
+        -- compute next CRC value
+        function crc
             (
-                constant msg        : in tMemX08;
-                constant polynom    : in std_logic_vector(7 downto 0) := x"07"
+                constant g  : in std_logic_vector;  --! generator polynom
+                constant d  : in std_logic_vector;  --! data input
+                constant c  : in std_logic_vector   --! crc from last computation step
             )
         return std_logic_vector;
         -- get current set espi clock period
@@ -135,7 +136,7 @@ package eSpiMasterBfm is
                     signal ALERTn   : in std_logic;                         --! slaves alert pin
                     variable good   : inout boolean;                        --! successful
                     constant log    : in tMsgLevel  := ERROR;               --! BFM log level
-                    constant crc    : in boolean    := false;               --! true: CRC is enabled
+                    constant crcen  : in boolean    := false;               --! true: CRC is enabled
                     constant maxClk : in boolean    := true;                --! true: enable maximum supported SPI clock, false: reset settings used
                     constant maxDIO : in boolean    := true                 --! true: max supported data lines are used, false: reset setting used
                 );
@@ -757,6 +758,35 @@ package body eSpiMasterBfm is
 
         --***************************
         -- calc crc
+        --   single input data word and CRC from last computation is processed
+        --   @see: https://barrgroup.com/embedded-systems/how-to/crc-calculation-c-code
+        --   @see: https://crccalc.com
+        function crc
+            (
+                constant g  : in std_logic_vector;  --! generator polynom
+                constant d  : in std_logic_vector;  --! data input
+                constant c  : in std_logic_vector   --! crc from last computation step
+            )
+        return std_logic_vector is
+            alias    data   : std_logic_vector(d'length-1 downto 0) is d;   --! loop convenient
+            alias    poly   : std_logic_vector(g'length-1 downto 0) is g;   --! convenient
+            variable crcv   : std_logic_vector(c'length-1 downto 0) := c;   --! get CRC from last computation step
+        begin
+            crcv := crcv xor d;  --! process new data byte
+            for i in data'high downto data'low loop
+                if ( '1' = crcv(crcv'left) ) then --! Topbit is one
+                    crcv := std_logic_vector(unsigned(crcv) sll 1) xor poly;
+                else
+                    crcv := std_logic_vector(unsigned(crcv) sll 1);
+                end if;
+            end loop;
+            return crcv;
+        end function crc;
+        --***************************
+
+
+        --***************************
+        -- calc crc for complete espi message
         function crc8
             (
                 constant msg        : in tMemX08;
@@ -768,19 +798,9 @@ package body eSpiMasterBfm is
             -- init
             remainder := (others => '0');
             -- calculate crc
-            -- @see: https://barrgroup.com/embedded-systems/how-to/crc-calculation-c-code
-            -- @see: https://crccalc.com
             -- iterate over byte messages
             for i in msg'low to msg'high loop
-                remainder := remainder xor msg(i);  --! add new message
-                -- iterate over bit in byte of message
-                for j in msg(i)'high downto msg(i)'low loop
-                    if ( '1' = remainder(remainder'left) ) then --! Topbit is one
-                        remainder := std_logic_vector(unsigned(remainder) sll 1) xor polynom;
-                    else
-                        remainder := std_logic_vector(unsigned(remainder) sll 1);
-                    end if;
-                end loop;
+                remainder := crc(polynom, msg(i), remainder);
             end loop;
             -- release
             return remainder;
@@ -1617,7 +1637,7 @@ package body eSpiMasterBfm is
                 signal ALERTn   : in std_logic;                         --! slaves alert pin
                 variable good   : inout boolean;                        --! successful
                 constant log    : in tMsgLevel  := ERROR;               --! BFM log level
-                constant crc    : in boolean    := false;               --! true: CRC is enabled
+                constant crcen  : in boolean    := false;               --! true: CRC is enabled
                 constant maxClk : in boolean    := true;                --! true: enable maximum supported SPI clock, false: reset settings used
                 constant maxDIO : in boolean    := true                 --! true: max supported data lines are used, false: reset setting used
             )
@@ -1658,7 +1678,7 @@ package body eSpiMasterBfm is
             end if;
             -- enable according "Exit G3" sequence
             -- CRC enabled?
-            if ( crc ) then
+            if ( crcen ) then
                 slv32(C_GENERAL_CRC'range) := "1";  --! CRC checking is enabled
             end if;
             -- Maximum Supported Clock?

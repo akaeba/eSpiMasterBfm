@@ -19,21 +19,23 @@
 
 
 
-# path setting
+# create lib if not existent
 #
-set path_tb "../tb"
-set path_src "../bfm"
+if { 0 == [file isdirectory work] } {
+    vlib work
+    vmap work work
+}
 #
 
 
 # BFM
 #
-vcom -93 -novopt $path_src/eSpiMasterBfm.vhd;   # BFM used for TB
-vcom -93 -novopt $path_src/eSpiStaticSlave.vhd; # needed for TB
+vcom -93 -novopt ../bfm/eSpiMasterBfm.vhd;   # BFM used for TB
+vcom -93 -novopt ../bfm/eSpiStaticSlave.vhd; # needed for TB
 #
 
 
 # TB
 #
-vcom -93 -novopt $path_tb/eSpiMasterBfm_tb.vhd;     # tests BFM
+vcom -93 -novopt ../tb/eSpiMasterBfm_tb.vhd;    # tests BFM
 #

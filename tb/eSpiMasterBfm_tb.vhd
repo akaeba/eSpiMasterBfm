@@ -90,7 +90,6 @@ begin
             variable good       : boolean := true;
         -- DUT
             variable eSpiMasterBfm  : tESpiBfm;                                         --! eSPI Master bfm Handle
-            variable eSpiMsg        : tMemX08(0 to 9);                                  --! eSPI Message
             variable config         : std_logic_vector(31 downto 0) := (others => '0'); --! slave configuration
             variable status         : std_logic_vector(15 downto 0) := (others => '0'); --! slave status
             variable slv8           : std_logic_vector(7 downto 0);                     --! help
@@ -125,37 +124,36 @@ begin
         -------------------------
         -- Test0: Check CRC8 Function
         -- SRC: http://www.sunshine2k.de/coding/javascript/crc/crc_js.html
+        -- Polynom: 0x07
         -------------------------
         if ( doTest0 or DO_ALL_TEST ) then
             Report "Test0: Check CRC8";
             -- set 0
-            eSpiMsg(0) := x"31";
-            eSpiMsg(1) := x"32";
-            eSpiMsg(2) := x"33";
-            eSpiMsg(3) := x"34";
-            eSpiMsg(4) := x"35";
-            eSpiMsg(5) := x"36";
-            eSpiMsg(6) := x"37";
-            eSpiMsg(7) := x"38";
-            eSpiMsg(8) := x"39";
-            slv8 := crc8(eSpiMsg(0 to 8));  --! calc crc
+                -- crc(g, d, c)
+            slv8 := crc(x"07", x"31", x"00");
+            slv8 := crc(x"07", x"32", slv8);
+            slv8 := crc(x"07", x"33", slv8);
+            slv8 := crc(x"07", x"34", slv8);
+            slv8 := crc(x"07", x"35", slv8);
+            slv8 := crc(x"07", x"36", slv8);
+            slv8 := crc(x"07", x"37", slv8);
+            slv8 := crc(x"07", x"38", slv8);
+            slv8 := crc(x"07", x"39", slv8);
             assert ( slv8 = x"F4" ) report "  Error: CRC calculation failed, expected 0xF4" severity warning;
             if not ( slv8 = x"F4" ) then good := false; end if;
             wait for tespi( eSpiMasterBfm )/2;
             -- set 1
-            eSpiMsg(0) := x"47";
-            eSpiMsg(1) := x"12";
-            eSpiMsg(2) := x"08";
-            eSpiMsg(3) := x"15";
-            slv8 := crc8(eSpiMsg(0 to 3));  --! calc crc
+            slv8 := crc(x"07", x"47", x"00");
+            slv8 := crc(x"07", x"12", slv8);
+            slv8 := crc(x"07", x"08", slv8);
+            slv8 := crc(x"07", x"15", slv8);
             assert ( slv8 = x"4E" ) report "  Error: CRC calculation failed, expected 0x4E" severity warning;
             if not ( slv8 = x"4E" ) then good := false; end if;
             wait for tespi( eSpiMasterBfm )/2;
             -- set 2
-            eSpiMsg(0) := x"21";
-            eSpiMsg(1) := x"00";
-            eSpiMsg(2) := x"04";
-            slv8 := crc8(eSpiMsg(0 to 2));  --! calc crc
+            slv8 := crc(x"07", x"21", x"00");
+            slv8 := crc(x"07", x"00", slv8);
+            slv8 := crc(x"07", x"04", slv8);
             assert ( slv8 = x"34" ) report "  Error: CRC calculation failed, expected 0x46" severity warning;
             if not ( slv8 = x"34" ) then good := false; end if;
             wait for tespi( eSpiMasterBfm )/2;
